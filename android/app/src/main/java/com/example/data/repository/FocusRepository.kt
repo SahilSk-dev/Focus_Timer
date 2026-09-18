@@ -31,7 +31,9 @@ class FocusRepository(
 
     var dailyTargetMinutes: Int
         get() = prefs.getInt("daily_target_mins", 120)
-        set(value) = prefs.edit().putInt("daily_target_mins", value).apply()
+        set(value) {
+            prefs.edit().putInt("daily_target_mins", value).apply()
+        }
 
     var isDialVisible: Boolean
         get() = prefs.getBoolean("is_dial_visible", true)
@@ -47,33 +49,62 @@ class FocusRepository(
         return id
     }
 
+    suspend fun updateSession(session: StudySessionEntity) {
+        studyDao.updateSession(session)
+        syncManager.uploadSession(session)
+    }
+
     suspend fun deleteSession(id: Long) {
+        val session = studyDao.getSessionById(id)
+        if (session != null) {
+            syncManager.deleteSessionFromCloud(session.timestamp, session.isNonStudy)
+        }
         studyDao.deleteSessionById(id)
     }
 
     suspend fun deleteSessionsBetweenDates(fromDate: String, toDate: String): Int {
+        val sessions = studyDao.getSessionsBetweenDates(fromDate, toDate)
+        if (sessions.isNotEmpty()) {
+            syncManager.bulkDeleteSessionsFromCloud(sessions.map { it.timestamp })
+        }
         return studyDao.deleteSessionsBetweenDates(fromDate, toDate)
     }
 
     suspend fun addSubject(subject: SubjectEntity): Long {
-        return studyDao.insertSubject(subject)
+        val id = studyDao.insertSubject(subject)
+        syncPrefsToCloud()
+        return id
     }
 
     suspend fun updateSubject(subject: SubjectEntity) {
         studyDao.updateSubject(subject)
+        syncPrefsToCloud()
     }
 
     suspend fun deleteSubject(id: Long) {
         studyDao.deleteSubjectById(id)
+        syncPrefsToCloud()
     }
 
     suspend fun addWorkType(name: String): Long {
-        return studyDao.insertWorkType(WorkTypeEntity(name = name))
+        val id = studyDao.insertWorkType(WorkTypeEntity(name = name))
+        syncPrefsToCloud()
+        return id
     }
 
     suspend fun deleteWorkType(id: Long) {
         studyDao.deleteWorkTypeById(id)
+        syncPrefsToCloud()
     }
+
+    suspend fun syncPrefsToCloud() {
+        try {
+            val subjects = kotlinx.coroutines.flow.first(studyDao.getAllSubjects())
+            val workTypes = kotlinx.coroutines.flow.first(studyDao.getAllWorkTypes())
+            syncManager.uploadPrefsToCloud(dailyTargetMinutes, subjects, workTypes)
+        } catch (_: Exception) {}
+    }
+
 
     fun exportToJson(sessions: List<StudySessionEntity>): String {
         val root = JSONObject()

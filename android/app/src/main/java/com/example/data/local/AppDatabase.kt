@@ -5,17 +5,13 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
-import androidx.sqlite.db.SupportSQLiteDatabase
 import com.example.data.model.StudySessionEntity
 import com.example.data.model.SubjectEntity
 import com.example.data.model.WorkTypeEntity
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 
 @Database(
     entities = [StudySessionEntity::class, SubjectEntity::class, WorkTypeEntity::class],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -32,21 +28,21 @@ abstract class AppDatabase : RoomDatabase() {
                     context.applicationContext,
                     AppDatabase::class.java,
                     "focus_timer.db"
-                ).addCallback(object : Callback() {
-                    override fun onCreate(db: SupportSQLiteDatabase) {
-                        super.onCreate(db)
-                        CoroutineScope(Dispatchers.IO).launch {
-                            val dao = getInstance(context).studyDao()
-                            prepopulateData(dao)
-                        }
-                    }
-                }).build()
+                )
+                    .fallbackToDestructiveMigration()
+                    .build()
                 INSTANCE = instance
                 instance
             }
         }
 
         suspend fun prepopulateData(dao: StudyDao) {
+            // Clean up any historical duplicates first
+            try {
+                dao.deduplicateSubjects()
+                dao.deduplicateWorkTypes()
+            } catch (_: Exception) {}
+
             if (dao.getSubjectCount() == 0) {
                 dao.insertSubjects(
                     listOf(
@@ -68,6 +64,13 @@ abstract class AppDatabase : RoomDatabase() {
                     ).map { WorkTypeEntity(name = it) }
                 )
             }
+
+            // Ensure duplicates are purged
+            try {
+                dao.deduplicateSubjects()
+                dao.deduplicateWorkTypes()
+            } catch (_: Exception) {}
         }
     }
 }
+

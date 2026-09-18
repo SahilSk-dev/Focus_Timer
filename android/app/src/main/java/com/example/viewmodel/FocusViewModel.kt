@@ -61,6 +61,17 @@ class FocusViewModel(application: Application) : AndroidViewModel(application) {
         AlarmService.stop(getApplication())
     }
 
+    fun signInWithGoogle(activity: android.app.Activity) {
+        viewModelScope.launch {
+            val result = repository.syncManager.signInWithGoogle(activity)
+            result.onSuccess { user ->
+                showToast("Signed in as ${user.email ?: "User"}")
+            }.onFailure { err ->
+                showToast("Sign in: ${err.message ?: "Cancelled"}")
+            }
+        }
+    }
+
     fun manualSync() {
         viewModelScope.launch {
             repository.syncManager.manualSyncNow()
@@ -69,7 +80,9 @@ class FocusViewModel(application: Application) : AndroidViewModel(application) {
 
     fun signOut() {
         repository.syncManager.signOut()
+        showToast("Signed out")
     }
+
 
     // Timer States
     private val _isTimerActive = MutableStateFlow(false)
@@ -173,20 +186,18 @@ class FocusViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun selectSubject(subject: SubjectEntity) {
-        if (_isTimerActive.value) return
         _selectedSubject.value = subject.name
         _selectedSubSubject.value = subject.subSubjects.firstOrNull()
     }
 
     fun selectSubSubject(sub: String) {
-        if (_isTimerActive.value) return
         _selectedSubSubject.value = sub
     }
 
     fun selectWorkType(wt: String) {
-        if (_isTimerActive.value) return
         _selectedWorkType.value = wt
     }
+
 
     fun togglePomodoro() {
         if (_isTimerActive.value) return
@@ -219,7 +230,11 @@ class FocusViewModel(application: Application) : AndroidViewModel(application) {
         val clamped = target.coerceAtLeast(10)
         _dailyTargetMinutes.value = clamped
         repository.dailyTargetMinutes = clamped
+        viewModelScope.launch {
+            repository.syncPrefsToCloud()
+        }
     }
+
 
     fun startTimer() {
         vibratePhone(40)
@@ -432,6 +447,20 @@ class FocusViewModel(application: Application) : AndroidViewModel(application) {
                 vibrator?.vibrate(durationMs)
             }
         } catch (_: Exception) {}
+    }
+
+    fun updateSession(session: StudySessionEntity) {
+        viewModelScope.launch {
+            repository.updateSession(session)
+            showToast("Session updated")
+        }
+    }
+
+    fun restoreSession(session: StudySessionEntity) {
+        viewModelScope.launch {
+            repository.addSession(session)
+            showToast("Session restored")
+        }
     }
 
     fun deleteSession(id: Long) {

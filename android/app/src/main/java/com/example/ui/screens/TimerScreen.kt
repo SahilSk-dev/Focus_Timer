@@ -68,7 +68,6 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.ui.components.GoldenClockDial
 import com.example.ui.theme.BgDark
 import com.example.ui.theme.GoldAccent
 import com.example.ui.theme.GoldBright
@@ -192,7 +191,7 @@ fun TimerScreen(
                     brush = GoldGradientBrush,
                     fontSize = 24.sp,
                     fontWeight = FontWeight.Bold,
-                    fontFamily = FontFamily.Serif
+                    
                 )
             )
         }
@@ -209,7 +208,7 @@ fun TimerScreen(
                     color = GoldLight,
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Medium,
-                    fontFamily = FontFamily.Serif
+                    
                 )
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     IconButton(
@@ -295,7 +294,7 @@ fun TimerScreen(
                 color = GoldLight,
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Medium,
-                fontFamily = FontFamily.Serif
+                
             )
             Spacer(modifier = Modifier.height(6.dp))
             FlowRow(
@@ -341,7 +340,7 @@ fun TimerScreen(
                     text = "Pomodoro Mode (25+5 mins)",
                     color = TextPrimary,
                     fontSize = 13.sp,
-                    fontFamily = FontFamily.Serif
+                    
                 )
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     IconButton(
@@ -392,7 +391,7 @@ fun TimerScreen(
                     text = "Show Golden Dial",
                     color = TextPrimary,
                     fontSize = 13.sp,
-                    fontFamily = FontFamily.Serif
+                    
                 )
                 Switch(
                     checked = isDialVisible,
@@ -489,14 +488,6 @@ fun TimerScreen(
                     }
                 }
 
-                // Golden Analog Clock Dial
-                if (isDialVisible) {
-                    GoldenClockDial(
-                        dialSize = 210.dp,
-                        modifier = Modifier.padding(bottom = 8.dp)
-                    )
-                }
-
                 // Status hint text
                 Text(
                     text = when {
@@ -508,7 +499,7 @@ fun TimerScreen(
                     },
                     color = GoldLight,
                     fontSize = 13.sp,
-                    fontFamily = FontFamily.Serif,
+                    
                     modifier = Modifier.padding(vertical = 4.dp)
                 )
 
@@ -519,7 +510,7 @@ fun TimerScreen(
                         brush = GoldGradientBrush,
                         fontSize = 44.sp,
                         fontWeight = FontWeight.ExtraBold,
-                        fontFamily = FontFamily.Monospace,
+                        
                         textAlign = TextAlign.Center
                     ),
                     modifier = Modifier
@@ -676,7 +667,7 @@ private fun SubjectChip(
                 if (isSelected) Modifier.shadow(8.dp, RoundedCornerShape(20.dp), spotColor = GoldAccent)
                 else Modifier
             )
-            .clickable(enabled = !isTimerActive) { onClick() }
+            .clickable { onClick() }
             .padding(horizontal = 14.dp, vertical = 7.dp)
     ) {
         Text(
@@ -684,7 +675,7 @@ private fun SubjectChip(
             color = textColor,
             fontSize = 13.sp,
             fontWeight = if (isSelected || isCore) FontWeight.SemiBold else FontWeight.Normal,
-            fontFamily = FontFamily.Serif
+            
         )
     }
 }
@@ -705,14 +696,14 @@ private fun SubChip(
                 color = if (isSelected) GoldBright else LineBorder,
                 shape = RoundedCornerShape(20.dp)
             )
-            .clickable(enabled = !isTimerActive) { onClick() }
+            .clickable { onClick() }
             .padding(horizontal = 12.dp, vertical = 5.dp)
     ) {
         Text(
             text = "↳ $name",
             color = if (isSelected) GoldBright else TextDim,
             fontSize = 12.sp,
-            fontFamily = FontFamily.Serif
+            
         )
     }
 }
@@ -733,14 +724,14 @@ private fun WorkTypeChip(
                 color = if (isSelected) GoldBright else LineBorder,
                 shape = RoundedCornerShape(20.dp)
             )
-            .clickable(enabled = !isTimerActive) { onClick() }
+            .clickable { onClick() }
             .padding(horizontal = 12.dp, vertical = 6.dp)
     ) {
         Text(
             text = name,
             color = if (isSelected) GoldBright else TextDim,
             fontSize = 12.sp,
-            fontFamily = FontFamily.Serif
+            
         )
     }
 }
@@ -761,7 +752,7 @@ private fun AddChip(
             text = label,
             color = GoldLight,
             fontSize = 12.sp,
-            fontFamily = FontFamily.Serif
+            
         )
     }
 }
@@ -784,79 +775,90 @@ private fun FullscreenFocusLayout(
         modifier = Modifier
             .fillMaxSize()
             .background(BgDark)
-            .padding(24.dp)
+            .padding(16.dp)
     ) {
         IconButton(
             onClick = onExitFullscreen,
             modifier = Modifier
                 .align(Alignment.TopEnd)
-                .size(44.dp)
+                .size(48.dp)
         ) {
             Icon(
                 imageVector = Icons.Default.FullscreenExit,
                 contentDescription = "Exit Fullscreen",
-                tint = GoldLight
+                tint = GoldLight,
+                modifier = Modifier.size(28.dp)
             )
         }
 
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 16.dp),
+                .padding(horizontal = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
             val title = if (!selectedSubSubject.isNullOrBlank()) "$selectedSubject - $selectedSubSubject" else selectedSubject
-            Text(
-                text = title,
-                color = GoldBright,
-                fontSize = 24.sp,
-                fontWeight = FontWeight.Bold,
-                fontFamily = FontFamily.Serif
-            )
-            Text(
-                text = "[$selectedWorkType]",
-                color = TextDim,
-                fontSize = 14.sp,
-                modifier = Modifier.padding(top = 4.dp)
-            )
-
-            if (pomoPhase != null) {
-                Spacer(modifier = Modifier.height(12.dp))
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
                 Text(
-                    text = if (pomoPhase == "work") "⏳ Focus Session (25m)" else "☕ Break (5m)",
-                    color = GoldLight,
-                    fontSize = 16.sp
+                    text = title,
+                    color = GoldBright,
+                    fontSize = 22.sp,
+                    fontWeight = FontWeight.Bold,
+                    
                 )
+                Box(
+                    modifier = Modifier
+                        .background(PanelElevated, RoundedCornerShape(6.dp))
+                        .border(1.dp, GoldAccent.copy(alpha = 0.5f), RoundedCornerShape(6.dp))
+                        .padding(horizontal = 8.dp, vertical = 3.dp)
+                ) {
+                    Text(
+                        text = selectedWorkType,
+                        color = GoldLight,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+                if (pomoPhase != null) {
+                    Text(
+                        text = if (pomoPhase == "work") "⏳ Focus" else "☕ Break",
+                        color = GoldLight,
+                        fontSize = 12.sp
+                    )
+                }
             }
 
-            Spacer(modifier = Modifier.height(28.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
             Text(
                 text = displayDigits,
                 style = TextStyle(
                     brush = GoldGradientBrush,
-                    fontSize = 68.sp,
+                    fontSize = 84.sp,
                     fontWeight = FontWeight.ExtraBold,
-                    fontFamily = FontFamily.Monospace,
+                    
                     textAlign = TextAlign.Center
                 )
             )
 
-            Spacer(modifier = Modifier.height(36.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
             Row(
-                modifier = Modifier.width(320.dp),
+                modifier = Modifier.width(360.dp),
                 horizontalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 Button(
                     onClick = onStart,
                     enabled = !isRunning,
                     colors = ButtonDefaults.buttonColors(containerColor = GoldAccent, contentColor = BgDark),
-                    shape = RoundedCornerShape(8.dp),
-                    modifier = Modifier.weight(1f).height(50.dp)
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier.weight(1f).height(48.dp)
                 ) {
-                    Text("Start", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                    Text("Start", fontWeight = FontWeight.Bold, fontSize = 15.sp)
                 }
 
                 Button(
@@ -864,20 +866,20 @@ private fun FullscreenFocusLayout(
                     enabled = isRunning,
                     colors = ButtonDefaults.buttonColors(containerColor = PanelElevated, contentColor = TextPrimary),
                     border = BorderStroke(1.dp, LineBorder),
-                    shape = RoundedCornerShape(8.dp),
-                    modifier = Modifier.weight(1f).height(50.dp)
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier.weight(1f).height(48.dp)
                 ) {
-                    Text("Pause", fontSize = 16.sp)
+                    Text("Pause", fontSize = 15.sp)
                 }
 
                 Button(
                     onClick = onReset,
                     colors = ButtonDefaults.buttonColors(containerColor = PanelElevated, contentColor = TextPrimary),
                     border = BorderStroke(1.dp, LineBorder),
-                    shape = RoundedCornerShape(8.dp),
-                    modifier = Modifier.weight(1f).height(50.dp)
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier.weight(1f).height(48.dp)
                 ) {
-                    Text("Reset", fontSize = 16.sp)
+                    Text("Reset", fontSize = 15.sp)
                 }
             }
         }

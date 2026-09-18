@@ -106,6 +106,8 @@ fun HistorySettingsScreen(
 
     var selectedTab by remember { mutableStateOf(0) } // 0: History, 1: Backup & Export, 2: Subjects & Work
     var sessionToDelete by remember { mutableStateOf<StudySessionEntity?>(null) }
+    var sessionToEdit by remember { mutableStateOf<StudySessionEntity?>(null) }
+    var recentlyDeletedSession by remember { mutableStateOf<StudySessionEntity?>(null) }
     var showBulkDeleteDialog by remember { mutableStateOf(false) }
 
     // Backup & Export state
@@ -130,7 +132,7 @@ fun HistorySettingsScreen(
                 brush = GoldGradientBrush,
                 fontSize = 24.sp,
                 fontWeight = FontWeight.Bold,
-                fontFamily = FontFamily.Serif
+                
             ),
             modifier = Modifier.padding(bottom = 12.dp, top = 4.dp)
         )
@@ -140,11 +142,15 @@ fun HistorySettingsScreen(
             selectedTabIndex = selectedTab,
             containerColor = PanelDark,
             contentColor = GoldBright,
-            indicator = {},
+            indicator = { tabPositions ->
+                TabRowDefaults.SecondaryIndicator(
+                    modifier = Modifier.tabIndicatorOffset(tabPositions[selectedTab]),
+                    color = GoldAccent
+                )
+            },
             divider = {}
         ) {
-            val tabs = listOf("History", "Backup & Export", "Subjects")
-            tabs.forEachIndexed { idx, title ->
+            listOf("Sessions", "Backup & Sync", "Subjects & Types").forEachIndexed { idx, title ->
                 val isSelected = selectedTab == idx
                 Tab(
                     selected = isSelected,
@@ -155,7 +161,7 @@ fun HistorySettingsScreen(
                             color = if (isSelected) GoldBright else TextDim,
                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
                             fontSize = 13.sp,
-                            fontFamily = FontFamily.Serif
+                            
                         )
                     }
                 )
@@ -163,6 +169,47 @@ fun HistorySettingsScreen(
         }
 
         Spacer(modifier = Modifier.height(14.dp))
+
+        // Undo banner if a session was just deleted
+        if (recentlyDeletedSession != null) {
+            val deleted = recentlyDeletedSession!!
+            Surface(
+                color = PanelElevated,
+                shape = RoundedCornerShape(10.dp),
+                border = BorderStroke(1.dp, GoldAccent),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 10.dp)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Deleted: ${deleted.subject} (${deleted.minutes}m)",
+                        color = TextPrimary,
+                        fontSize = 13.sp
+                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        TextButton(onClick = {
+                            viewModel.restoreSession(deleted)
+                            recentlyDeletedSession = null
+                        }) {
+                            Text("UNDO ↩️", color = GoldBright, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                        }
+                        IconButton(
+                            onClick = { recentlyDeletedSession = null },
+                            modifier = Modifier.size(24.dp)
+                        ) {
+                            Text("✕", color = TextDim, fontSize = 12.sp)
+                        }
+                    }
+                }
+            }
+        }
 
         when (selectedTab) {
             0 -> {
@@ -189,6 +236,7 @@ fun HistorySettingsScreen(
                         items(allSessions, key = { it.id }) { session ->
                             SessionHistoryItem(
                                 session = session,
+                                onEdit = { sessionToEdit = session },
                                 onDelete = { sessionToDelete = session }
                             )
                         }
@@ -231,7 +279,7 @@ fun HistorySettingsScreen(
                                             brush = GoldGradientBrush,
                                             fontSize = 16.sp,
                                             fontWeight = FontWeight.Bold,
-                                            fontFamily = FontFamily.Serif
+                                            
                                         )
                                     )
                                 }
@@ -251,37 +299,60 @@ fun HistorySettingsScreen(
                                 )
                             } else {
                                 Text(
-                                    text = "Bi-directional real-time sync with your Laptop and Firestore.",
+                                    text = "Sign in to synchronize study sessions, custom subjects, and daily targets with your Web app in real-time.",
                                     color = TextDim,
                                     fontSize = 12.sp
                                 )
                             }
                             Spacer(modifier = Modifier.height(14.dp))
 
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(10.dp)
-                            ) {
+                            if (currentUser == null) {
                                 Button(
-                                    onClick = { viewModel.manualSync() },
+                                    onClick = {
+                                        val act = context as? android.app.Activity
+                                        if (act != null) {
+                                            viewModel.signInWithGoogle(act)
+                                        } else {
+                                            viewModel.showToast("Cannot launch Google Sign-In")
+                                        }
+                                    },
                                     colors = ButtonDefaults.buttonColors(
                                         containerColor = GoldAccent,
                                         contentColor = BgDark
                                     ),
                                     shape = RoundedCornerShape(8.dp),
-                                    modifier = Modifier.weight(1f),
-                                    enabled = !isSyncing
+                                    modifier = Modifier.fillMaxWidth().height(46.dp)
                                 ) {
-                                    Icon(
-                                        Icons.Default.Sync,
-                                        contentDescription = null,
-                                        modifier = Modifier.size(16.dp)
+                                    Text(
+                                        "Sign In with Google 🔑",
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 14.sp
                                     )
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text(if (isSyncing) "Syncing..." else "Sync Now")
                                 }
+                            } else {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                ) {
+                                    Button(
+                                        onClick = { viewModel.manualSync() },
+                                        colors = ButtonDefaults.buttonColors(
+                                            containerColor = GoldAccent,
+                                            contentColor = BgDark
+                                        ),
+                                        shape = RoundedCornerShape(8.dp),
+                                        modifier = Modifier.weight(1f),
+                                        enabled = !isSyncing
+                                    ) {
+                                        Icon(
+                                            Icons.Default.Sync,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text(if (isSyncing) "Syncing..." else "Sync Now")
+                                    }
 
-                                if (currentUser != null) {
                                     OutlinedButton(
                                         onClick = { viewModel.signOut() },
                                         border = BorderStroke(1.dp, DangerRed),
@@ -308,7 +379,7 @@ fun HistorySettingsScreen(
                                     brush = GoldGradientBrush,
                                     fontSize = 16.sp,
                                     fontWeight = FontWeight.Bold,
-                                    fontFamily = FontFamily.Serif
+                                    
                                 )
                             )
                             Spacer(modifier = Modifier.height(8.dp))
@@ -385,7 +456,7 @@ fun HistorySettingsScreen(
                                     brush = GoldGradientBrush,
                                     fontSize = 16.sp,
                                     fontWeight = FontWeight.Bold,
-                                    fontFamily = FontFamily.Serif
+                                    
                                 )
                             )
                             Spacer(modifier = Modifier.height(8.dp))
@@ -446,7 +517,7 @@ fun HistorySettingsScreen(
                                 color = DangerRed,
                                 fontSize = 16.sp,
                                 fontWeight = FontWeight.Bold,
-                                fontFamily = FontFamily.Serif
+                                
                             )
                             Spacer(modifier = Modifier.height(6.dp))
                             Text(
@@ -527,7 +598,7 @@ fun HistorySettingsScreen(
                                     brush = GoldGradientBrush,
                                     fontSize = 16.sp,
                                     fontWeight = FontWeight.Bold,
-                                    fontFamily = FontFamily.Serif
+                                    
                                 )
                             )
                             Spacer(modifier = Modifier.height(10.dp))
@@ -608,7 +679,7 @@ fun HistorySettingsScreen(
                                     brush = GoldGradientBrush,
                                     fontSize = 16.sp,
                                     fontWeight = FontWeight.Bold,
-                                    fontFamily = FontFamily.Serif
+                                    
                                 )
                             )
                             Spacer(modifier = Modifier.height(10.dp))
@@ -655,6 +726,7 @@ fun HistorySettingsScreen(
             confirmButton = {
                 Button(
                     onClick = {
+                        recentlyDeletedSession = s
                         viewModel.deleteSession(s.id)
                         sessionToDelete = null
                     },
@@ -665,6 +737,120 @@ fun HistorySettingsScreen(
             },
             dismissButton = {
                 TextButton(onClick = { sessionToDelete = null }) {
+                    Text("Cancel", color = TextDim)
+                }
+            },
+            containerColor = PanelDark
+        )
+    }
+
+    // Edit session dialog
+    if (sessionToEdit != null) {
+        val s = sessionToEdit!!
+        var editSubject by remember(s) { mutableStateOf(s.subject) }
+        var editSubSubject by remember(s) { mutableStateOf(s.subSubject ?: "") }
+        var editWorkType by remember(s) { mutableStateOf(s.workType) }
+        var editMinutes by remember(s) { mutableStateOf(s.minutes.toString()) }
+        var editDate by remember(s) { mutableStateOf(s.date) }
+
+        AlertDialog(
+            onDismissRequest = { sessionToEdit = null },
+            title = { Text("Edit Study Session", color = GoldBright, ) },
+            text = {
+                Column(
+                    modifier = Modifier.verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    OutlinedTextField(
+                        value = editSubject,
+                        onValueChange = { editSubject = it },
+                        label = { Text("Subject (e.g. Bengali, Math)", color = TextDim) },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = GoldAccent,
+                            unfocusedBorderColor = LineBorder,
+                            focusedTextColor = TextPrimary,
+                            unfocusedTextColor = TextPrimary
+                        )
+                    )
+
+                    OutlinedTextField(
+                        value = editSubSubject,
+                        onValueChange = { editSubSubject = it },
+                        label = { Text("Sub-Subject (Optional)", color = TextDim) },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = GoldAccent,
+                            unfocusedBorderColor = LineBorder,
+                            focusedTextColor = TextPrimary,
+                            unfocusedTextColor = TextPrimary
+                        )
+                    )
+
+                    OutlinedTextField(
+                        value = editWorkType,
+                        onValueChange = { editWorkType = it },
+                        label = { Text("Work Type (e.g. Revision, Memorize)", color = TextDim) },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = GoldAccent,
+                            unfocusedBorderColor = LineBorder,
+                            focusedTextColor = TextPrimary,
+                            unfocusedTextColor = TextPrimary
+                        )
+                    )
+
+                    OutlinedTextField(
+                        value = editMinutes,
+                        onValueChange = { editMinutes = it },
+                        label = { Text("Duration (Minutes)", color = TextDim) },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = GoldAccent,
+                            unfocusedBorderColor = LineBorder,
+                            focusedTextColor = TextPrimary,
+                            unfocusedTextColor = TextPrimary
+                        )
+                    )
+
+                    OutlinedTextField(
+                        value = editDate,
+                        onValueChange = { editDate = it },
+                        label = { Text("Date (YYYY-MM-DD)", color = TextDim) },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = GoldAccent,
+                            unfocusedBorderColor = LineBorder,
+                            focusedTextColor = TextPrimary,
+                            unfocusedTextColor = TextPrimary
+                        )
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val mins = editMinutes.toIntOrNull() ?: s.minutes
+                        if (editSubject.isNotBlank() && mins > 0) {
+                            val updated = s.copy(
+                                subject = editSubject.trim(),
+                                subSubject = if (editSubSubject.isNotBlank()) editSubSubject.trim() else null,
+                                workType = editWorkType.trim(),
+                                minutes = mins,
+                                date = editDate.trim()
+                            )
+                            viewModel.updateSession(updated)
+                            sessionToEdit = null
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = GoldAccent, contentColor = BgDark)
+                ) {
+                    Text("Save Changes")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { sessionToEdit = null }) {
                     Text("Cancel", color = TextDim)
                 }
             },
@@ -754,6 +940,7 @@ fun HistorySettingsScreen(
 @Composable
 private fun SessionHistoryItem(
     session: StudySessionEntity,
+    onEdit: () -> Unit,
     onDelete: () -> Unit
 ) {
     val sdf = SimpleDateFormat("hh:mm a", Locale.getDefault())
@@ -780,7 +967,7 @@ private fun SessionHistoryItem(
                     color = GoldBright,
                     fontSize = 14.sp,
                     fontWeight = FontWeight.SemiBold,
-                    fontFamily = FontFamily.Serif
+                    
                 )
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -813,8 +1000,20 @@ private fun SessionHistoryItem(
                     color = TextPrimary,
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(end = 10.dp)
+                    modifier = Modifier.padding(end = 4.dp)
                 )
+
+                IconButton(
+                    onClick = onEdit,
+                    modifier = Modifier.size(32.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Edit,
+                        contentDescription = "Edit Session",
+                        tint = GoldAccent,
+                        modifier = Modifier.size(17.dp)
+                    )
+                }
 
                 IconButton(
                     onClick = onDelete,
@@ -824,7 +1023,7 @@ private fun SessionHistoryItem(
                         imageVector = Icons.Default.Delete,
                         contentDescription = "Delete Session",
                         tint = DangerRed,
-                        modifier = Modifier.size(18.dp)
+                        modifier = Modifier.size(17.dp)
                     )
                 }
             }

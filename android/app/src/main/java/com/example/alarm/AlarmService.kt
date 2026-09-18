@@ -1,4 +1,4 @@
-﻿package com.example.alarm
+package com.example.alarm
 
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -108,7 +108,15 @@ class AlarmService : Service() {
             .setAutoCancel(false)
             .build()
 
-        startForeground(NOTIFICATION_ID, notification)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            startForeground(
+                NOTIFICATION_ID,
+                notification,
+                android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK
+            )
+        } else {
+            startForeground(NOTIFICATION_ID, notification)
+        }
 
         // Start playing alarm ringtone
         playRingtone()

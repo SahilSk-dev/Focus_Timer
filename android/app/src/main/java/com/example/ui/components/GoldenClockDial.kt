@@ -33,20 +33,23 @@ fun GoldenClockDial(
     modifier: Modifier = Modifier,
     dialSize: Dp = 260.dp
 ) {
-    var currentTime by remember { mutableStateOf(Calendar.getInstance()) }
+    var currentMillis by remember { mutableStateOf(System.currentTimeMillis()) }
 
     // Smooth real-time update loop
     LaunchedEffect(Unit) {
         while (true) {
-            currentTime = Calendar.getInstance()
+            currentMillis = System.currentTimeMillis()
             delay(50L) // smooth 20 FPS updates for sweeping second hand
         }
     }
 
-    val hour = currentTime.get(Calendar.HOUR)
-    val minute = currentTime.get(Calendar.MINUTE)
-    val second = currentTime.get(Calendar.SECOND)
-    val millis = currentTime.get(Calendar.MILLISECOND)
+    val cal = remember { Calendar.getInstance() }
+    cal.timeInMillis = currentMillis
+
+    val hour = cal.get(Calendar.HOUR)
+    val minute = cal.get(Calendar.MINUTE)
+    val second = cal.get(Calendar.SECOND)
+    val millis = cal.get(Calendar.MILLISECOND)
 
     val sweepSecond = second + millis / 1000f
     val sweepMinute = minute + sweepSecond / 60f

@@ -1,11 +1,22 @@
-﻿package com.example.data.sync
+package com.example.data.sync
 
+import android.app.Activity
 import android.content.Context
+import android.content.SharedPreferences
 import android.util.Log
+import androidx.credentials.CredentialManager
+import androidx.credentials.GetCredentialRequest
+import androidx.credentials.exceptions.GetCredentialException
 import com.example.data.local.StudyDao
 import com.example.data.model.StudySessionEntity
+import com.example.data.model.SubjectEntity
+import com.example.data.model.WorkTypeEntity
+import com.google.android.libraries.identity.googleid.GetGoogleIdOption
+import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
+import com.google.firebase.auth.GoogleAuthProvider
+import com.google.firebase.firestore.DocumentChange
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.SetOptions
@@ -23,10 +34,13 @@ class FirebaseSyncManager(
 ) {
     companion object {
         private const val TAG = "FirebaseSyncManager"
+        const val WEB_CLIENT_ID = "602759203883-l97ieof4p2p1dvbe3f864bv24i5bqt68.apps.googleusercontent.com"
     }
 
     private val auth: FirebaseAuth by lazy { FirebaseAuth.getInstance() }
     private val firestore: FirebaseFirestore by lazy { FirebaseFirestore.getInstance() }
+    private val prefs: SharedPreferences =
+        context.getSharedPreferences("focus_timer_prefs", Context.MODE_PRIVATE)
 
     private val _currentUser = MutableStateFlow<FirebaseUser?>(null)
     val currentUser = _currentUser.asStateFlow()
@@ -39,6 +53,7 @@ class FirebaseSyncManager(
 
     private var sessionListener: ListenerRegistration? = null
     private var nonStudySessionListener: ListenerRegistration? = null
+    private var prefsListener: ListenerRegistration? = null
     private val scope = CoroutineScope(Dispatchers.IO)
 
     init {
@@ -65,9 +80,10 @@ class FirebaseSyncManager(
         stopRealtimeSync()
         _syncStatus.value = "Connecting to Cloud..."
 
-        // 1. Initial 2-way sync: Push local sessions that aren't on cloud yet
+        // 1. Initial 2-way sync: push local sessions & prefs
         scope.launch {
             uploadLocalSessionsToCloud(uid)
+            syncLocalPrefsToCloud(uid)
         }
 
         // 2. Listen to /users/{uid}/sessions
@@ -83,8 +99,8 @@ class FirebaseSyncManager(
 
                 if (snapshot != null) {
                     scope.launch {
-                        processIncomingSessions(snapshot.documents, isNonStudy = false)
-                        _syncStatus.value = "Synced with Laptop & Cloud"
+                        processSessionChanges(snapshot.documentChanges, isNonStudy = false)
+                        _syncStatus.value = "Synced with Web & Cloud"
                     }
                 }
             }
@@ -101,7 +117,25 @@ class FirebaseSyncManager(
 
                 if (snapshot != null) {
                     scope.launch {
-                        processIncomingSessions(snapshot.documents, isNonStudy = true)
+                        processSessionChanges(snapshot.documentChanges, isNonStudy = true)
+                    }
+                }
+            }
+
+        // 4. Listen to /users/{uid}/meta/prefs (Subjects, WorkTypes, DailyTarget matching Web)
+        prefsListener = firestore.collection("users")
+            .document(uid)
+            .collection("meta")
+            .document("prefs")
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    Log.e(TAG, "Listen failed on prefs: ${error.message}")
+                    return@addSnapshotListener
+                }
+
+                if (snapshot != null && snapshot.exists()) {
+                    scope.launch {
+                        applyCloudPrefs(snapshot)
                     }
                 }
             }
@@ -112,7 +146,53 @@ class FirebaseSyncManager(
         sessionListener = null
         nonStudySessionListener?.remove()
         nonStudySessionListener = null
+        prefsListener?.remove()
+        prefsListener = null
         _syncStatus.value = "Guest Mode"
+    }
+
+    // Google Sign-In using Android Credential Manager
+    suspend fun signInWithGoogle(activity: Activity): Result<FirebaseUser> {
+        return try {
+            _syncStatus.value = "Signing in..."
+            val credentialManager = CredentialManager.create(activity)
+            val googleIdOption = GetGoogleIdOption.Builder()
+                .setFilterByAuthorizedAccounts(false)
+                .setServerClientId(WEB_CLIENT_ID)
+                .setAutoSelectEnabled(false)
+                .build()
+
+            val request = GetCredentialRequest.Builder()
+                .addCredentialOption(googleIdOption)
+                .build()
+
+            val result = credentialManager.getCredential(activity, request)
+            val credential = result.credential
+
+            if (credential.type == GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL) {
+                val googleIdTokenCredential = GoogleIdTokenCredential.createFrom(credential.data)
+                val idToken = googleIdTokenCredential.idToken
+                val authCredential = GoogleAuthProvider.getCredential(idToken, null)
+                val authResult = auth.signInWithCredential(authCredential).await()
+                val user = authResult.user
+                if (user != null) {
+                    _currentUser.value = user
+                    startRealtimeSync(user.uid)
+                    Result.success(user)
+                } else {
+                    Result.failure(Exception("User authentication failed"))
+                }
+            } else {
+                Result.failure(Exception("Unsupported credential type"))
+            }
+        } catch (e: GetCredentialException) {
+            _syncStatus.value = "Sign-in cancelled"
+            Result.failure(e)
+        } catch (e: Exception) {
+            Log.e(TAG, "Google Sign-In failed: ${e.message}")
+            _syncStatus.value = "Sign-in error"
+            Result.failure(e)
+        }
     }
 
     suspend fun uploadSession(session: StudySessionEntity) {
@@ -128,7 +208,6 @@ class FirebaseSyncManager(
                 "ts" to session.timestamp,
                 "isNonStudy" to session.isNonStudy
             )
-            // Use timestamp as document key or auto ID
             val docRef = firestore.collection("users")
                 .document(user.uid)
                 .collection(collectionName)
@@ -139,6 +218,134 @@ class FirebaseSyncManager(
         } catch (e: Exception) {
             Log.e(TAG, "Failed to upload session: ${e.message}")
             _syncStatus.value = "Offline (Local Only)"
+        }
+    }
+
+    suspend fun deleteSessionFromCloud(timestamp: Long, isNonStudy: Boolean) {
+        val user = auth.currentUser ?: return
+        try {
+            val collectionName = if (isNonStudy) "nonStudySessions" else "sessions"
+            val col = firestore.collection("users").document(user.uid).collection(collectionName)
+
+            // 1. Delete if doc id is the timestamp
+            col.document(timestamp.toString()).delete().await()
+
+            // 2. Delete if web created doc with auto-generated ID but same ts
+            val querySnap = col.whereEqualTo("ts", timestamp).get().await()
+            for (doc in querySnap.documents) {
+                doc.reference.delete().await()
+            }
+            Log.d(TAG, "Successfully deleted session $timestamp from Cloud")
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to delete session from cloud: ${e.message}")
+        }
+    }
+
+    suspend fun bulkDeleteSessionsFromCloud(timestamps: List<Long>) {
+        val user = auth.currentUser ?: return
+        try {
+            val sessionsCol = firestore.collection("users").document(user.uid).collection("sessions")
+            val nonStudyCol = firestore.collection("users").document(user.uid).collection("nonStudySessions")
+
+            for (ts in timestamps) {
+                sessionsCol.document(ts.toString()).delete()
+                nonStudyCol.document(ts.toString()).delete()
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to bulk delete sessions: ${e.message}")
+        }
+    }
+
+    suspend fun uploadPrefsToCloud(
+        dailyTarget: Int,
+        subjects: List<SubjectEntity>,
+        workTypes: List<WorkTypeEntity>
+    ) {
+        val user = auth.currentUser ?: return
+        try {
+            val subjectsList = subjects.map { s ->
+                hashMapOf(
+                    "name" to s.name,
+                    "isCore" to s.isCore,
+                    "isNonStudy" to s.isNonStudy,
+                    "sub" to s.subSubjects
+                )
+            }
+            val workTypesList = workTypes.map { it.name }
+
+            val data = hashMapOf(
+                "dailyTarget" to dailyTarget,
+                "subjects" to subjectsList,
+                "workTypes" to workTypesList
+            )
+
+            firestore.collection("users")
+                .document(user.uid)
+                .collection("meta")
+                .document("prefs")
+                .set(data, SetOptions.merge())
+                .await()
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to update prefs to cloud: ${e.message}")
+        }
+    }
+
+    private suspend fun syncLocalPrefsToCloud(uid: String) {
+        try {
+            val localSubjects = studyDao.getAllSubjects().first()
+            val localWorkTypes = studyDao.getAllWorkTypes().first()
+            val dailyTarget = prefs.getInt("daily_target_mins", 120)
+
+            uploadPrefsToCloud(dailyTarget, localSubjects, localWorkTypes)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error syncing local prefs to cloud: ${e.message}")
+        }
+    }
+
+    private suspend fun applyCloudPrefs(snapshot: com.google.firebase.firestore.DocumentSnapshot) {
+        try {
+            // 1. Daily Target
+            val cloudTarget = snapshot.getLong("dailyTarget")?.toInt()
+            if (cloudTarget != null && cloudTarget > 0) {
+                prefs.edit().putInt("daily_target_mins", cloudTarget).apply()
+            }
+
+            // 2. Subjects
+            @Suppress("UNCHECKED_CAST")
+            val rawSubjects = snapshot.get("subjects") as? List<Map<String, Any>>
+            if (!rawSubjects.isNullOrEmpty()) {
+                val list = rawSubjects.mapNotNull { map ->
+                    val name = map["name"] as? String ?: return@mapNotNull null
+                    val isCore = map["isCore"] as? Boolean ?: false
+                    val isNonStudy = map["isNonStudy"] as? Boolean ?: false
+                    @Suppress("UNCHECKED_CAST")
+                    val sub = (map["sub"] as? List<*>)?.mapNotNull { it?.toString() }
+                        ?: (map["subSubjects"] as? List<*>)?.mapNotNull { it?.toString() }
+                        ?: emptyList()
+
+                    SubjectEntity(
+                        name = name,
+                        isCore = isCore,
+                        isNonStudy = isNonStudy,
+                        subSubjects = sub
+                    )
+                }
+                if (list.isNotEmpty()) {
+                    studyDao.insertSubjects(list)
+                    studyDao.deduplicateSubjects()
+                }
+            }
+
+            // 3. Work Types
+            @Suppress("UNCHECKED_CAST")
+            val rawWorkTypes = snapshot.get("workTypes") as? List<*>
+            if (!rawWorkTypes.isNullOrEmpty()) {
+                val wtEntities = rawWorkTypes.mapNotNull { it?.toString() }.map { WorkTypeEntity(name = it) }
+                studyDao.insertWorkTypes(wtEntities)
+                studyDao.deduplicateWorkTypes()
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error applying cloud prefs: ${e.message}")
         }
     }
 
@@ -169,44 +376,48 @@ class FirebaseSyncManager(
         }
     }
 
-    private suspend fun processIncomingSessions(
-        docs: List<com.google.firebase.firestore.DocumentSnapshot>,
+    private suspend fun processSessionChanges(
+        changes: List<DocumentChange>,
         isNonStudy: Boolean
     ) {
         try {
             val localSessions = studyDao.getAllSessions().first()
             val localTsSet = localSessions.map { it.timestamp }.toSet()
 
-            val toInsert = mutableListOf<StudySessionEntity>()
-            for (doc in docs) {
+            for (change in changes) {
+                val doc = change.document
                 val ts = doc.getLong("ts") ?: continue
-                if (!localTsSet.contains(ts)) {
-                    val date = doc.getString("date") ?: ""
-                    val subject = doc.getString("subject") ?: "General"
-                    val subSubject = doc.getString("subSubject").takeIf { !it.isNullOrBlank() }
-                    val workType = doc.getString("workType") ?: "Other"
-                    val minutes = doc.getLong("minutes")?.toInt() ?: 0
 
-                    toInsert.add(
-                        StudySessionEntity(
-                            date = date,
-                            subject = subject,
-                            subSubject = subSubject,
-                            workType = workType,
-                            minutes = minutes,
-                            timestamp = ts,
-                            isNonStudy = isNonStudy
-                        )
-                    )
+                when (change.type) {
+                    DocumentChange.Type.REMOVED -> {
+                        studyDao.deleteSessionByTimestamp(ts)
+                        Log.d(TAG, "Removed session $ts locally per cloud sync")
+                    }
+                    DocumentChange.Type.ADDED, DocumentChange.Type.MODIFIED -> {
+                        if (!localTsSet.contains(ts)) {
+                            val date = doc.getString("date") ?: ""
+                            val subject = doc.getString("subject") ?: "General"
+                            val subSubject = doc.getString("subSubject").takeIf { !it.isNullOrBlank() }
+                            val workType = doc.getString("workType") ?: "Other"
+                            val minutes = doc.getLong("minutes")?.toInt() ?: 0
+
+                            studyDao.insertSession(
+                                StudySessionEntity(
+                                    date = date,
+                                    subject = subject,
+                                    subSubject = subSubject,
+                                    workType = workType,
+                                    minutes = minutes,
+                                    timestamp = ts,
+                                    isNonStudy = isNonStudy
+                                )
+                            )
+                        }
+                    }
                 }
             }
-
-            if (toInsert.isNotEmpty()) {
-                studyDao.insertSessions(toInsert)
-                Log.d(TAG, "Inserted ${toInsert.size} new sessions from Cloud")
-            }
         } catch (e: Exception) {
-            Log.e(TAG, "Error processing incoming sessions: ${e.message}")
+            Log.e(TAG, "Error processing session changes: ${e.message}")
         }
     }
 
@@ -215,7 +426,8 @@ class FirebaseSyncManager(
         _isSyncing.value = true
         _syncStatus.value = "Syncing..."
         uploadLocalSessionsToCloud(user.uid)
-        _syncStatus.value = "Synced with Laptop & Cloud"
+        syncLocalPrefsToCloud(user.uid)
+        _syncStatus.value = "Synced with Web & Cloud"
         _isSyncing.value = false
     }
 
@@ -225,3 +437,4 @@ class FirebaseSyncManager(
         stopRealtimeSync()
     }
 }
+

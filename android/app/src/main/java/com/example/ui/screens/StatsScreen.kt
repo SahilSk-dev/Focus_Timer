@@ -124,7 +124,7 @@ fun StatsScreen(
                 brush = GoldGradientBrush,
                 fontSize = 24.sp,
                 fontWeight = FontWeight.Bold,
-                fontFamily = FontFamily.Serif
+                
             ),
             modifier = Modifier.padding(bottom = 16.dp)
         )
@@ -162,7 +162,7 @@ fun StatsScreen(
                             text = "Day Streak",
                             color = TextDim,
                             fontSize = 12.sp,
-                            fontFamily = FontFamily.Serif
+                            
                         )
                     }
                 }
@@ -171,7 +171,7 @@ fun StatsScreen(
                         text = "Best Streak",
                         color = TextDim,
                         fontSize = 11.sp,
-                        fontFamily = FontFamily.Serif
+                        
                     )
                     Text(
                         text = "$bestStreak days",
@@ -207,7 +207,7 @@ fun StatsScreen(
                         color = GoldLight,
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Medium,
-                        fontFamily = FontFamily.Serif
+                        
                     )
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(text = "Target ", color = TextDim, fontSize = 12.sp)
@@ -291,7 +291,7 @@ fun StatsScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column {
-                        Text(text = "Level", color = GoldLight, fontSize = 12.sp, fontFamily = FontFamily.Serif)
+                        Text(text = "Level", color = GoldLight, fontSize = 12.sp, )
                         Text(
                             text = "Level $level",
                             color = TextPrimary,
@@ -333,7 +333,7 @@ fun StatsScreen(
                 text = weekComparison,
                 color = GoldLight,
                 fontSize = 12.sp,
-                fontFamily = FontFamily.Serif,
+                
                 modifier = Modifier.padding(horizontal = 4.dp)
             )
         }
@@ -352,7 +352,7 @@ fun StatsScreen(
                     brush = GoldGradientBrush,
                     fontSize = 16.sp,
                     fontWeight = FontWeight.SemiBold,
-                    fontFamily = FontFamily.Serif
+                    
                 )
             )
             Row(
@@ -481,7 +481,7 @@ fun StatsScreen(
                     brush = GoldGradientBrush,
                     fontSize = 16.sp,
                     fontWeight = FontWeight.SemiBold,
-                    fontFamily = FontFamily.Serif
+                    
                 )
             )
             Text(text = "🏆 Badges", color = GoldAccent, fontSize = 12.sp)
@@ -521,7 +521,7 @@ fun StatsScreen(
                                 text = item.subjectName,
                                 color = TextPrimary,
                                 fontSize = 13.sp,
-                                fontFamily = FontFamily.Serif,
+                                
                                 modifier = Modifier.weight(1f)
                             )
                             Text(
@@ -545,7 +545,7 @@ fun StatsScreen(
                 brush = GoldGradientBrush,
                 fontSize = 16.sp,
                 fontWeight = FontWeight.SemiBold,
-                fontFamily = FontFamily.Serif
+                
             ),
             modifier = Modifier.padding(bottom = 10.dp)
         )
@@ -600,7 +600,7 @@ private fun BarChartRow(
             text = label,
             color = TextPrimary,
             fontSize = 12.sp,
-            fontFamily = FontFamily.Serif,
+            
             modifier = Modifier.width(80.dp)
         )
         Box(

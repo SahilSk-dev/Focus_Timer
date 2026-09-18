@@ -88,12 +88,43 @@ fun FocusTimerApp(
 
     var editSubjectTarget by remember { mutableStateOf<Pair<String, Long>?>(null) }
 
+    val notifPermissionLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        contract = androidx.activity.result.contract.ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (!isGranted) {
+            viewModel.showToast("Enable notifications to receive study timer alarms")
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            val permission = android.Manifest.permission.POST_NOTIFICATIONS
+            val hasPermission = androidx.core.content.ContextCompat.checkSelfPermission(
+                context, permission
+            ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+            if (!hasPermission) {
+                notifPermissionLauncher.launch(permission)
+            }
+        }
+    }
+
+    val activity = context as? android.app.Activity
+    LaunchedEffect(isFullscreen) {
+        activity?.requestedOrientation = if (isFullscreen) {
+            android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+        } else {
+            android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+        }
+    }
+
     LaunchedEffect(toastMsg) {
         toastMsg?.let { msg ->
             Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
             viewModel.clearToast()
         }
     }
+
+
 
     Box(modifier = Modifier.fillMaxSize()) {
         Scaffold(
@@ -113,7 +144,7 @@ fun FocusTimerApp(
                                     contentDescription = "Timer"
                                 )
                             },
-                            label = { Text("Timer", fontFamily = FontFamily.Serif) },
+                            label = { Text("Timer", ) },
                             colors = NavigationBarItemDefaults.colors(
                                 selectedIconColor = BgDark,
                                 selectedTextColor = GoldBright,
@@ -132,7 +163,7 @@ fun FocusTimerApp(
                                     contentDescription = "Stats"
                                 )
                             },
-                            label = { Text("Stats", fontFamily = FontFamily.Serif) },
+                            label = { Text("Stats", ) },
                             colors = NavigationBarItemDefaults.colors(
                                 selectedIconColor = BgDark,
                                 selectedTextColor = GoldBright,
@@ -151,7 +182,7 @@ fun FocusTimerApp(
                                     contentDescription = "History"
                                 )
                             },
-                            label = { Text("History", fontFamily = FontFamily.Serif) },
+                            label = { Text("History", ) },
                             colors = NavigationBarItemDefaults.colors(
                                 selectedIconColor = BgDark,
                                 selectedTextColor = GoldBright,
@@ -200,7 +231,7 @@ fun FocusTimerApp(
                 showAddSubjectDialog = false
                 newSubjectName = ""
             },
-            title = { Text("Add New Subject", color = GoldBright, fontFamily = FontFamily.Serif) },
+            title = { Text("Add New Subject", color = GoldBright, ) },
             text = {
                 Column {
                     OutlinedTextField(
@@ -270,7 +301,7 @@ fun FocusTimerApp(
                 subSubjectTargetSubject = null
                 newSubSubjectName = ""
             },
-            title = { Text("Add Sub-Subject for $parent", color = GoldBright, fontFamily = FontFamily.Serif) },
+            title = { Text("Add Sub-Subject for $parent", color = GoldBright, ) },
             text = {
                 OutlinedTextField(
                     value = newSubSubjectName,
@@ -318,7 +349,7 @@ fun FocusTimerApp(
                 showAddWorkTypeDialog = false
                 newWorkTypeName = ""
             },
-            title = { Text("Add Work Type", color = GoldBright, fontFamily = FontFamily.Serif) },
+            title = { Text("Add Work Type", color = GoldBright, ) },
             text = {
                 OutlinedTextField(
                     value = newWorkTypeName,
