@@ -8,13 +8,12 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyB1eP2u9-9ydGDzCe7HEVOtHkgld6_Bm9A",
-  authDomain: "my-new-project-a510e.firebaseapp.com",
-  projectId: "my-new-project-a510e",
-  storageBucket: "my-new-project-a510e.firebasestorage.app",
-  messagingSenderId: "589824399304",
-  appId: "1:589824399304:web:9e93181ccc258c316b52fd",
-  measurementId: "G-88XV4T1K3B"
+  apiKey: "AIzaSyA4ZdANZWpoDKZ0pUjUX1EZwfgJbBZ9LpQ",
+  authDomain: "my-portal-f20f1.firebaseapp.com",
+  projectId: "my-portal-f20f1",
+  storageBucket: "my-portal-f20f1.firebasestorage.app",
+  messagingSenderId: "602759203883",
+  appId: "1:602759203883:web:focusstudy"
 };
 const fbApp = initializeApp(firebaseConfig);
 const auth = getAuth(fbApp);
@@ -381,10 +380,59 @@ function playChime(){
     });
   }catch(e){}
 }
-function vibrate(){ if(navigator.vibrate) navigator.vibrate([250,120,250,120,250]); }
+function vibrate(){ if(navigator.vibrate) navigator.vibrate([300,150,300,150,300]); }
+
+let alarmInterval = null;
+let alarmBannerEl = null;
+
+function stopWebAlarm() {
+  if (alarmInterval) {
+    clearInterval(alarmInterval);
+    alarmInterval = null;
+  }
+  if (alarmBannerEl && alarmBannerEl.parentNode) {
+    alarmBannerEl.parentNode.removeChild(alarmBannerEl);
+    alarmBannerEl = null;
+  }
+}
+
+function startWebAlarm(msg) {
+  stopWebAlarm();
+  playChime();
+  vibrate();
+  notify(msg);
+
+  // Repeat alarm chime every 2.5 seconds
+  alarmInterval = setInterval(() => {
+    playChime();
+    vibrate();
+  }, 2500);
+
+  // Show floating Gold Alarm Banner with STOP button
+  if (!alarmBannerEl) {
+    alarmBannerEl = document.createElement('div');
+    alarmBannerEl.id = 'webAlarmOverlay';
+    alarmBannerEl.style.cssText = 'position: fixed; top: 20px; left: 50%; transform: translateX(-50%); background: linear-gradient(135deg, #2a1b05, #141414); border: 2px solid #e0ab34; border-radius: 14px; padding: 14px 24px; display: flex; align-items: center; gap: 14px; box-shadow: 0 0 30px rgba(224, 171, 52, 0.6); z-index: 100000;';
+    alarmBannerEl.innerHTML = '<span style="font-size: 26px;">⏰</span><div><div style="font-size: 15px; font-weight: bold; color: #ffd700;">Time\'s Up!</div><div style="font-size: 13px; color: #d0d0d0;">' + msg + '</div></div><button id="dismissWebAlarmBtn" style="background: #e0ab34; color: #111; border: none; font-weight: bold; padding: 8px 18px; border-radius: 8px; cursor: pointer; font-size: 13px; margin-left: 8px;">STOP ALARM 🔔</button>';
+    document.body.appendChild(alarmBannerEl);
+    document.getElementById('dismissWebAlarmBtn').addEventListener('click', stopWebAlarm);
+  }
+}
+
 function notify(msg){
   if('Notification' in window && Notification.permission==='granted'){
-    try{ new Notification("Time's up! ⏰", { body: msg }); }catch(e){}
+    try{
+      const notif = new Notification("Time's up! ⏰", {
+        body: msg,
+        icon: '/icon.png',
+        requireInteraction: true
+      });
+      notif.onclick = () => {
+        window.focus();
+        stopWebAlarm();
+        notif.close();
+      };
+    }catch(e){}
   }
 }
 if('Notification' in window && Notification.permission==='default'){
@@ -809,20 +857,20 @@ async function finish(){
 
   if(pomodoroMode){
     if(pomoPhase==='work'){
-      playChime(); vibrate(); notify('Focus session ended - take a break');
+      startWebAlarm('Focus session ended - take a break');
       showToast('⏳ Focus session ended! Now 5 mins break');
       triggerConfetti();
       await addSession(sname, WORK_MIN, selectedWorkType);
       pomoPhase='break';
     } else {
-      playChime(); vibrate(); notify('Break ended - back to focus');
+      startWebAlarm('Break ended - back to focus');
       showToast('☕ Break ended! Start again');
       pomoPhase='work';
     }
     updatePhaseBadge();
     hintEl.textContent = pomoPhase==='work' ? 'Press Start for next session' : 'Press Start to begin break';
   } else {
-    playChime(); vibrate(); notify(sname + ' study time ended');
+    startWebAlarm(sname + ' study time ended');
     showToast('⏰ ' + sname + " — time's up!");
     triggerConfetti();
     const elapsedSec = wasStopwatch
@@ -841,6 +889,7 @@ async function finish(){
 }
 
 function startTimer(fromResume=false){
+  stopWebAlarm();
   if(!selectedSubject) {
     showToast('Select a subject first');
     return;
@@ -902,6 +951,7 @@ function pauseTimer(){
 }
 
 async function resetTimer(){
+  stopWebAlarm();
   const wasRunning = running;
   const wasStopwatch = stopwatchMode;
   running=false; clearInterval(tickHandle);
