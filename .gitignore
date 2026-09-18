@@ -5,3 +5,8 @@ scratch/
 temp.png
 *.log
 .env
+*.apk
+.gradle/
+build/
+local.properties
+.cxx/

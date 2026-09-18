@@ -1,0 +1,6 @@
+{
+  "name": "Focus Timer",
+  "description": "Luxury study timer with Pomodoro, real-time analog golden dial, subject analytics, streak tracking, and study management.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
