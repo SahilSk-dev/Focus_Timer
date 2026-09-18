@@ -1,9 +1,22 @@
+// Load environment variables (.env) if present
+try {
+  if (typeof process.loadEnvFile === 'function') {
+    process.loadEnvFile();
+  }
+} catch (e) {}
+
 const express = require('express');
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
 const nodemailer = require('nodemailer');
-const { DatabaseSync } = require('node:sqlite');
+
+let DatabaseSync = null;
+try {
+  DatabaseSync = require('node:sqlite').DatabaseSync;
+} catch (e) {
+  // node:sqlite not supported in this Node runtime
+}
 
 const app = express();
 app.use(express.json({ limit: '10mb' }));
@@ -24,9 +37,15 @@ app.use((req, res, next) => {
   next();
 });
 
-const db = new DatabaseSync(path.join(__dirname, 'focus.db'));
-
-db.exec(`
+let db = null;
+if (DatabaseSync) {
+  try {
+    const isVercel = !!process.env.VERCEL;
+    const dbPath = isVercel
+      ? path.join('/tmp', 'focus.db')
+      : (process.env.DATABASE_PATH || path.join(__dirname, 'focus.db'));
+    db = new DatabaseSync(dbPath);
+    db.exec(`
 CREATE TABLE IF NOT EXISTS users(
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   email TEXT UNIQUE NOT NULL,
@@ -54,19 +73,19 @@ CREATE TABLE IF NOT EXISTS prefs(
 CREATE TABLE IF NOT EXISTS tokens(
   token TEXT PRIMARY KEY,
   user_id INTEGER NOT NULL,
-  created_at INTEGER NOT NULL
+  expires_at INTEGER NOT NULL
 );
 CREATE TABLE IF NOT EXISTS otps(
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  email TEXT NOT NULL,
-  code TEXT,
-  token TEXT,
+  email TEXT PRIMARY KEY,
+  code TEXT NOT NULL,
   expires_at INTEGER NOT NULL,
-  attempts INTEGER NOT NULL DEFAULT 0,
-  used INTEGER NOT NULL DEFAULT 0
+  attempts INTEGER NOT NULL DEFAULT 0
 );
-CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id, ts);
-
+CREATE TABLE IF NOT EXISTS magic_links(
+  token TEXT PRIMARY KEY,
+  email TEXT NOT NULL,
+  expires_at INTEGER NOT NULL
+);
 CREATE TABLE IF NOT EXISTS papers(
   id TEXT PRIMARY KEY,
   user_id INTEGER NOT NULL,
@@ -82,16 +101,22 @@ CREATE TABLE IF NOT EXISTS papers(
   updated_at INTEGER NOT NULL
 );
 `);
+  } catch (err) {
+    console.warn('SQLite initialization skipped or failed:', err.message);
+  }
+}
 
 let mailer = null;
+let fileConfig = {};
 try {
-  const fileConfig = JSON.parse(fs.readFileSync(path.join(__dirname, 'mail.json'), 'utf8'));
-  const user = process.env.SMTP_USER || fileConfig.user;
-  const pass = process.env.SMTP_PASS || fileConfig.pass;
-  if (user && pass) {
-    mailer = nodemailer.createTransport({ service: 'gmail', auth: { user, pass } });
-  }
+  fileConfig = JSON.parse(fs.readFileSync(path.join(__dirname, 'mail.json'), 'utf8'));
 } catch (e) {}
+
+const user = process.env.SMTP_USER || fileConfig.user;
+const pass = process.env.SMTP_PASS || fileConfig.pass;
+if (user && pass) {
+  mailer = nodemailer.createTransport({ service: 'gmail', auth: { user, pass } });
+}
 
 async function sendLoginEmail(to, code, magicUrl) {
   const html = `
@@ -561,6 +586,10 @@ app.use((err, req, res, next) => {
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log('Focus Study Timer server running at http://localhost:' + PORT);
-});
+if (require.main === module) {
+  app.listen(PORT, () => {
+    console.log('Focus Study Timer server running at http://localhost:' + PORT);
+  });
+}
+
+module.exports = app;
