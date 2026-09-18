@@ -67,7 +67,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import com.example.ui.theme.AppTheme
 import com.example.ui.theme.BgDark
 import com.example.ui.theme.GoldAccent
 import com.example.ui.theme.GoldBright
@@ -80,6 +80,11 @@ import com.example.ui.theme.PanelDark
 import com.example.ui.theme.PanelElevated
 import com.example.ui.theme.TextDim
 import com.example.ui.theme.TextPrimary
+import com.example.ui.theme.ThemeBright
+import com.example.ui.theme.ThemeDark
+import com.example.ui.theme.ThemeGradientBrush
+import com.example.ui.theme.ThemeLight
+import com.example.ui.theme.ThemePrimary
 import com.example.viewmodel.FocusViewModel
 import kotlinx.coroutines.delay
 import java.text.SimpleDateFormat
@@ -162,38 +167,71 @@ fun TimerScreen(
             .padding(horizontal = 20.dp, vertical = 16.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // App Header
+        val currentTheme by viewModel.currentAppTheme.collectAsState()
+        var showThemeDialog by remember { mutableStateOf(false) }
+
+        // App Header with Active Atmosphere Theme & Quick Switcher
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Center,
-            modifier = Modifier.padding(bottom = 18.dp)
+            horizontalArrangement = Arrangement.SpaceBetween,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 18.dp)
         ) {
-            Box(
-                modifier = Modifier
-                    .size(36.dp)
-                    .clip(CircleShape)
-                    .background(
-                        Brush.radialGradient(
-                            listOf(GoldBright, GoldAccent, GoldDark)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier
+                        .size(38.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(ThemeGradientBrush),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = currentTheme.icon,
+                        fontSize = 20.sp
+                    )
+                }
+                Spacer(modifier = Modifier.width(10.dp))
+                Column {
+                    Text(
+                        text = "Focus Timer",
+                        style = TextStyle(
+                            brush = ThemeGradientBrush,
+                            fontSize = 22.sp,
+                            fontWeight = FontWeight.Bold
                         )
-                    ),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = "⏱️",
-                    fontSize = 18.sp
-                )
+                    )
+                    Text(
+                        text = currentTheme.subtitle,
+                        color = ThemeLight,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
             }
-            Spacer(modifier = Modifier.width(10.dp))
-            Text(
-                text = "Focus Study Timer",
-                style = TextStyle(
-                    brush = GoldGradientBrush,
-                    fontSize = 24.sp,
-                    fontWeight = FontWeight.Bold,
-                    
-                )
-            )
+
+            // Theme Switcher Button 🎨
+            Surface(
+                onClick = { showThemeDialog = true },
+                shape = RoundedCornerShape(12.dp),
+                color = PanelDark,
+                border = BorderStroke(1.dp, LineBorder),
+                modifier = Modifier.testTag("theme_selector_btn")
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Text("🎨", fontSize = 13.sp)
+                    Text(
+                        text = currentTheme.displayName,
+                        color = TextPrimary,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
         }
 
         // Subject Selection Area
@@ -371,41 +409,7 @@ fun TimerScreen(
             }
         }
 
-        Spacer(modifier = Modifier.height(8.dp))
-
-        // Golden Dial Toggle Row
-        Surface(
-            modifier = Modifier.fillMaxWidth(),
-            color = PanelDark,
-            shape = RoundedCornerShape(12.dp),
-            border = BorderStroke(1.dp, LineBorder)
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 14.dp, vertical = 10.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "Show Golden Dial",
-                    color = TextPrimary,
-                    fontSize = 13.sp,
-                    
-                )
-                Switch(
-                    checked = isDialVisible,
-                    onCheckedChange = { viewModel.toggleDial() },
-                    colors = SwitchDefaults.colors(
-                        checkedThumbColor = GoldBright,
-                        checkedTrackColor = GoldDark,
-                        uncheckedThumbColor = TextDim,
-                        uncheckedTrackColor = LineBorder
-                    ),
-                    modifier = Modifier.testTag("dial_switch")
-                )
-            }
-        }
+        // (Golden Dial removed for clean distraction-free study layout)
 
         // Custom Time Row (Hidden in Pomodoro Mode)
         AnimatedVisibility(visible = !pomodoroMode) {
@@ -603,6 +607,89 @@ fun TimerScreen(
                 }
             }
         }
+        if (showThemeDialog) {
+            AlertDialog(
+                onDismissRequest = { showThemeDialog = false },
+                containerColor = PanelDark,
+                title = {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text("🎨", fontSize = 20.sp)
+                        Text(
+                            text = "Atmosphere Theme",
+                            color = TextPrimary,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 18.sp
+                        )
+                    }
+                },
+                text = {
+                    Column(
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        AppTheme.entries.forEach { theme ->
+                            val isSelected = theme == currentTheme
+                            Surface(
+                                onClick = {
+                                    viewModel.setAppTheme(theme)
+                                    showThemeDialog = false
+                                },
+                                shape = RoundedCornerShape(14.dp),
+                                color = if (isSelected) PanelElevated else BgDark,
+                                border = BorderStroke(
+                                    width = if (isSelected) 2.dp else 1.dp,
+                                    color = if (isSelected) theme.primary else LineBorder
+                                ),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                    ) {
+                                        Text(theme.icon, fontSize = 22.sp)
+                                        Column {
+                                            Text(
+                                                text = theme.displayName,
+                                                color = if (isSelected) theme.primaryBright else TextPrimary,
+                                                fontWeight = FontWeight.Bold,
+                                                fontSize = 14.sp
+                                            )
+                                            Text(
+                                                text = theme.subtitle,
+                                                color = TextDim,
+                                                fontSize = 11.sp
+                                            )
+                                        }
+                                    }
+                                    Box(
+                                        modifier = Modifier
+                                            .size(16.dp)
+                                            .clip(CircleShape)
+                                            .background(theme.primary)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = { showThemeDialog = false }) {
+                        Text("Close", color = ThemeLight, fontWeight = FontWeight.Bold)
+                    }
+                }
+            )
+        }
+
         Spacer(modifier = Modifier.height(30.dp))
     }
 }
@@ -631,7 +718,7 @@ private fun SubjectChip(
         Brush.linearGradient(
             colors = listOf(
                 PanelDark,
-                Color(0x33E6C875),
+                ThemeLight.copy(alpha = 0.2f),
                 PanelDark
             ),
             start = Offset(shimmerOffset * 100f, 0f),

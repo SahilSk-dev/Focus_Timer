@@ -48,10 +48,12 @@ class MainActivity : ComponentActivity() {
                 }
             }
 
-            MyApplicationTheme {
+            val currentTheme by viewModel.currentAppTheme.collectAsState()
+
+            MyApplicationTheme(appTheme = currentTheme) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
-                    color = BgDark
+                    color = currentTheme.bgBase
                 ) {
                     FocusTimerApp(viewModel = viewModel)
                 }

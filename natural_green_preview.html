@@ -1,0 +1,1866 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Focus Timer — Multi-Theme Atmospheric Experience</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Outfit:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    /* ============================================================
+       THEME DESIGN SYSTEM (6 Rich Aesthetic Palettes)
+       ============================================================ */
+    :root {
+      --font-main: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      --font-display: 'Outfit', var(--font-main);
+      --transition-smooth: all 0.45s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    /* 1. 🌿 EMERALD FOREST (প্রাকৃতিক সবুজ - Deep Nature) */
+    body[data-theme="forest"] {
+      --bg-base: #040e08;
+      --bg-gradient: radial-gradient(circle at 50% 10%, rgba(16, 185, 129, 0.22) 0%, rgba(4, 14, 8, 0.96) 65%, #020704 100%);
+      --panel-bg: rgba(10, 31, 20, 0.68);
+      --panel-elevated: rgba(18, 48, 32, 0.78);
+      --panel-border: rgba(52, 211, 153, 0.24);
+      --panel-border-hover: rgba(52, 211, 153, 0.55);
+      --panel-glow: rgba(16, 185, 129, 0.2);
+      --primary: #10b981;
+      --primary-light: #34d399;
+      --primary-glow: #6ee7b7;
+      --primary-deep: #065f46;
+      --accent: #84cc16;
+      --text-main: #f0fdf4;
+      --text-dim: #a7f3d0;
+      --text-muted: #6ee7b799;
+      --clock-gradient: linear-gradient(180deg, #ffffff 15%, #6ee7b7 60%, #10b981 100%);
+      --btn-gradient: linear-gradient(135deg, #10b981 0%, #059669 100%);
+      --btn-hover: linear-gradient(135deg, #34d399 0%, #10b981 100%);
+      --btn-text: #021a0d;
+      --chip-active-bg: linear-gradient(135deg, rgba(16, 185, 129, 0.35), rgba(6, 95, 70, 0.5));
+      --tag: "🌿 Emerald Forest";
+    }
+
+    /* 2. 🌌 CYBER NEON (সাইবার নিয়ন - Tokyo Midnight) */
+    body[data-theme="cyber"] {
+      --bg-base: #060411;
+      --bg-gradient: radial-gradient(circle at 50% 10%, rgba(139, 92, 246, 0.25) 0%, rgba(6, 4, 17, 0.96) 65%, #020108 100%);
+      --panel-bg: rgba(19, 14, 43, 0.7);
+      --panel-elevated: rgba(32, 22, 70, 0.8);
+      --panel-border: rgba(168, 85, 247, 0.3);
+      --panel-border-hover: rgba(236, 72, 153, 0.6);
+      --panel-glow: rgba(168, 85, 247, 0.28);
+      --primary: #8b5cf6;
+      --primary-light: #c084fc;
+      --primary-glow: #e879f9;
+      --primary-deep: #581c87;
+      --accent: #06b6d4;
+      --text-main: #faf5ff;
+      --text-dim: #e9d5ff;
+      --text-muted: #c084fc99;
+      --clock-gradient: linear-gradient(180deg, #ffffff 10%, #e879f9 55%, #8b5cf6 100%);
+      --btn-gradient: linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%);
+      --btn-hover: linear-gradient(135deg, #a855f7 0%, #f43f5e 100%);
+      --btn-text: #0f051d;
+      --chip-active-bg: linear-gradient(135deg, rgba(139, 92, 246, 0.35), rgba(236, 72, 153, 0.35));
+      --tag: "🌌 Cyber Neon";
+    }
+
+    /* 3. 🌅 SUNSET EMBER (গোধূলির আগুন - Golden Hour) */
+    body[data-theme="sunset"] {
+      --bg-base: #110703;
+      --bg-gradient: radial-gradient(circle at 50% 10%, rgba(249, 115, 22, 0.24) 0%, rgba(17, 7, 3, 0.96) 65%, #080301 100%);
+      --panel-bg: rgba(35, 17, 10, 0.7);
+      --panel-elevated: rgba(54, 26, 15, 0.8);
+      --panel-border: rgba(249, 115, 22, 0.28);
+      --panel-border-hover: rgba(251, 191, 36, 0.6);
+      --panel-glow: rgba(249, 115, 22, 0.25);
+      --primary: #f97316;
+      --primary-light: #fb923c;
+      --primary-glow: #fcd34d;
+      --primary-deep: #7c2d12;
+      --accent: #ef4444;
+      --text-main: #fffaf0;
+      --text-dim: #fed7aa;
+      --text-muted: #fb923c99;
+      --clock-gradient: linear-gradient(180deg, #ffffff 10%, #fcd34d 55%, #f97316 100%);
+      --btn-gradient: linear-gradient(135deg, #f97316 0%, #dc2626 100%);
+      --btn-hover: linear-gradient(135deg, #fb923c 0%, #ea580c 100%);
+      --btn-text: #210901;
+      --chip-active-bg: linear-gradient(135deg, rgba(249, 115, 22, 0.35), rgba(220, 38, 38, 0.35));
+      --tag: "🌅 Sunset Ember";
+    }
+
+    /* 4. 🌊 OCEANIC ABYSS (গভীর সমুদ্র - Deep Marina) */
+    body[data-theme="ocean"] {
+      --bg-base: #030b14;
+      --bg-gradient: radial-gradient(circle at 50% 10%, rgba(14, 165, 233, 0.22) 0%, rgba(3, 11, 20, 0.96) 65%, #01050a 100%);
+      --panel-bg: rgba(8, 26, 46, 0.7);
+      --panel-elevated: rgba(14, 42, 74, 0.8);
+      --panel-border: rgba(56, 189, 248, 0.28);
+      --panel-border-hover: rgba(56, 189, 248, 0.6);
+      --panel-glow: rgba(14, 165, 233, 0.25);
+      --primary: #0284c7;
+      --primary-light: #38bdf8;
+      --primary-glow: #7dd3fc;
+      --primary-deep: #075985;
+      --accent: #06b6d4;
+      --text-main: #f0f9ff;
+      --text-dim: #bae6fd;
+      --text-muted: #38bdf899;
+      --clock-gradient: linear-gradient(180deg, #ffffff 10%, #7dd3fc 55%, #0284c7 100%);
+      --btn-gradient: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
+      --btn-hover: linear-gradient(135deg, #38bdf8 0%, #0284c7 100%);
+      --btn-text: #011827;
+      --chip-active-bg: linear-gradient(135deg, rgba(2, 132, 199, 0.35), rgba(6, 182, 212, 0.35));
+      --tag: "🌊 Oceanic Abyss";
+    }
+
+    /* 5. ☕ VINTAGE ESPRESSO (ভিন্টেজ ক্যাফে - Dark Walnut & Brass) */
+    body[data-theme="coffee"] {
+      --bg-base: #100b07;
+      --bg-gradient: radial-gradient(circle at 50% 10%, rgba(217, 119, 6, 0.2) 0%, rgba(16, 11, 7, 0.96) 65%, #090604 100%);
+      --panel-bg: rgba(32, 21, 14, 0.72);
+      --panel-elevated: rgba(49, 32, 21, 0.82);
+      --panel-border: rgba(217, 119, 6, 0.26);
+      --panel-border-hover: rgba(245, 158, 11, 0.6);
+      --panel-glow: rgba(217, 119, 6, 0.22);
+      --primary: #d97706;
+      --primary-light: #f59e0b;
+      --primary-glow: #fde68a;
+      --primary-deep: #78350f;
+      --accent: #b45309;
+      --text-main: #fefce8;
+      --text-dim: #fde68a;
+      --text-muted: #f59e0b99;
+      --clock-gradient: linear-gradient(180deg, #ffffff 10%, #fde68a 55%, #d97706 100%);
+      --btn-gradient: linear-gradient(135deg, #d97706 0%, #92400e 100%);
+      --btn-hover: linear-gradient(135deg, #f59e0b 0%, #b45309 100%);
+      --btn-text: #1d0f04;
+      --chip-active-bg: linear-gradient(135deg, rgba(217, 119, 6, 0.35), rgba(120, 53, 15, 0.45));
+      --tag: "☕ Vintage Espresso";
+    }
+
+    /* 6. ❄️ ARCTIC AURORA (আর্কটিক অরোরা - Frost & Northern Lights) */
+    body[data-theme="arctic"] {
+      --bg-base: #030813;
+      --bg-gradient: radial-gradient(circle at 50% 10%, rgba(45, 212, 191, 0.2) 0%, rgba(3, 8, 19, 0.96) 65%, #01040a 100%);
+      --panel-bg: rgba(10, 24, 45, 0.7);
+      --panel-elevated: rgba(18, 41, 75, 0.8);
+      --panel-border: rgba(45, 212, 191, 0.26);
+      --panel-border-hover: rgba(129, 140, 248, 0.6);
+      --panel-glow: rgba(45, 212, 191, 0.25);
+      --primary: #2dd4bf;
+      --primary-light: #5eead4;
+      --primary-glow: #99f6e4;
+      --primary-deep: #115e59;
+      --accent: #818cf8;
+      --text-main: #f0fdfa;
+      --text-dim: #ccfbf1;
+      --text-muted: #5eead499;
+      --clock-gradient: linear-gradient(180deg, #ffffff 10%, #99f6e4 50%, #818cf8 100%);
+      --btn-gradient: linear-gradient(135deg, #2dd4bf 0%, #6366f1 100%);
+      --btn-hover: linear-gradient(135deg, #5eead4 0%, #818cf8 100%);
+      --btn-text: #021a17;
+      --chip-active-bg: linear-gradient(135deg, rgba(45, 212, 191, 0.3), rgba(99, 102, 241, 0.35));
+      --tag: "❄️ Arctic Aurora";
+    }
+
+    /* ============================================================
+       GLOBAL STYLES & LAYOUT
+       ============================================================ */
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: var(--font-main);
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      background-color: var(--bg-base);
+      background-image: var(--bg-gradient);
+      color: var(--text-main);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 24px 16px 60px;
+      overflow-x: hidden;
+      position: relative;
+      transition: background 0.6s ease, color 0.4s ease;
+    }
+
+    /* Ambient Particle Canvas */
+    #ambientCanvas {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 0;
+      opacity: 0.65;
+    }
+
+    /* Subtle top glow */
+    .ambient-glow-orb {
+      position: fixed;
+      top: -120px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 650px;
+      height: 450px;
+      background: radial-gradient(ellipse, var(--panel-glow), transparent 70%);
+      filter: blur(70px);
+      pointer-events: none;
+      z-index: 0;
+      transition: background 0.6s ease;
+    }
+
+    .app-container {
+      width: 100%;
+      max-width: 540px;
+      position: relative;
+      z-index: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    /* Top Bar */
+    .top-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 4px 6px;
+    }
+
+    .brand-title {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .brand-icon {
+      width: 44px;
+      height: 44px;
+      border-radius: 14px;
+      background: var(--btn-gradient);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+      box-shadow: 0 4px 20px var(--panel-glow);
+      border: 1px solid var(--panel-border-hover);
+      transition: var(--transition-smooth);
+    }
+
+    .brand-text h1 {
+      font-size: 22px;
+      font-weight: 800;
+      font-family: var(--font-display);
+      letter-spacing: -0.5px;
+      background: var(--clock-gradient);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .brand-text p {
+      font-size: 11px;
+      color: var(--primary-light);
+      font-weight: 700;
+      letter-spacing: 0.6px;
+      text-transform: uppercase;
+      opacity: 0.9;
+    }
+
+    .top-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .action-btn {
+      height: 40px;
+      padding: 0 14px;
+      border-radius: 12px;
+      background: var(--panel-bg);
+      border: 1px solid var(--panel-border);
+      color: var(--text-dim);
+      font-size: 13px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      cursor: pointer;
+      backdrop-filter: blur(12px);
+      transition: var(--transition-smooth);
+    }
+
+    .action-btn:hover {
+      background: var(--panel-elevated);
+      border-color: var(--panel-border-hover);
+      transform: translateY(-2px);
+      color: #ffffff;
+      box-shadow: 0 4px 14px var(--panel-glow);
+    }
+
+    .action-btn.active {
+      background: var(--chip-active-bg);
+      border-color: var(--primary);
+      color: var(--text-main);
+    }
+
+    /* ============================================================
+       THEME SELECTOR CAROUSEL / DRAWER
+       ============================================================ */
+    .theme-selector-card {
+      background: var(--panel-bg);
+      border: 1px solid var(--panel-border);
+      border-radius: 20px;
+      padding: 16px 18px;
+      backdrop-filter: blur(20px);
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      transition: var(--transition-smooth);
+    }
+
+    .theme-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .theme-header span {
+      font-size: 12px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: var(--primary-light);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .theme-current-badge {
+      font-size: 11px;
+      font-weight: 700;
+      padding: 3px 10px;
+      border-radius: 20px;
+      background: var(--chip-active-bg);
+      border: 1px solid var(--panel-border-hover);
+      color: var(--primary-glow);
+    }
+
+    .theme-pills-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+    }
+
+    @media (max-width: 480px) {
+      .theme-pills-row {
+        grid-template-columns: repeat(2, 1fr);
+      }
+    }
+
+    .theme-btn {
+      background: var(--panel-elevated);
+      border: 1px solid var(--panel-border);
+      border-radius: 14px;
+      padding: 10px 10px;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 4px;
+      transition: var(--transition-smooth);
+      position: relative;
+      overflow: hidden;
+      text-align: left;
+    }
+
+    .theme-btn:hover {
+      border-color: var(--primary-light);
+      transform: translateY(-2px);
+      box-shadow: 0 4px 15px var(--panel-glow);
+    }
+
+    .theme-btn.active {
+      border-color: var(--primary);
+      background: var(--chip-active-bg);
+      box-shadow: 0 0 16px var(--panel-glow);
+    }
+
+    .theme-btn-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      width: 100%;
+    }
+
+    .theme-emoji {
+      font-size: 18px;
+    }
+
+    .theme-dots {
+      display: flex;
+      gap: 3px;
+    }
+
+    .theme-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+    }
+
+    .theme-name {
+      font-size: 12px;
+      font-weight: 800;
+      color: var(--text-main);
+    }
+
+    .theme-bengali {
+      font-size: 10px;
+      color: var(--text-muted);
+      font-weight: 600;
+    }
+
+    /* ============================================================
+       MODE SWITCHER TABS
+       ============================================================ */
+    .mode-tabs {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      background: var(--panel-bg);
+      border: 1px solid var(--panel-border);
+      border-radius: 16px;
+      padding: 5px;
+      gap: 6px;
+      backdrop-filter: blur(14px);
+    }
+
+    .mode-tab {
+      padding: 11px 8px;
+      border: none;
+      background: transparent;
+      color: var(--text-muted);
+      font-weight: 700;
+      font-size: 13px;
+      border-radius: 12px;
+      cursor: pointer;
+      transition: var(--transition-smooth);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+
+    .mode-tab:hover {
+      color: var(--text-main);
+    }
+
+    .mode-tab.active {
+      background: var(--chip-active-bg);
+      color: var(--primary-glow);
+      border: 1px solid var(--panel-border-hover);
+      box-shadow: 0 3px 12px var(--panel-glow);
+    }
+
+    /* ============================================================
+       MAIN TIMER CARD (The Centerpiece)
+       ============================================================ */
+    .timer-card {
+      background: var(--panel-bg);
+      border: 1px solid var(--panel-border);
+      border-radius: 28px;
+      padding: 34px 24px 30px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      box-shadow: 0 25px 50px -15px rgba(0, 0, 0, 0.7), 0 0 30px var(--panel-glow);
+      backdrop-filter: blur(25px);
+      position: relative;
+      overflow: hidden;
+      transition: var(--transition-smooth);
+    }
+
+    .timer-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 3px;
+      background: linear-gradient(90deg, transparent, var(--primary-light), transparent);
+      opacity: 0.8;
+      transition: var(--transition-smooth);
+    }
+
+    .timer-card.running {
+      border-color: var(--panel-border-hover);
+      box-shadow: 0 25px 60px -12px rgba(0, 0, 0, 0.85), 0 0 45px var(--panel-glow);
+    }
+
+    .active-session-badge {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: var(--chip-active-bg);
+      border: 1px solid var(--panel-border-hover);
+      padding: 6px 16px;
+      border-radius: 40px;
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--primary-glow);
+      margin-bottom: 16px;
+      animation: gentlePulse 3s infinite ease-in-out;
+    }
+
+    @keyframes gentlePulse {
+      0%, 100% { transform: scale(1); opacity: 0.95; }
+      50% { transform: scale(1.02); opacity: 1; border-color: var(--primary-light); }
+    }
+
+    .work-tag {
+      background: rgba(255, 255, 255, 0.12);
+      padding: 3px 10px;
+      border-radius: 12px;
+      font-size: 11px;
+      color: #ffffff;
+      font-weight: 700;
+    }
+
+    /* Big Glowing Digital Clock */
+    .timer-display {
+      font-size: 78px;
+      font-weight: 800;
+      font-family: var(--font-display);
+      letter-spacing: -1.5px;
+      line-height: 1;
+      margin: 10px 0 20px;
+      background: var(--clock-gradient);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      user-select: none;
+      transition: var(--transition-smooth);
+      text-shadow: 0 0 35px var(--panel-glow);
+    }
+
+    .status-hint {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-dim);
+      margin-bottom: 26px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .pulse-dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background: var(--primary);
+      box-shadow: 0 0 10px var(--primary);
+      display: inline-block;
+    }
+
+    .pulse-dot.running {
+      animation: blinkDot 1.2s infinite alternate cubic-bezier(0.4, 0, 0.6, 1);
+    }
+
+    @keyframes blinkDot {
+      from { opacity: 0.35; transform: scale(0.8); }
+      to { opacity: 1; transform: scale(1.25); }
+    }
+
+    /* Timer Action Controls */
+    .timer-controls {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 14px;
+      width: 100%;
+      max-width: 400px;
+    }
+
+    .btn-main {
+      flex: 1.5;
+      height: 56px;
+      border-radius: 16px;
+      border: none;
+      background: var(--btn-gradient);
+      color: var(--btn-text);
+      font-size: 16px;
+      font-weight: 800;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      box-shadow: 0 8px 25px var(--panel-glow);
+      transition: var(--transition-smooth);
+    }
+
+    .btn-main:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 12px 30px var(--panel-glow);
+      background: var(--btn-hover);
+    }
+
+    .btn-main:active {
+      transform: scale(0.97);
+    }
+
+    .btn-secondary {
+      flex: 1;
+      height: 56px;
+      border-radius: 16px;
+      border: 1px solid var(--panel-border);
+      background: var(--panel-elevated);
+      color: var(--text-main);
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition: var(--transition-smooth);
+    }
+
+    .btn-secondary:hover {
+      background: var(--panel-border-hover);
+      border-color: var(--primary-light);
+      transform: translateY(-2px);
+      color: #ffffff;
+    }
+
+    .btn-secondary:active {
+      transform: scale(0.97);
+    }
+
+    /* Duration Quick Selection */
+    .duration-picker {
+      width: 100%;
+      background: var(--panel-bg);
+      border: 1px solid var(--panel-border);
+      border-radius: 20px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      backdrop-filter: blur(14px);
+    }
+
+    .section-title {
+      font-size: 13px;
+      font-weight: 800;
+      color: var(--primary-light);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      letter-spacing: 0.4px;
+    }
+
+    .chip-group {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .time-chip {
+      padding: 8px 16px;
+      border-radius: 12px;
+      background: var(--panel-elevated);
+      border: 1px solid var(--panel-border);
+      color: var(--text-muted);
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: var(--transition-smooth);
+    }
+
+    .time-chip:hover {
+      border-color: var(--primary-light);
+      color: var(--text-main);
+    }
+
+    .time-chip.active {
+      background: var(--chip-active-bg);
+      border-color: var(--primary);
+      color: var(--primary-glow);
+      font-weight: 800;
+      box-shadow: 0 2px 10px var(--panel-glow);
+    }
+
+    /* Subject & Work-Type Selection */
+    .selection-card {
+      background: var(--panel-bg);
+      border: 1px solid var(--panel-border);
+      border-radius: 20px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      backdrop-filter: blur(14px);
+    }
+
+    .subject-chip {
+      padding: 9px 18px;
+      border-radius: 24px;
+      background: var(--panel-elevated);
+      border: 1px solid var(--panel-border);
+      color: var(--text-dim);
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: var(--transition-smooth);
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .subject-chip:hover {
+      border-color: var(--primary-light);
+      color: #ffffff;
+      transform: translateY(-1px);
+    }
+
+    .subject-chip.active {
+      background: var(--chip-active-bg);
+      border-color: var(--primary);
+      color: #ffffff;
+      font-weight: 800;
+      box-shadow: 0 4px 16px var(--panel-glow);
+    }
+
+    /* Ambient Sound Controls Bar */
+    .soundscape-card {
+      background: var(--panel-bg);
+      border: 1px solid var(--panel-border);
+      border-radius: 20px;
+      padding: 16px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      backdrop-filter: blur(14px);
+      gap: 12px;
+    }
+
+    .soundscape-info {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .soundscape-icon {
+      width: 42px;
+      height: 42px;
+      border-radius: 12px;
+      background: var(--panel-elevated);
+      border: 1px solid var(--panel-border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+    }
+
+    .soundscape-title {
+      font-size: 14px;
+      font-weight: 800;
+      color: var(--text-main);
+    }
+
+    .soundscape-desc {
+      font-size: 11px;
+      color: var(--text-muted);
+      font-weight: 600;
+    }
+
+    .soundscape-toggle {
+      height: 40px;
+      padding: 0 16px;
+      border-radius: 12px;
+      background: var(--btn-gradient);
+      color: var(--btn-text);
+      font-size: 13px;
+      font-weight: 800;
+      border: none;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: var(--transition-smooth);
+    }
+
+    .soundscape-toggle:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 15px var(--panel-glow);
+    }
+
+    /* Stats Quick Glance */
+    .stats-card {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      background: var(--panel-bg);
+      border: 1px solid var(--panel-border);
+      border-radius: 20px;
+      padding: 18px;
+      gap: 12px;
+      text-align: center;
+      backdrop-filter: blur(14px);
+    }
+
+    .stat-val {
+      font-size: 22px;
+      font-weight: 800;
+      font-family: var(--font-display);
+      color: var(--primary-glow);
+    }
+
+    .stat-lbl {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      margin-top: 4px;
+    }
+
+    /* Fullscreen Landscape Desk Clock Overlay */
+    .fullscreen-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: var(--bg-base);
+      background-image: var(--bg-gradient);
+      z-index: 9999;
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 30px;
+      gap: 24px;
+    }
+
+    .fullscreen-overlay.active {
+      display: flex;
+    }
+
+    .fs-timer {
+      font-size: clamp(80px, 18vw, 190px);
+      font-weight: 800;
+      font-family: var(--font-display);
+      line-height: 1;
+      background: var(--clock-gradient);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      text-shadow: 0 0 50px var(--panel-glow);
+    }
+
+    .fs-close-btn {
+      position: absolute;
+      top: 24px;
+      right: 24px;
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      background: var(--panel-elevated);
+      border: 1px solid var(--panel-border);
+      color: var(--text-main);
+      font-size: 20px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: var(--transition-smooth);
+    }
+
+    .fs-close-btn:hover {
+      background: var(--panel-border-hover);
+      transform: scale(1.1);
+    }
+
+    /* Floating Toast Message */
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      background: var(--panel-elevated);
+      border: 1px solid var(--panel-border-hover);
+      color: var(--text-main);
+      padding: 12px 24px;
+      border-radius: 30px;
+      font-size: 14px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6), 0 0 20px var(--panel-glow);
+      backdrop-filter: blur(20px);
+      opacity: 0;
+      transform: translateY(20px);
+      pointer-events: none;
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      z-index: 10000;
+    }
+
+    .toast.show {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  </style>
+</head>
+<body data-theme="forest">
+
+  <!-- Ambient Particle Canvas for Dynamic Atmosphere -->
+  <canvas id="ambientCanvas"></canvas>
+  <div class="ambient-glow-orb"></div>
+
+  <div class="app-container">
+    
+    <!-- Top Bar -->
+    <header class="top-bar">
+      <div class="brand-title">
+        <div class="brand-icon" id="brandIcon">🌿</div>
+        <div class="brand-text">
+          <h1>Focus Timer</h1>
+          <p id="brandSub">Atmospheric Nature Edition</p>
+        </div>
+      </div>
+      <div class="top-actions">
+        <button class="action-btn" id="soundBtn" title="Toggle Nature Ambient Sound">
+          <span id="soundIcon">🌧️</span> Sound
+        </button>
+        <button class="action-btn" id="fsBtn" title="Landscape Desk Clock">
+          🖥️ Desk
+        </button>
+      </div>
+    </header>
+
+    <!-- Theme Switcher Selector Showcase -->
+    <section class="theme-selector-card">
+      <div class="theme-header">
+        <span>🎨 Select Aesthetic Atmosphere</span>
+        <div class="theme-current-badge" id="currentThemeBadge">🌿 Emerald Forest</div>
+      </div>
+      <div class="theme-pills-row">
+        <!-- Theme 1: Emerald Forest -->
+        <button class="theme-btn active" data-theme="forest" title="Natural Forest & Moss">
+          <div class="theme-btn-top">
+            <span class="theme-emoji">🌿</span>
+            <div class="theme-dots">
+              <span class="theme-dot" style="background:#10b981"></span>
+              <span class="theme-dot" style="background:#065f46"></span>
+            </div>
+          </div>
+          <div class="theme-name">Emerald Forest</div>
+          <div class="theme-bengali">প্রাকৃতিক সবুজ</div>
+        </button>
+
+        <!-- Theme 2: Cyber Neon -->
+        <button class="theme-btn" data-theme="cyber" title="Cyberpunk Tokyo Night">
+          <div class="theme-btn-top">
+            <span class="theme-emoji">🌌</span>
+            <div class="theme-dots">
+              <span class="theme-dot" style="background:#8b5cf6"></span>
+              <span class="theme-dot" style="background:#ec4899"></span>
+            </div>
+          </div>
+          <div class="theme-name">Cyber Neon</div>
+          <div class="theme-bengali">সাইবার নিয়ন</div>
+        </button>
+
+        <!-- Theme 3: Sunset Ember -->
+        <button class="theme-btn" data-theme="sunset" title="Golden Sunset & Campfire">
+          <div class="theme-btn-top">
+            <span class="theme-emoji">🌅</span>
+            <div class="theme-dots">
+              <span class="theme-dot" style="background:#f97316"></span>
+              <span class="theme-dot" style="background:#dc2626"></span>
+            </div>
+          </div>
+          <div class="theme-name">Sunset Ember</div>
+          <div class="theme-bengali">গোধূলির আগুন</div>
+        </button>
+
+        <!-- Theme 4: Oceanic Abyss -->
+        <button class="theme-btn" data-theme="ocean" title="Deep Sea Marina">
+          <div class="theme-btn-top">
+            <span class="theme-emoji">🌊</span>
+            <div class="theme-dots">
+              <span class="theme-dot" style="background:#0284c7"></span>
+              <span class="theme-dot" style="background:#38bdf8"></span>
+            </div>
+          </div>
+          <div class="theme-name">Oceanic Abyss</div>
+          <div class="theme-bengali">গভীর সমুদ্র</div>
+        </button>
+
+        <!-- Theme 5: Vintage Espresso -->
+        <button class="theme-btn" data-theme="coffee" title="Dark Walnut & Warm Coffee">
+          <div class="theme-btn-top">
+            <span class="theme-emoji">☕</span>
+            <div class="theme-dots">
+              <span class="theme-dot" style="background:#d97706"></span>
+              <span class="theme-dot" style="background:#78350f"></span>
+            </div>
+          </div>
+          <div class="theme-name">Vintage Coffee</div>
+          <div class="theme-bengali">ভিন্টেজ ক্যাফে</div>
+        </button>
+
+        <!-- Theme 6: Arctic Aurora -->
+        <button class="theme-btn" data-theme="arctic" title="Northern Lights & Frost">
+          <div class="theme-btn-top">
+            <span class="theme-emoji">❄️</span>
+            <div class="theme-dots">
+              <span class="theme-dot" style="background:#2dd4bf"></span>
+              <span class="theme-dot" style="background:#818cf8"></span>
+            </div>
+          </div>
+          <div class="theme-name">Arctic Aurora</div>
+          <div class="theme-bengali">আর্কটিক অরোরা</div>
+        </button>
+      </div>
+    </section>
+
+    <!-- Mode Selector Tabs -->
+    <nav class="mode-tabs">
+      <button class="mode-tab active" id="tabCountdown">⏳ Countdown</button>
+      <button class="mode-tab" id="tabPomodoro">🍅 Pomodoro</button>
+      <button class="mode-tab" id="tabStopwatch">⏱ Stopwatch</button>
+    </nav>
+
+    <!-- Main Glowing Timer Centerpiece -->
+    <main class="timer-card" id="timerCard">
+      <div class="active-session-badge">
+        <span id="activeSubjectBadge">Bengali</span>
+        <span class="work-tag" id="activeWorkTypeBadge">Revision</span>
+      </div>
+
+      <div class="timer-display" id="timeDisplay">25:00</div>
+
+      <div class="status-hint">
+        <span class="pulse-dot" id="pulseDot"></span>
+        <span id="statusHintText">Ready to start session</span>
+      </div>
+
+      <div class="timer-controls">
+        <button class="btn-main" id="startBtn">▶ Start Focus</button>
+        <button class="btn-secondary" id="pauseBtn" disabled>⏸ Pause</button>
+        <button class="btn-secondary" id="resetBtn">↺ Reset</button>
+      </div>
+    </main>
+
+    <!-- Ambient Soundscape Controller -->
+    <section class="soundscape-card">
+      <div class="soundscape-info">
+        <div class="soundscape-icon" id="soundscapeIcon">🌧️</div>
+        <div>
+          <div class="soundscape-title" id="soundscapeTitle">Forest Rain Soundscape</div>
+          <div class="soundscape-desc" id="soundscapeDesc">Gentle procedural binaural rain waves</div>
+        </div>
+      </div>
+      <button class="soundscape-toggle" id="soundscapeToggleBtn">
+        ▶ Play Sound
+      </button>
+    </section>
+
+    <!-- Quick Duration Picker (Only in Countdown mode) -->
+    <section class="duration-picker" id="durationPickerBox">
+      <div class="section-title">
+        <span>⏱ Quick Duration</span>
+        <span style="font-size:11px; opacity:0.8;">Tap to set</span>
+      </div>
+      <div class="chip-group">
+        <button class="time-chip" data-mins="5">5 min</button>
+        <button class="time-chip" data-mins="15">15 min</button>
+        <button class="time-chip active" data-mins="25">25 min</button>
+        <button class="time-chip" data-mins="45">45 min</button>
+        <button class="time-chip" data-mins="60">60 min</button>
+        <button class="time-chip" data-mins="90">90 min</button>
+      </div>
+    </section>
+
+    <!-- Live Subject & Work-Type Selection (No need to stop timer!) -->
+    <section class="selection-card">
+      <div class="section-title">
+        <span>📚 Select Subject</span>
+        <span style="font-size:11px; opacity:0.8;">Live switchable anytime</span>
+      </div>
+      <div class="chip-group" id="subjectGroup">
+        <button class="subject-chip active" data-subject="Bengali">📖 Bengali</button>
+        <button class="subject-chip" data-subject="English">🔤 English</button>
+        <button class="subject-chip" data-subject="History">🏛️ History</button>
+        <button class="subject-chip" data-subject="Math">📐 Math</button>
+        <button class="subject-chip" data-subject="Physics">⚡ Physics</button>
+        <button class="subject-chip" data-subject="Chemistry">🧪 Chemistry</button>
+      </div>
+
+      <div class="section-title" style="margin-top: 6px;">
+        <span>🎯 Work Type</span>
+        <span style="font-size:11px; opacity:0.8;">Session goal</span>
+      </div>
+      <div class="chip-group" id="workTypeGroup">
+        <button class="time-chip active" data-type="Revision">🔄 Revision</button>
+        <button class="time-chip" data-type="Memorize">🧠 Memorize</button>
+        <button class="time-chip" data-type="Practice">✍️ Practice</button>
+        <button class="time-chip" data-type="Notes">📝 Notes</button>
+        <button class="time-chip" data-type="Deep Work">🚀 Deep Work</button>
+      </div>
+    </section>
+
+    <!-- Daily Stats Card -->
+    <section class="stats-card">
+      <div>
+        <div class="stat-val" id="statStreak">🔥 7 Days</div>
+        <div class="stat-lbl">Focus Streak</div>
+      </div>
+      <div>
+        <div class="stat-val" id="statToday">125 min</div>
+        <div class="stat-lbl">Today's Focus</div>
+      </div>
+      <div>
+        <div class="stat-val" id="statRank">🌳 Master</div>
+        <div class="stat-lbl">Atmosphere Rank</div>
+      </div>
+    </section>
+
+  </div>
+
+  <!-- Fullscreen Desk Clock Overlay -->
+  <div class="fullscreen-overlay" id="fsOverlay">
+    <button class="fs-close-btn" id="fsCloseBtn">✕</button>
+    <div class="active-session-badge" style="margin-bottom:0;">
+      <span id="fsSubjectBadge">Bengali</span>
+      <span class="work-tag" id="fsWorkTypeBadge">Revision</span>
+    </div>
+    <div class="fs-timer" id="fsDisplay">25:00</div>
+    <div class="timer-controls" style="max-width: 440px;">
+      <button class="btn-main" id="fsStartBtn">▶ Start Focus</button>
+      <button class="btn-secondary" id="fsPauseBtn" disabled>⏸ Pause</button>
+      <button class="btn-secondary" id="fsResetBtn">↺ Reset</button>
+    </div>
+  </div>
+
+  <!-- Interactive Floating Toast -->
+  <div class="toast" id="toast">
+    <span id="toastIcon">🌿</span>
+    <span id="toastMsg">Session Complete!</span>
+  </div>
+
+  <!-- ============================================================
+       JAVASCRIPT LOGIC & PROCEDURAL SYNTHESIZERS
+       ============================================================ -->
+  <script>
+    // 1. Theme Configuration Metadata
+    const THEMES = {
+      forest: {
+        badge: '🌿 Emerald Forest',
+        sub: 'Atmospheric Nature Edition',
+        icon: '🌿',
+        soundIcon: '🌧️',
+        soundTitle: 'Forest Rain & Breeze',
+        soundDesc: 'Gentle procedural rain with pine breeze',
+        particleColor: 'rgba(52, 211, 153, ',
+        particleType: 'leaves',
+        chimeFrequencies: [528, 660, 792] // E/A/B chord
+      },
+      cyber: {
+        badge: '🌌 Cyber Neon',
+        sub: 'Tokyo Midnight Cyberpunk',
+        icon: '🌌',
+        soundIcon: '🛸',
+        soundTitle: '432Hz Cosmic Synth Drone',
+        soundDesc: 'Deep binaural space hum for hyper-focus',
+        particleColor: 'rgba(168, 85, 247, ',
+        particleType: 'stars',
+        chimeFrequencies: [440, 554, 659] // Synth triad
+      },
+      sunset: {
+        badge: '🌅 Sunset Ember',
+        sub: 'Warm Golden Hour Focus',
+        icon: '🌅',
+        soundIcon: '🔥',
+        soundTitle: 'Campfire & Warm Hearth',
+        soundDesc: 'Cozy crackling firewood and warm noise',
+        particleColor: 'rgba(249, 115, 22, ',
+        particleType: 'embers',
+        chimeFrequencies: [392, 493, 587] // Warm G major
+      },
+      ocean: {
+        badge: '🌊 Oceanic Abyss',
+        sub: 'Deep Marina Tranquility',
+        icon: '🌊',
+        soundIcon: '🌊',
+        soundTitle: 'Tidal Swell & Ocean Waves',
+        soundDesc: 'Rhythmic deep ocean swells & surf',
+        particleColor: 'rgba(56, 189, 248, ',
+        particleType: 'bubbles',
+        chimeFrequencies: [349, 440, 523] // F Major
+      },
+      coffee: {
+        badge: '☕ Vintage Espresso',
+        sub: 'Dark Walnut Study Atelier',
+        icon: '☕',
+        soundIcon: '📻',
+        soundTitle: 'Cozy Cafe & Vinyl Warmth',
+        soundDesc: 'Warm vinyl hum and cafe ambiance',
+        particleColor: 'rgba(217, 119, 6, ',
+        particleType: 'steam',
+        chimeFrequencies: [330, 415, 493] // E Major
+      },
+      arctic: {
+        badge: '❄️ Arctic Aurora',
+        sub: 'Northern Lights & Crisp Frost',
+        icon: '❄️',
+        soundIcon: '🌬️',
+        soundTitle: 'Crystalline Aurora Breeze',
+        soundDesc: 'Ethereal sub-zero wind & ice chimes',
+        particleColor: 'rgba(45, 212, 191, ',
+        particleType: 'snow',
+        chimeFrequencies: [587, 740, 880] // D Major High
+      }
+    };
+
+    // State Variables
+    let currentTheme = 'forest';
+    let mode = 'countdown'; // 'countdown', 'pomodoro', 'stopwatch'
+    let selectedSubject = 'Bengali';
+    let selectedWorkType = 'Revision';
+    let totalSeconds = 25 * 60;
+    let remainingSeconds = 25 * 60;
+    let stopwatchElapsed = 0;
+    let isRunning = false;
+    let timerInterval = null;
+    let todayFocusMins = 125;
+    let pomoPhase = 'work'; // 'work' or 'break'
+
+    // DOM References
+    const body = document.body;
+    const timeDisplay = document.getElementById('timeDisplay');
+    const fsDisplay = document.getElementById('fsDisplay');
+    const startBtn = document.getElementById('startBtn');
+    const pauseBtn = document.getElementById('pauseBtn');
+    const resetBtn = document.getElementById('resetBtn');
+    const fsStartBtn = document.getElementById('fsStartBtn');
+    const fsPauseBtn = document.getElementById('fsPauseBtn');
+    const fsResetBtn = document.getElementById('fsResetBtn');
+    const timerCard = document.getElementById('timerCard');
+    const pulseDot = document.getElementById('pulseDot');
+    const statusHintText = document.getElementById('statusHintText');
+    const activeSubjectBadge = document.getElementById('activeSubjectBadge');
+    const activeWorkTypeBadge = document.getElementById('activeWorkTypeBadge');
+    const fsSubjectBadge = document.getElementById('fsSubjectBadge');
+    const fsWorkTypeBadge = document.getElementById('fsWorkTypeBadge');
+    const durationPickerBox = document.getElementById('durationPickerBox');
+    const fsOverlay = document.getElementById('fsOverlay');
+    const toast = document.getElementById('toast');
+
+    // Theme Elements
+    const brandIcon = document.getElementById('brandIcon');
+    const brandSub = document.getElementById('brandSub');
+    const currentThemeBadge = document.getElementById('currentThemeBadge');
+    const soundscapeIcon = document.getElementById('soundscapeIcon');
+    const soundscapeTitle = document.getElementById('soundscapeTitle');
+    const soundscapeDesc = document.getElementById('soundscapeDesc');
+    const soundscapeToggleBtn = document.getElementById('soundscapeToggleBtn');
+    const soundIcon = document.getElementById('soundIcon');
+
+    // ============================================================
+    // THEME SWITCHING ENGINE
+    // ============================================================
+    function switchTheme(themeKey) {
+      if (!THEMES[themeKey]) return;
+      currentTheme = themeKey;
+      body.setAttribute('data-theme', themeKey);
+
+      // Update Theme Switcher UI
+      document.querySelectorAll('.theme-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.theme === themeKey);
+      });
+
+      const config = THEMES[themeKey];
+      brandIcon.textContent = config.icon;
+      brandSub.textContent = config.sub;
+      currentThemeBadge.textContent = config.badge;
+      soundscapeIcon.textContent = config.soundIcon;
+      soundscapeTitle.textContent = config.soundTitle;
+      soundscapeDesc.textContent = config.soundDesc;
+      soundIcon.textContent = config.soundIcon;
+
+      // Re-init canvas particles for active theme
+      initCanvasParticles();
+
+      // If ambient sound is running, update soundscape seamlessly
+      if (isAmbientSoundPlaying) {
+        stopAmbientSound();
+        startAmbientSound();
+      }
+
+      showToast(`Switched theme to ${config.badge}!`, config.icon);
+    }
+
+    document.querySelectorAll('.theme-btn').forEach(btn => {
+      btn.addEventListener('click', () => switchTheme(btn.dataset.theme));
+    });
+
+    // ============================================================
+    // TIMER ENGINE
+    // ============================================================
+    function formatTime(secs) {
+      const h = Math.floor(secs / 3600);
+      const m = Math.floor((secs % 3600) / 60);
+      const s = secs % 60;
+      if (h > 0) {
+        return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+      }
+      return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+    }
+
+    function updateDisplay() {
+      const formatted = formatTime(mode === 'stopwatch' ? stopwatchElapsed : remainingSeconds);
+      timeDisplay.textContent = formatted;
+      fsDisplay.textContent = formatted;
+    }
+
+    function setMode(newMode) {
+      if (isRunning) pauseTimer();
+      mode = newMode;
+      document.getElementById('tabCountdown').classList.toggle('active', mode === 'countdown');
+      document.getElementById('tabPomodoro').classList.toggle('active', mode === 'pomodoro');
+      document.getElementById('tabStopwatch').classList.toggle('active', mode === 'stopwatch');
+
+      durationPickerBox.style.display = (mode === 'countdown') ? 'flex' : 'none';
+
+      if (mode === 'pomodoro') {
+        pomoPhase = 'work';
+        totalSeconds = 25 * 60;
+        remainingSeconds = 25 * 60;
+        statusHintText.textContent = 'Pomodoro: 25 min Study session';
+      } else if (mode === 'stopwatch') {
+        stopwatchElapsed = 0;
+        statusHintText.textContent = 'Stopwatch: Count upward';
+      } else {
+        remainingSeconds = totalSeconds;
+        statusHintText.textContent = 'Countdown Ready';
+      }
+      updateDisplay();
+    }
+
+    function startTimer() {
+      if (isRunning) return;
+      isRunning = true;
+      startBtn.disabled = true;
+      pauseBtn.disabled = false;
+      fsStartBtn.disabled = true;
+      fsPauseBtn.disabled = false;
+
+      timerCard.classList.add('running');
+      pulseDot.classList.add('running');
+      statusHintText.textContent = mode === 'stopwatch' ? 'Studying actively...' : 'Deep Focus session in progress...';
+
+      timerInterval = setInterval(() => {
+        if (mode === 'stopwatch') {
+          stopwatchElapsed++;
+          updateDisplay();
+        } else {
+          if (remainingSeconds > 0) {
+            remainingSeconds--;
+            updateDisplay();
+          } else {
+            onTimerComplete();
+          }
+        }
+      }, 1000);
+    }
+
+    function pauseTimer() {
+      if (!isRunning) return;
+      isRunning = false;
+      clearInterval(timerInterval);
+      startBtn.disabled = false;
+      pauseBtn.disabled = true;
+      fsStartBtn.disabled = false;
+      fsPauseBtn.disabled = true;
+
+      timerCard.classList.remove('running');
+      pulseDot.classList.remove('running');
+      statusHintText.textContent = 'Paused — Tap Start to continue';
+    }
+
+    function resetTimer() {
+      pauseTimer();
+      if (mode === 'stopwatch') {
+        if (stopwatchElapsed >= 60) {
+          saveSession(Math.floor(stopwatchElapsed / 60));
+        }
+        stopwatchElapsed = 0;
+      } else {
+        const doneSecs = totalSeconds - remainingSeconds;
+        if (doneSecs >= 60) {
+          saveSession(Math.floor(doneSecs / 60));
+        }
+        remainingSeconds = totalSeconds;
+      }
+      statusHintText.textContent = 'Reset to start';
+      updateDisplay();
+    }
+
+    function onTimerComplete() {
+      pauseTimer();
+      playZenChime();
+      const mins = Math.floor(totalSeconds / 60);
+      saveSession(mins);
+
+      if (mode === 'pomodoro') {
+        if (pomoPhase === 'work') {
+          showToast(`🎯 25m Focus done! Take 5 mins Break`, '☕');
+          pomoPhase = 'break';
+          totalSeconds = 5 * 60;
+          remainingSeconds = 5 * 60;
+        } else {
+          showToast(`🌿 Break finished! Ready for next round`, '💪');
+          pomoPhase = 'work';
+          totalSeconds = 25 * 60;
+          remainingSeconds = 25 * 60;
+        }
+      } else {
+        showToast(`🔔 Session complete! ${selectedSubject} saved`, '🎉');
+      }
+      updateDisplay();
+    }
+
+    function saveSession(mins) {
+      if (mins <= 0) return;
+      todayFocusMins += mins;
+      document.getElementById('statToday').textContent = `${todayFocusMins} min`;
+    }
+
+    function showToast(msg, icon = '🌿') {
+      document.getElementById('toastMsg').textContent = msg;
+      document.getElementById('toastIcon').textContent = icon;
+      toast.classList.add('show');
+      setTimeout(() => toast.classList.remove('show'), 3500);
+    }
+
+    // ============================================================
+    // PROCEDURAL WEB AUDIO API (Zen Chime & 6 Soundscapes)
+    // ============================================================
+    let audioCtx = null;
+    function getAudioContext() {
+      if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+      return audioCtx;
+    }
+
+    // Theme-tuned Zen Chime
+    function playZenChime() {
+      try {
+        const ctx = getAudioContext();
+        const now = ctx.currentTime;
+        const freqs = THEMES[currentTheme].chimeFrequencies;
+        freqs.forEach((f, i) => {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(f, now + i * 0.12);
+          gain.gain.setValueAtTime(0.001, now + i * 0.12);
+          gain.gain.exponentialRampToValueAtTime(0.3, now + i * 0.12 + 0.04);
+          gain.gain.exponentialRampToValueAtTime(0.0001, now + i * 0.12 + 2.8);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(now + i * 0.12);
+          osc.stop(now + i * 0.12 + 2.9);
+        });
+      } catch(e) {}
+    }
+
+    // Procedural Ambient Synthesizer
+    let ambientNodes = [];
+    let isAmbientSoundPlaying = false;
+
+    function startAmbientSound() {
+      try {
+        const ctx = getAudioContext();
+        stopAmbientSound(); // clear any previous
+
+        if (currentTheme === 'forest') {
+          // Forest Rain: filtered white noise + low breeze
+          const bufferSize = ctx.sampleRate * 2;
+          const noiseBuffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+          const output = noiseBuffer.getChannelData(0);
+          for (let i = 0; i < bufferSize; i++) {
+            output[i] = (Math.random() * 2 - 1) * 0.09;
+          }
+          const whiteNoise = ctx.createBufferSource();
+          whiteNoise.buffer = noiseBuffer;
+          whiteNoise.loop = true;
+
+          const filter = ctx.createBiquadFilter();
+          filter.type = 'lowpass';
+          filter.frequency.value = 820;
+
+          const gainNode = ctx.createGain();
+          gainNode.gain.value = 0.28;
+
+          whiteNoise.connect(filter);
+          filter.connect(gainNode);
+          gainNode.connect(ctx.destination);
+          whiteNoise.start();
+
+          ambientNodes.push(whiteNoise, filter, gainNode);
+
+        } else if (currentTheme === 'cyber') {
+          // 432Hz Cosmic Synth Binaural Drone
+          const osc1 = ctx.createOscillator();
+          const osc2 = ctx.createOscillator();
+          const gainNode = ctx.createGain();
+
+          osc1.type = 'triangle';
+          osc1.frequency.value = 108; // sub harmonic
+          osc2.type = 'sine';
+          osc2.frequency.value = 432;
+
+          gainNode.gain.value = 0.12;
+
+          osc1.connect(gainNode);
+          osc2.connect(gainNode);
+          gainNode.connect(ctx.destination);
+
+          osc1.start();
+          osc2.start();
+          ambientNodes.push(osc1, osc2, gainNode);
+
+        } else if (currentTheme === 'sunset') {
+          // Campfire Hearth: Brown noise + random crackle
+          const bufferSize = ctx.sampleRate * 2;
+          const noiseBuffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+          const output = noiseBuffer.getChannelData(0);
+          let lastOut = 0.0;
+          for (let i = 0; i < bufferSize; i++) {
+            const white = Math.random() * 2 - 1;
+            output[i] = (lastOut + (0.02 * white)) / 1.02;
+            lastOut = output[i];
+            output[i] *= 0.8;
+          }
+          const brownNoise = ctx.createBufferSource();
+          brownNoise.buffer = noiseBuffer;
+          brownNoise.loop = true;
+
+          const gainNode = ctx.createGain();
+          gainNode.gain.value = 0.35;
+
+          brownNoise.connect(gainNode);
+          gainNode.connect(ctx.destination);
+          brownNoise.start();
+          ambientNodes.push(brownNoise, gainNode);
+
+        } else if (currentTheme === 'ocean') {
+          // Ocean Swells: Rhythmic filtered noise
+          const bufferSize = ctx.sampleRate * 2;
+          const noiseBuffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+          const output = noiseBuffer.getChannelData(0);
+          for (let i = 0; i < bufferSize; i++) output[i] = (Math.random() * 2 - 1) * 0.1;
+          const whiteNoise = ctx.createBufferSource();
+          whiteNoise.buffer = noiseBuffer;
+          whiteNoise.loop = true;
+
+          const filter = ctx.createBiquadFilter();
+          filter.type = 'bandpass';
+          filter.frequency.value = 350;
+          filter.Q.value = 1.0;
+
+          const gainNode = ctx.createGain();
+          gainNode.gain.value = 0.3;
+
+          // LFO for wave rhythmic surge
+          const lfo = ctx.createOscillator();
+          lfo.frequency.value = 0.12; // 1 wave every 8 seconds
+          const lfoGain = ctx.createGain();
+          lfoGain.gain.value = 0.2;
+          lfo.connect(lfoGain);
+          lfoGain.connect(gainNode.gain);
+
+          whiteNoise.connect(filter);
+          filter.connect(gainNode);
+          gainNode.connect(ctx.destination);
+
+          whiteNoise.start();
+          lfo.start();
+          ambientNodes.push(whiteNoise, filter, gainNode, lfo, lfoGain);
+
+        } else if (currentTheme === 'coffee') {
+          // Warm Vinyl Needle hum & soft low pass
+          const osc = ctx.createOscillator();
+          osc.type = 'sine';
+          osc.frequency.value = 85;
+          const gainNode = ctx.createGain();
+          gainNode.gain.value = 0.08;
+          osc.connect(gainNode);
+          gainNode.connect(ctx.destination);
+          osc.start();
+          ambientNodes.push(osc, gainNode);
+
+        } else if (currentTheme === 'arctic') {
+          // Arctic Aurora: High atmospheric breeze
+          const bufferSize = ctx.sampleRate * 2;
+          const noiseBuffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+          const output = noiseBuffer.getChannelData(0);
+          for (let i = 0; i < bufferSize; i++) output[i] = (Math.random() * 2 - 1) * 0.06;
+          const noise = ctx.createBufferSource();
+          noise.buffer = noiseBuffer;
+          noise.loop = true;
+
+          const filter = ctx.createBiquadFilter();
+          filter.type = 'bandpass';
+          filter.frequency.value = 1200;
+          filter.Q.value = 2.5;
+
+          const gainNode = ctx.createGain();
+          gainNode.gain.value = 0.22;
+
+          noise.connect(filter);
+          filter.connect(gainNode);
+          gainNode.connect(ctx.destination);
+          noise.start();
+          ambientNodes.push(noise, filter, gainNode);
+        }
+
+        isAmbientSoundPlaying = true;
+        soundscapeToggleBtn.textContent = '⏸ Mute Sound';
+        document.getElementById('soundBtn').classList.add('active');
+        showToast(`${THEMES[currentTheme].soundTitle} playing!`, THEMES[currentTheme].soundIcon);
+      } catch(e) {
+        showToast('Click anywhere on page first to enable Web Audio');
+      }
+    }
+
+    function stopAmbientSound() {
+      ambientNodes.forEach(node => {
+        try {
+          if (node.stop) node.stop();
+          if (node.disconnect) node.disconnect();
+        } catch(e) {}
+      });
+      ambientNodes = [];
+      isAmbientSoundPlaying = false;
+      soundscapeToggleBtn.textContent = '▶ Play Sound';
+      document.getElementById('soundBtn').classList.remove('active');
+    }
+
+    function toggleAmbientSound() {
+      if (isAmbientSoundPlaying) {
+        stopAmbientSound();
+        showToast('Ambient sound paused');
+      } else {
+        startAmbientSound();
+      }
+    }
+
+    soundscapeToggleBtn.addEventListener('click', toggleAmbientSound);
+    document.getElementById('soundBtn').addEventListener('click', toggleAmbientSound);
+
+    // ============================================================
+    // CANVAS PARTICLE ANIMATION ENGINE (Theme-Adaptive)
+    // ============================================================
+    const canvas = document.getElementById('ambientCanvas');
+    const ctx = canvas.getContext('2d');
+    let particles = [];
+    let animationFrameId = null;
+
+    function resizeCanvas() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    }
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+
+    class Particle {
+      constructor() {
+        this.reset();
+      }
+
+      reset() {
+        const themeConfig = THEMES[currentTheme];
+        this.x = Math.random() * canvas.width;
+        this.size = Math.random() * 4 + 2;
+        this.colorBase = themeConfig.particleColor;
+        this.alpha = Math.random() * 0.6 + 0.2;
+        this.type = themeConfig.particleType;
+
+        if (this.type === 'leaves') {
+          this.y = -20;
+          this.speedY = Math.random() * 0.8 + 0.4;
+          this.speedX = Math.sin(Math.random() * Math.PI) * 0.5;
+          this.rotation = Math.random() * 360;
+          this.rotSpeed = (Math.random() - 0.5) * 1.5;
+        } else if (this.type === 'embers') {
+          this.y = canvas.height + 20;
+          this.speedY = -(Math.random() * 1.4 + 0.6);
+          this.speedX = (Math.random() - 0.5) * 0.8;
+          this.alpha = Math.random() * 0.8 + 0.2;
+        } else if (this.type === 'bubbles') {
+          this.y = canvas.height + 20;
+          this.speedY = -(Math.random() * 1.0 + 0.5);
+          this.speedX = Math.sin(Math.random() * Math.PI) * 0.4;
+        } else if (this.type === 'snow') {
+          this.y = -20;
+          this.speedY = Math.random() * 1.2 + 0.6;
+          this.speedX = (Math.random() - 0.5) * 0.6;
+        } else if (this.type === 'steam') {
+          this.y = canvas.height + 20;
+          this.speedY = -(Math.random() * 0.6 + 0.3);
+          this.speedX = Math.sin(Math.random() * Math.PI) * 0.3;
+          this.size = Math.random() * 8 + 4;
+        } else {
+          // Stars
+          this.y = Math.random() * canvas.height;
+          this.speedY = (Math.random() - 0.5) * 0.3;
+          this.speedX = (Math.random() - 0.5) * 0.3;
+        }
+      }
+
+      update() {
+        this.x += this.speedX;
+        this.y += this.speedY;
+        if (this.rotation !== undefined) this.rotation += this.rotSpeed;
+
+        // Reset if out of viewport
+        if (this.y > canvas.height + 30 || this.y < -30 || this.x > canvas.width + 30 || this.x < -30) {
+          this.reset();
+        }
+      }
+
+      draw() {
+        ctx.save();
+        ctx.fillStyle = `${this.colorBase}${this.alpha})`;
+        ctx.shadowColor = `${this.colorBase}0.8)`;
+        ctx.shadowBlur = 10;
+
+        if (this.type === 'leaves') {
+          ctx.translate(this.x, this.y);
+          ctx.rotate((this.rotation * Math.PI) / 180);
+          ctx.beginPath();
+          ctx.ellipse(0, 0, this.size * 2, this.size, 0, 0, Math.PI * 2);
+          ctx.fill();
+        } else if (this.type === 'bubbles') {
+          ctx.strokeStyle = `${this.colorBase}${this.alpha})`;
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+          ctx.stroke();
+        } else {
+          ctx.beginPath();
+          ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.restore();
+      }
+    }
+
+    function initCanvasParticles() {
+      particles = [];
+      const count = window.innerWidth < 600 ? 30 : 55;
+      for (let i = 0; i < count; i++) {
+        const p = new Particle();
+        p.y = Math.random() * canvas.height; // distribute initially
+        particles.push(p);
+      }
+    }
+
+    function animateParticles() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      particles.forEach(p => {
+        p.update();
+        p.draw();
+      });
+      animationFrameId = requestAnimationFrame(animateParticles);
+    }
+
+    initCanvasParticles();
+    animateParticles();
+
+    // ============================================================
+    // SELECTION LISTENERS (Subject, Work Type, Duration, Fullscreen)
+    // ============================================================
+    startBtn.addEventListener('click', startTimer);
+    pauseBtn.addEventListener('click', pauseTimer);
+    resetBtn.addEventListener('click', resetTimer);
+    fsStartBtn.addEventListener('click', startTimer);
+    fsPauseBtn.addEventListener('click', pauseTimer);
+    fsResetBtn.addEventListener('click', resetTimer);
+
+    document.getElementById('tabCountdown').addEventListener('click', () => setMode('countdown'));
+    document.getElementById('tabPomodoro').addEventListener('click', () => setMode('pomodoro'));
+    document.getElementById('tabStopwatch').addEventListener('click', () => setMode('stopwatch'));
+
+    // Subject switcher
+    document.querySelectorAll('#subjectGroup .subject-chip').forEach(chip => {
+      chip.addEventListener('click', () => {
+        document.querySelectorAll('#subjectGroup .subject-chip').forEach(c => c.classList.remove('active'));
+        chip.classList.add('active');
+        selectedSubject = chip.dataset.subject;
+        activeSubjectBadge.textContent = selectedSubject;
+        fsSubjectBadge.textContent = selectedSubject;
+        showToast(`Subject switched to ${selectedSubject}`, '📚');
+      });
+    });
+
+    // Work-type switcher
+    document.querySelectorAll('#workTypeGroup .time-chip').forEach(chip => {
+      chip.addEventListener('click', () => {
+        document.querySelectorAll('#workTypeGroup .time-chip').forEach(c => c.classList.remove('active'));
+        chip.classList.add('active');
+        selectedWorkType = chip.dataset.type;
+        activeWorkTypeBadge.textContent = selectedWorkType;
+        fsWorkTypeBadge.textContent = selectedWorkType;
+      });
+    });
+
+    // Duration chips
+    document.querySelectorAll('.duration-picker .time-chip').forEach(chip => {
+      chip.addEventListener('click', () => {
+        if (isRunning) return;
+        document.querySelectorAll('.duration-picker .time-chip').forEach(c => c.classList.remove('active'));
+        chip.classList.add('active');
+        const mins = parseInt(chip.dataset.mins);
+        totalSeconds = mins * 60;
+        remainingSeconds = totalSeconds;
+        updateDisplay();
+      });
+    });
+
+    // Fullscreen Toggle
+    function toggleFullscreen() {
+      const isFs = fsOverlay.classList.toggle('active');
+      if (isFs) {
+        if (document.documentElement.requestFullscreen) {
+          document.documentElement.requestFullscreen().catch(() => {});
+        }
+      } else {
+        if (document.exitFullscreen && document.fullscreenElement) {
+          document.exitFullscreen().catch(() => {});
+        }
+      }
+    }
+
+    document.getElementById('fsBtn').addEventListener('click', toggleFullscreen);
+    document.getElementById('fsCloseBtn').addEventListener('click', toggleFullscreen);
+
+    // Initial render
+    updateDisplay();
+  </script>
+</body>
+</html>

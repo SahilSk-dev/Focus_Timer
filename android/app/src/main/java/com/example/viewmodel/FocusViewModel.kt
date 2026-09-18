@@ -26,11 +26,24 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import com.example.ui.theme.AppTheme
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
 class FocusViewModel(application: Application) : AndroidViewModel(application) {
+
+    private val prefs = application.getSharedPreferences("focus_timer_prefs", Context.MODE_PRIVATE)
+    private val _currentAppTheme = MutableStateFlow(
+        AppTheme.fromId(prefs.getString("app_theme", "forest"))
+    )
+    val currentAppTheme: StateFlow<AppTheme> = _currentAppTheme.asStateFlow()
+
+    fun setAppTheme(theme: AppTheme) {
+        _currentAppTheme.value = theme
+        prefs.edit().putString("app_theme", theme.id).apply()
+        showToast("${theme.displayName} ${theme.icon} applied")
+    }
 
     private val db = AppDatabase.getInstance(application)
     val repository = FocusRepository(db.studyDao(), application)

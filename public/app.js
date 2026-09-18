@@ -8,12 +8,13 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyA4ZdANZWpoDKZ0pUjUX1EZwfgJbBZ9LpQ",
-  authDomain: "my-portal-f20f1.firebaseapp.com",
-  projectId: "my-portal-f20f1",
-  storageBucket: "my-portal-f20f1.firebasestorage.app",
-  messagingSenderId: "602759203883",
-  appId: "1:602759203883:web:focusstudy"
+  apiKey: "AIzaSyB1eP2u9-9ydGDzCe7HEVOtHkgld6_Bm9A",
+  authDomain: "my-new-project-a510e.firebaseapp.com",
+  projectId: "my-new-project-a510e",
+  storageBucket: "my-new-project-a510e.firebasestorage.app",
+  messagingSenderId: "589824399304",
+  appId: "1:589824399304:web:9e93181ccc258c316b52fd",
+  measurementId: "G-88XV4T1K3B"
 };
 const fbApp = initializeApp(firebaseConfig);
 const auth = getAuth(fbApp);
@@ -380,59 +381,10 @@ function playChime(){
     });
   }catch(e){}
 }
-function vibrate(){ if(navigator.vibrate) navigator.vibrate([300,150,300,150,300]); }
-
-let alarmInterval = null;
-let alarmBannerEl = null;
-
-function stopWebAlarm() {
-  if (alarmInterval) {
-    clearInterval(alarmInterval);
-    alarmInterval = null;
-  }
-  if (alarmBannerEl && alarmBannerEl.parentNode) {
-    alarmBannerEl.parentNode.removeChild(alarmBannerEl);
-    alarmBannerEl = null;
-  }
-}
-
-function startWebAlarm(msg) {
-  stopWebAlarm();
-  playChime();
-  vibrate();
-  notify(msg);
-
-  // Repeat alarm chime every 2.5 seconds
-  alarmInterval = setInterval(() => {
-    playChime();
-    vibrate();
-  }, 2500);
-
-  // Show floating Gold Alarm Banner with STOP button
-  if (!alarmBannerEl) {
-    alarmBannerEl = document.createElement('div');
-    alarmBannerEl.id = 'webAlarmOverlay';
-    alarmBannerEl.style.cssText = 'position: fixed; top: 20px; left: 50%; transform: translateX(-50%); background: linear-gradient(135deg, #2a1b05, #141414); border: 2px solid #e0ab34; border-radius: 14px; padding: 14px 24px; display: flex; align-items: center; gap: 14px; box-shadow: 0 0 30px rgba(224, 171, 52, 0.6); z-index: 100000;';
-    alarmBannerEl.innerHTML = '<span style="font-size: 26px;">⏰</span><div><div style="font-size: 15px; font-weight: bold; color: #ffd700;">Time\'s Up!</div><div style="font-size: 13px; color: #d0d0d0;">' + msg + '</div></div><button id="dismissWebAlarmBtn" style="background: #e0ab34; color: #111; border: none; font-weight: bold; padding: 8px 18px; border-radius: 8px; cursor: pointer; font-size: 13px; margin-left: 8px;">STOP ALARM 🔔</button>';
-    document.body.appendChild(alarmBannerEl);
-    document.getElementById('dismissWebAlarmBtn').addEventListener('click', stopWebAlarm);
-  }
-}
-
+function vibrate(){ if(navigator.vibrate) navigator.vibrate([250,120,250,120,250]); }
 function notify(msg){
   if('Notification' in window && Notification.permission==='granted'){
-    try{
-      const notif = new Notification("Time's up! ⏰", {
-        body: msg,
-        icon: '/icon.png',
-        requireInteraction: true
-      });
-      notif.onclick = () => {
-        window.focus();
-        stopWebAlarm();
-        notif.close();
-      };
-    }catch(e){}
+    try{ new Notification("Time's up! ⏰", { body: msg }); }catch(e){}
   }
 }
 if('Notification' in window && Notification.permission==='default'){
@@ -712,63 +664,40 @@ document.getElementById('addModalSave').addEventListener('click', async () => {
 });
 
 /* ============================================================
-   🎯 GOLDEN DIAL + TIMER INTEGRATION
+   🎨 MULTI-THEME SYSTEM (Emerald Forest, Cyber, Sunset, Ocean, Coffee, Arctic)
    ============================================================ */
-const clockContainer = document.getElementById('clockContainer');
-const dialToggle = document.getElementById('dialToggle');
-const hourHand = document.getElementById('hourHand');
-const minuteHand = document.getElementById('minuteHand');
-const secondHand = document.getElementById('secondHand');
+function initTheme() {
+  const savedTheme = localStorage.getItem('st_app_theme') || (prefs && prefs.theme) || 'forest';
+  applyTheme(savedTheme, false);
 
-// Build dial (ticks + numbers)
-if (clockContainer) {
-  for(let i=0; i<60; i++){
-    const tick = document.createElement('div');
-    tick.className = 'tick' + (i%5===0 ? ' major' : '');
-    tick.style.setProperty('--i', i);
-    clockContainer.appendChild(tick);
-  }
-  const nums = [12,1,2,3,4,5,6,7,8,9,10,11];
-  nums.forEach((n, i) => {
-    const num = document.createElement('div');
-    num.className = 'num';
-    num.style.setProperty('--i', i);
-    num.innerHTML = `<span>${n}</span>`;
-    clockContainer.appendChild(num);
+  const themePills = document.querySelectorAll('.theme-pill');
+  themePills.forEach(pill => {
+    pill.addEventListener('click', () => {
+      const themeId = pill.dataset.theme;
+      applyTheme(themeId, true);
+    });
   });
 }
 
-// Dial toggle - save preference to localStorage
-if (dialToggle) {
-  const savedDialPref = localStorage.getItem('st_dial_visible');
-  if (savedDialPref !== null) {
-    dialToggle.checked = savedDialPref === 'true';
-  }
-  if (dialToggle.checked) clockContainer.classList.add('show');
-  else clockContainer.classList.remove('show');
-
-  dialToggle.addEventListener('change', () => {
-    if (dialToggle.checked) clockContainer.classList.add('show');
-    else clockContainer.classList.remove('show');
-    localStorage.setItem('st_dial_visible', dialToggle.checked);
+function applyTheme(themeId, persist = true) {
+  if (!themeId) themeId = 'forest';
+  document.body.setAttribute('data-theme', themeId);
+  const themePills = document.querySelectorAll('.theme-pill');
+  themePills.forEach(pill => {
+    pill.classList.toggle('active', pill.dataset.theme === themeId);
   });
+  if (persist) {
+    localStorage.setItem('st_app_theme', themeId);
+    if (typeof prefs === 'object' && prefs !== null) {
+      prefs.theme = themeId;
+      savePrefs();
+    }
+  }
 }
 
-/**
- * 🎨 updateDial() - ALWAYS SHOWS THE REAL-TIME LOCAL CLOCK
- * The golden dial has NO relation to stopwatch / countdown.
- * Stopwatch & countdown are shown only in the digital display.
- */
-function updateDial() {
-  if (!clockContainer || !dialToggle || !dialToggle.checked) return;
-  const now = new Date();
-  const h = now.getHours() % 12;
-  const m = now.getMinutes();
-  const s = now.getSeconds() + now.getMilliseconds() / 1000;
-  if (secondHand) secondHand.style.transform = `rotate(${s * 6}deg)`;
-  if (minuteHand) minuteHand.style.transform = `rotate(${(m + s / 60) * 6}deg)`;
-  if (hourHand) hourHand.style.transform = `rotate(${(h + m / 60) * 30}deg)`;
-}
+// Stub for dial to prevent reference errors
+function updateDial() {}
+
 
 /* ---------- pomodoro ---------- */
 const pomoToggle = document.getElementById('pomoToggle');
@@ -857,20 +786,20 @@ async function finish(){
 
   if(pomodoroMode){
     if(pomoPhase==='work'){
-      startWebAlarm('Focus session ended - take a break');
+      playChime(); vibrate(); notify('Focus session ended - take a break');
       showToast('⏳ Focus session ended! Now 5 mins break');
       triggerConfetti();
       await addSession(sname, WORK_MIN, selectedWorkType);
       pomoPhase='break';
     } else {
-      startWebAlarm('Break ended - back to focus');
+      playChime(); vibrate(); notify('Break ended - back to focus');
       showToast('☕ Break ended! Start again');
       pomoPhase='work';
     }
     updatePhaseBadge();
     hintEl.textContent = pomoPhase==='work' ? 'Press Start for next session' : 'Press Start to begin break';
   } else {
-    startWebAlarm(sname + ' study time ended');
+    playChime(); vibrate(); notify(sname + ' study time ended');
     showToast('⏰ ' + sname + " — time's up!");
     triggerConfetti();
     const elapsedSec = wasStopwatch
@@ -889,7 +818,6 @@ async function finish(){
 }
 
 function startTimer(fromResume=false){
-  stopWebAlarm();
   if(!selectedSubject) {
     showToast('Select a subject first');
     return;
@@ -951,7 +879,6 @@ function pauseTimer(){
 }
 
 async function resetTimer(){
-  stopWebAlarm();
   const wasRunning = running;
   const wasStopwatch = stopwatchMode;
   running=false; clearInterval(tickHandle);
@@ -1169,8 +1096,7 @@ function renderHeatmap(){
     if(min>0 && min<=30) level=1; else if(min>30 && min<=60) level=2; else if(min>60) level=3;
     cells.push({d, min, level});
   }
-  const colors = ['#1c1c1a','#4a3a1a','#7a5f22','#c9962f'];
-  grid.innerHTML = cells.map(c=>`<div class="hcell" style="background:${colors[c.level]}" title="${c.d}: ${c.min} mins"></div>`).join('');
+  grid.innerHTML = cells.map(c=>`<div class="hcell level-${c.level}" title="${c.d}: ${c.min} mins"></div>`).join('');
 }
 
 /* ---------- history ---------- */
@@ -1475,8 +1401,13 @@ function initTimerFromLocalState(){
    the correct elapsed time (or finishes if it already expired). */
 
 (async function init(){
+  initTheme();
   renderAuthBar();
   await loadAll();
+  
+  if(prefs && prefs.theme){
+    applyTheme(prefs.theme, false);
+  }
   
   if(selectedSubject !== '' && !prefs.subjects.find(s => s.name === selectedSubject)) {
     selectedSubject = prefs.subjects[0]?.name || '';
@@ -1554,12 +1485,16 @@ document.getElementById('bulkDeleteBtn').addEventListener('click', async () => {
    🎯 ADVANCED FEATURES (Confetti, Target Detection, Analytics)
    ============================================================ */
 
-// SINGLE CONFETTI FUNCTION (removed duplicate from earlier)
+// SINGLE CONFETTI FUNCTION (Theme responsive)
 function triggerConfetti() {
   const container = document.getElementById('particles');
   if(!container) return;
   container.innerHTML = ''; 
-  const colors = ['#FFDF00', '#c9962f', '#FFF8DC', '#DAA520'];
+  const computed = getComputedStyle(document.body);
+  const accent = computed.getPropertyValue('--accent').trim() || '#10b981';
+  const bright = computed.getPropertyValue('--accent-bright').trim() || '#34d399';
+  const glow = computed.getPropertyValue('--accent-glow').trim() || '#6ee7b7';
+  const colors = [accent, bright, glow, '#ffffff'];
   for (let i = 0; i < 50; i++) {
     const p = document.createElement('div');
     p.classList.add('particle');
@@ -1627,7 +1562,7 @@ function renderSubjectAnalytics() {
     let badgeClass = 'normal';
     let badgeIcon = `${index + 1}`;
     
-    if (index === 0) { badgeClass = 'gold'; badgeIcon = '🏆'; }
+    if (index === 0) { badgeClass = 'rank-1'; badgeIcon = '👑'; }
     else if (index === 1) { badgeClass = 'silver'; badgeIcon = '🥈'; }
     else if (index === 2) { badgeClass = 'bronze'; badgeIcon = '🥉'; }
 

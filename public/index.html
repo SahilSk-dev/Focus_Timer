@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<meta name="theme-color" content="#0d0d0c">
+<meta name="theme-color" content="#040e08">
 <link rel="manifest" href="./manifest.json">
 <title>Focus Study Timer</title>
 <link rel="icon" type="image/png" href="./icon.png?v=5">
@@ -12,11 +12,21 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
 <link rel="stylesheet" href="./style.css">
 </head>
-<body>
+<body data-theme="forest">
 
-<div style="display: flex; align-items: center; justify-content: center; gap: 14px; margin-top: 15px; margin-bottom: 25px;">
-  <img src="./icon.svg?v=4" alt="Focus Timer Logo" width="48" height="48" style="filter: drop-shadow(0 4px 12px rgba(218, 165, 32, 0.4)); object-fit: cover;" />
+<div style="display: flex; align-items: center; justify-content: center; gap: 14px; margin-top: 15px; margin-bottom: 15px;">
+  <img src="./icon.svg?v=4" alt="Focus Timer Logo" width="44" height="44" style="filter: drop-shadow(0 4px 12px rgba(16, 185, 129, 0.4)); object-fit: cover;" />
   <h1 style="margin: 0;">Focus Study Timer</h1>
+</div>
+
+<!-- 🎨 THEME QUICK-SWITCHER BAR -->
+<div class="theme-bar" id="themeBar">
+  <button class="theme-pill active" data-theme="forest">🌿 Nature</button>
+  <button class="theme-pill" data-theme="cyber">🌌 Cyber</button>
+  <button class="theme-pill" data-theme="sunset">🌅 Sunset</button>
+  <button class="theme-pill" data-theme="ocean">🌊 Ocean</button>
+  <button class="theme-pill" data-theme="coffee">☕ Coffee</button>
+  <button class="theme-pill" data-theme="arctic">❄️ Arctic</button>
 </div>
 
 <div class="wrap">
@@ -53,15 +63,6 @@
     </div>
   </div>
 
-  <!-- ✅ GOLDEN DIAL TOGGLE -->
-  <div class="pomo-row" style="margin-top:-6px;">
-    <span class="pomo-label">Show Golden Dial</span>
-    <label class="switch">
-      <input type="checkbox" id="dialToggle" checked>
-      <span class="slider"></span>
-    </label>
-  </div>
-
   <div class="time-row" id="customTimeRow">
     <div>
       <label class="field-label">Hours</label>
@@ -79,17 +80,6 @@
     <button id="fullscreenBtn" class="fs-btn" title="Full Screen">
       <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/></svg>
     </button>
-
-    <!-- ✅ GOLDEN DIAL (Real-time clock / Stopwatch / Countdown) -->
-    <div class="clock-container show" id="clockContainer">
-      <div class="clock-face"></div>
-      <div class="dial-brand">FOCUS</div>
-      <div class="dial-sub">LEGENDARY</div>
-      <div class="hand hand-hour"   id="hourHand"></div>
-      <div class="hand hand-minute" id="minuteHand"></div>
-      <div class="hand hand-second" id="secondHand"></div>
-      <div class="center-dot"></div>
-    </div>
 
     <div class="hint" id="hint">Press Start to begin studying</div>
     <div class="timer-display" id="display">00:00:00</div>
@@ -114,8 +104,8 @@
     <div class="card-row">
       <div class="streak-left">
         <svg class="flame" viewBox="0 0 24 24" fill="none">
-          <path d="M12 2C12 2 7 7.5 7 12.5C7 15.5 9 18 12 18C15 18 17 15.5 17 12.5C17 11 16.3 9.7 15.5 8.7C15.7 10 15 11 14 11C13.5 11 13.2 10.6 13.2 10C13.2 8.8 14 8 14 6C14 4.5 13 3 12 2Z" fill="#c9962f"/>
-          <path d="M9.5 14.5C9.5 16.4 10.6 18 12 18C13.4 18 14.5 16.6 14.5 15C14.5 13.8 13.8 13 13 12.3C13.1 13 12.7 13.5 12.2 13.5C11.9 13.5 11.7 13.2 11.7 12.9C11.7 12.2 12 11.8 12 11C12 10.2 11.6 9.6 11 9C11 9 9.5 11.8 9.5 14.5Z" fill="#0a0a0a"/>
+          <path class="flame-path" d="M12 2C12 2 7 7.5 7 12.5C7 15.5 9 18 12 18C15 18 17 15.5 17 12.5C17 11 16.3 9.7 15.5 8.7C15.7 10 15 11 14 11C13.5 11 13.2 10.6 13.2 10C13.2 8.8 14 8 14 6C14 4.5 13 3 12 2Z"/>
+          <path d="M9.5 14.5C9.5 16.4 10.6 18 12 18C13.4 18 14.5 16.6 14.5 15C14.5 13.8 13.8 13 13 12.3C13.1 13 12.7 13.5 12.2 13.5C11.9 13.5 11.7 13.2 11.7 12.9C11.7 12.2 12 11.8 12 11C12 10.2 11.6 9.6 11 9C11 9 9.5 11.8 9.5 14.5Z" fill="#040e08"/>
         </svg>
         <div>
           <div class="streak-num" id="streakNum">0</div>
@@ -141,7 +131,7 @@
         <div class="card-title" style="margin-bottom:2px;">Level</div>
         <div class="level-num" id="levelNum">Level 1</div>
       </div>
-      <div style="text-align:right; font-family:'Inter',sans-serif; font-size:0.8rem; color:var(--text-dim);" id="xpMeta">0 / 300 mins</div>
+      <div style="text-align:right; font-family:var(--font-main); font-size:0.8rem; color:var(--text-dim);" id="xpMeta">0 / 300 mins</div>
     </div>
     <div class="track"><div class="fill green" id="xpFill"></div></div>
   </div>
@@ -163,7 +153,7 @@
   <!-- 7-Day Subject Analytics & Badges -->
   <div class="stats-title" style="margin-bottom:14px; display:flex; justify-content:space-between; align-items:center;">
     <span>Last 7 Days Ranking</span>
-    <span style="font-size:0.8rem; font-weight:normal; color:var(--gold);">🏆 Badges</span>
+    <span style="font-size:0.82rem; font-weight:600; color:var(--accent-bright);">🏆 Top Ranks</span>
   </div>
   <div id="subjectRankingList" class="subj-rank-list">
     <!-- Ranks injected via JS -->
@@ -174,7 +164,7 @@
   <div class="stats-title" style="margin-bottom:14px;">Last 12 Weeks</div>
   <div class="heatmap-scroll"><div class="heatmap-grid" id="heatmap"></div></div>
   <div class="heatmap-legend">
-    Less <div class="hcell" style="background:#1c1c1a"></div><div class="hcell" style="background:#4a3a1a"></div><div class="hcell" style="background:#7a5f22"></div><div class="hcell" style="background:#c9962f"></div> More
+    Less <div class="hcell level-0"></div><div class="hcell level-1"></div><div class="hcell level-2"></div><div class="hcell level-3"></div> More
   </div>
 
   </div> <!-- END VIEW 2 -->
@@ -262,7 +252,7 @@
     <div id="addModalOptions" style="display:none; text-align:left; margin-bottom:15px; margin-top:-5px;">
       <label style="font-size:0.85rem; color:var(--text-dim); display:flex; align-items:center; gap:8px; cursor:pointer;">
         <input type="checkbox" id="modalIsCoreCheck" style="width:auto; margin:0; cursor:pointer;">
-        Core Subject (Golden Effect)
+        Core Subject (Highlight Effect)
       </label>
       <label style="font-size:0.85rem; color:var(--text-dim); display:flex; align-items:center; gap:8px; cursor:pointer; margin-top:6px;">
         <input type="checkbox" id="modalIsNonStudyCheck" style="width:auto; margin:0; cursor:pointer;">
