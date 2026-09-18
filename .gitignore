@@ -1,0 +1,7 @@
+node_modules/
+focus.db
+mail.json
+scratch/
+temp.png
+*.log
+.env

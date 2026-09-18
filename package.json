@@ -1,0 +1,17 @@
+{
+  "name": "focus-study-timer",
+  "version": "2.0.0",
+  "private": true,
+  "description": "Focus Study Timer with SQL backend auth (login, register, forgot password)",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.22.2",
+    "nodemailer": "^9.0.3"
+  },
+  "devDependencies": {
+    "sharp": "^0.35.3"
+  }
+}

@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pure CSS Golden Watch</title>
+<style>
+  body {
+    background: #1a1a1a;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    margin: 0;
+    font-family: 'Times New Roman', serif;
+  }
+
+  /* The main metallic case */
+  .watch-case {
+    position: relative;
+    width: 320px;
+    height: 320px;
+    border-radius: 50%;
+    /* Golden metallic conic gradient */
+    background: conic-gradient(
+      #ffd700 0deg,
+      #b8860b 45deg,
+      #fff8dc 90deg,
+      #b8860b 135deg,
+      #ffd700 180deg,
+      #b8860b 225deg,
+      #fff8dc 270deg,
+      #b8860b 315deg,
+      #ffd700 360deg
+    );
+    box-shadow: 
+      0 15px 35px rgba(0,0,0,0.8),
+      inset 0 3px 6px rgba(255, 255, 255, 0.7),
+      inset 0 -3px 6px rgba(0, 0, 0, 0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+
+  /* The crown (Top button) */
+  .watch-crown {
+    position: absolute;
+    top: -20px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 28px;
+    height: 20px;
+    border-radius: 6px 6px 0 0;
+    background: linear-gradient(90deg, #b8860b, #ffd700, #fff8dc, #ffd700, #b8860b);
+    z-index: 0;
+  }
+  /* Crown ridges */
+  .watch-crown::after {
+    content: '';
+    position: absolute;
+    top: -10px;
+    left: 2px;
+    width: 24px;
+    height: 10px;
+    border-radius: 4px 4px 0 0;
+    background: repeating-linear-gradient(90deg, #8a6327 0, #8a6327 2px, #ffd700 2px, #ffd700 4px);
+  }
+
+  /* The inner black dial */
+  .watch-dial {
+    position: relative;
+    width: 280px;
+    height: 280px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 50% 50%, #2a2a2a 0%, #000000 100%);
+    box-shadow: 
+      inset 0 8px 20px rgba(0,0,0,0.9),
+      0 0 3px rgba(255, 215, 0, 0.6);
+    z-index: 10;
+  }
+
+  /* Dial inner metallic ring */
+  .watch-dial::before {
+    content: '';
+    position: absolute;
+    top: 6px; left: 6px; right: 6px; bottom: 6px;
+    border-radius: 50%;
+    border: 1px solid rgba(218, 165, 32, 0.3);
+  }
+
+  /* Center pin (where hands meet) */
+  .center-pin {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: radial-gradient(circle, #fff8dc, #d4af37, #8a6327);
+    box-shadow: 0 2px 5px rgba(0,0,0,0.7);
+    z-index: 50;
+  }
+  .center-pin::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #111;
+  }
+
+  /* Clock hands */
+  .hand {
+    position: absolute;
+    bottom: 50%;
+    left: 50%;
+    transform-origin: bottom center;
+    border-radius: 50px 50px 0 0;
+    z-index: 20;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.6);
+  }
+
+  .hour-hand {
+    width: 8px;
+    height: 75px;
+    background: linear-gradient(to right, #8a6327, #fff8dc, #8a6327);
+    margin-left: -4px;
+  }
+
+  .minute-hand {
+    width: 6px;
+    height: 110px;
+    background: linear-gradient(to right, #8a6327, #fff8dc, #8a6327);
+    margin-left: -3px;
+  }
+
+  .second-hand {
+    width: 2px;
+    height: 120px;
+    background: #e74c3c;
+    margin-left: -1px;
+    z-index: 30;
+  }
+  .second-hand::after {
+    content: '';
+    position: absolute;
+    bottom: -25px;
+    left: -1px;
+    width: 4px;
+    height: 25px;
+    background: #e74c3c;
+    border-radius: 2px;
+  }
+
+  /* Glass reflection */
+  .glass {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    border-radius: 50%;
+    background: linear-gradient(135deg, rgba(255,255,255,0.2) 0%, rgba(255,255,255,0.05) 45%, rgba(255,255,255,0) 50%);
+    pointer-events: none;
+    z-index: 100;
+  }
+
+  /* Tick marks container */
+  .ticks {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+  }
+
+  .tick {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform-origin: bottom center;
+    width: 2px;
+    height: 140px; /* Radius from center */
+    margin-left: -1px;
+  }
+
+  .tick::before {
+    content: '';
+    position: absolute;
+    top: 5px;
+    left: 0;
+    width: 100%;
+    height: 5px;
+    background: #666;
+  }
+  
+  .tick.hour::before {
+    top: 5px;
+    height: 15px;
+    width: 4px;
+    margin-left: -1px;
+    background: #d4af37;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.5);
+  }
+
+  /* Decorative Text inside Dial */
+  .brand-text {
+    position: absolute;
+    top: 30%;
+    width: 100%;
+    text-align: center;
+    color: #d4af37;
+    font-size: 14px;
+    font-weight: bold;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    text-shadow: 0 1px 2px #000;
+  }
+
+  .sub-text {
+    position: absolute;
+    bottom: 30%;
+    width: 100%;
+    text-align: center;
+    color: #888;
+    font-size: 10px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+</style>
+</head>
+<body>
+
+<div class="watch-case">
+  <div class="watch-crown"></div>
+  <div class="watch-dial">
+    <div class="brand-text">Focus</div>
+    <div class="sub-text">Automatic<br>Chronograph</div>
+    
+    <div class="ticks" id="ticks"></div>
+    <div class="hand hour-hand" id="hr"></div>
+    <div class="hand minute-hand" id="mn"></div>
+    <div class="hand second-hand" id="sc"></div>
+    <div class="center-pin"></div>
+  </div>
+  <div class="glass"></div>
+</div>
+
+<script>
+  // Generate 60 tick marks
+  const ticksContainer = document.getElementById('ticks');
+  for(let i = 0; i < 60; i++) {
+    const tick = document.createElement('div');
+    tick.className = 'tick' + (i % 5 === 0 ? ' hour' : '');
+    tick.style.transform = `rotate(${i * 6}deg)`;
+    ticksContainer.appendChild(tick);
+  }
+
+  // Animate the clock hands using real time
+  const hr = document.getElementById('hr');
+  const mn = document.getElementById('mn');
+  const sc = document.getElementById('sc');
+
+  function updateClock() {
+    let day = new Date();
+    let hh = day.getHours() * 30; // 360 / 12 = 30
+    let mm = day.getMinutes() * 6; // 360 / 60 = 6
+    let ss = day.getSeconds() * 6;
+
+    hr.style.transform = `rotateZ(${hh + (mm/12)}deg)`;
+    mn.style.transform = `rotateZ(${mm}deg)`;
+    sc.style.transform = `rotateZ(${ss}deg)`;
+  }
+  
+  setInterval(updateClock, 1000);
+  updateClock(); // initial call to avoid delay
+</script>
+
+</body>
+</html>
