@@ -579,6 +579,14 @@ app.patch('/api/papers/:id/publish', requireAuth, (req, res) => {
 
 app.use(express.static(path.join(__dirname, 'public')));
 
+app.get('*', (req, res) => {
+  const indexPath = path.join(__dirname, 'public', 'index.html');
+  if (fs.existsSync(indexPath)) {
+    return res.sendFile(indexPath);
+  }
+  res.status(200).send('Focus Study Timer');
+});
+
 app.use((err, req, res, next) => {
   if (err.type === 'entity.parse.failed') return res.status(400).json({ ok: false, error: 'bad_json' });
   console.error(err);

@@ -5,7 +5,8 @@
   "description": "Focus Study Timer with SQL backend auth (login, register, forgot password)",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "build": "echo 'Static assets ready'"
   },
   "dependencies": {
     "express": "^4.22.2",
