@@ -49,9 +49,10 @@ class ExampleRobolectricTest {
         val allSessions = repo.getAllSessions().first()
         assertTrue(allSessions.any { it.subject == "Bengali - Text" && it.minutes == 45 })
 
-        // Test JSON export
+        // Test JSON export matching Web schema
         val exportedJson = repo.exportToJson(allSessions)
-        assertTrue(exportedJson.contains("Focus Study Timer"))
+        assertTrue(exportedJson.contains("sessions"))
+        assertTrue(exportedJson.contains("nonStudySessions"))
         assertTrue(exportedJson.contains("Bengali - Text"))
     }
 }

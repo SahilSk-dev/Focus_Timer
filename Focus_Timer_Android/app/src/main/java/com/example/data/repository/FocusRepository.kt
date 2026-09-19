@@ -168,43 +168,91 @@ class FocusRepository(
     fun exportToJson(sessions: List<StudySessionEntity>): String {
         val root = JSONObject()
         root.put("timestamp", System.currentTimeMillis())
-        root.put("appName", "Focus Study Timer")
-        val sessArray = JSONArray()
+        val studyArray = JSONArray()
+        val nonStudyArray = JSONArray()
+
         for (s in sessions) {
             val obj = JSONObject()
-            obj.put("id", s.id)
-            obj.put("date", s.date)
-            obj.put("subject", s.subject)
-            obj.put("subSubject", s.subSubject ?: "")
-            obj.put("workType", s.workType)
-            obj.put("minutes", s.minutes)
-            obj.put("ts", s.timestamp)
-            obj.put("isNonStudy", s.isNonStudy)
-            sessArray.put(obj)
+            val idStr = if (s.id > 0) s.id.toString() else "s_${s.timestamp}"
+            val workTypeStr = if (s.workType.isBlank()) "N/A" else s.workType
+
+            if (s.isNonStudy) {
+                obj.put("id", idStr)
+                obj.put("workType", workTypeStr)
+                obj.put("ts", s.timestamp)
+                obj.put("minutes", s.minutes)
+                obj.put("subject", s.subject)
+                obj.put("date", s.date)
+                obj.put("isNonStudy", true)
+                nonStudyArray.put(obj)
+            } else {
+                obj.put("id", idStr)
+                obj.put("date", s.date)
+                obj.put("workType", workTypeStr)
+                obj.put("minutes", s.minutes)
+                obj.put("subject", s.subject)
+                obj.put("ts", s.timestamp)
+                studyArray.put(obj)
+            }
         }
-        root.put("sessions", sessArray)
+
+        root.put("sessions", studyArray)
+        root.put("nonStudySessions", nonStudyArray)
         return root.toString(2)
     }
 
     suspend fun importFromJson(jsonString: String): Int {
         val root = JSONObject(jsonString)
-        val sessArray = root.optJSONArray("sessions") ?: return 0
+        val studyArray = root.optJSONArray("sessions")
+        val nonStudyArray = root.optJSONArray("nonStudySessions")
+
+        if (studyArray == null && nonStudyArray == null) return 0
+
+        val existingSessions = studyDao.getAllSessions().first()
+        val existingTsSet = existingSessions.map { it.timestamp }.toSet()
         val list = mutableListOf<StudySessionEntity>()
-        for (i in 0 until sessArray.length()) {
-            val obj = sessArray.getJSONObject(i)
+
+        fun parseSession(obj: JSONObject, defaultIsNonStudy: Boolean) {
+            val ts = obj.optLong("ts", System.currentTimeMillis())
+            // Check for deduplication
+            if (existingTsSet.contains(ts) || list.any { it.timestamp == ts }) {
+                return
+            }
+
+            val subject = obj.optString("subject", "General")
             val sub = obj.optString("subSubject", "")
+            val workType = obj.optString("workType", "N/A")
+            val minutes = obj.optInt("minutes", 0)
+            val date = obj.optString("date", getTodayString())
+            val isNonStudy = if (obj.has("isNonStudy")) obj.optBoolean("isNonStudy", defaultIsNonStudy) else defaultIsNonStudy
+
             list.add(
                 StudySessionEntity(
-                    date = obj.optString("date", getTodayString()),
-                    subject = obj.optString("subject", "General"),
+                    date = date,
+                    subject = subject,
                     subSubject = if (sub.isNotBlank()) sub else null,
-                    workType = obj.optString("workType", "Other"),
-                    minutes = obj.optInt("minutes", 0),
-                    timestamp = obj.optLong("ts", System.currentTimeMillis()),
-                    isNonStudy = obj.optBoolean("isNonStudy", false)
+                    workType = if (workType.isBlank()) "N/A" else workType,
+                    minutes = minutes,
+                    timestamp = ts,
+                    isNonStudy = isNonStudy
                 )
             )
         }
+
+        if (studyArray != null) {
+            for (i in 0 until studyArray.length()) {
+                val obj = studyArray.getJSONObject(i)
+                parseSession(obj, defaultIsNonStudy = false)
+            }
+        }
+
+        if (nonStudyArray != null) {
+            for (i in 0 until nonStudyArray.length()) {
+                val obj = nonStudyArray.getJSONObject(i)
+                parseSession(obj, defaultIsNonStudy = true)
+            }
+        }
+
         if (list.isNotEmpty()) {
             studyDao.insertSessions(list)
         }

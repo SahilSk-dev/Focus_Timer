@@ -1,6 +1,9 @@
 package com.example.ui.screens
 
 import android.content.Intent
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -25,6 +28,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Download
@@ -117,9 +122,28 @@ fun HistorySettingsScreen(
     var showBulkDeleteDialog by remember { mutableStateOf(false) }
 
     // Backup & Export state
-    var exportRange by remember { mutableStateOf("All Time") }
+    var exportRange by remember { mutableStateOf("Last 30 Days") }
+    var rangeDropdownExpanded by remember { mutableStateOf(false) }
     var jsonImportText by remember { mutableStateOf("") }
     var showImportDialog by remember { mutableStateOf(false) }
+
+    val jsonFilePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        uri?.let {
+            coroutineScope.launch {
+                try {
+                    context.contentResolver.openInputStream(it)?.use { stream ->
+                        val content = stream.bufferedReader().use { r -> r.readText() }
+                        val count = viewModel.repository.importFromJson(content)
+                        viewModel.showToast("Restore successful: $count sessions added!")
+                    }
+                } catch (e: Exception) {
+                    viewModel.showToast("Import error: Invalid JSON file")
+                }
+            }
+        }
+    }
 
     // Bulk delete dates
     val todayStr = remember { FocusRepository.getTodayString() }
@@ -372,6 +396,7 @@ fun HistorySettingsScreen(
                     }
 
                     // Export Card
+                    // DATA BACKUP & EXPORT (Matching Web layout)
                     Surface(
                         modifier = Modifier.fillMaxWidth(),
                         color = PanelDark,
@@ -380,51 +405,67 @@ fun HistorySettingsScreen(
                     ) {
                         Column(modifier = Modifier.padding(16.dp)) {
                             Text(
-                                text = "Export Report",
+                                text = "Data Backup & Export",
                                 style = TextStyle(
                                     brush = GoldGradientBrush,
                                     fontSize = 16.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    
+                                    fontWeight = FontWeight.Bold
                                 )
                             )
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text(
-                                text = "Select range and share a summarized report of your study hours.",
-                                color = TextDim,
-                                fontSize = 12.sp
-                            )
-                            Spacer(modifier = Modifier.height(12.dp))
+                            Spacer(modifier = Modifier.height(14.dp))
 
-                            // Range selector
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)
-                            ) {
-                                val ranges = listOf("Today", "7 Days", "30 Days", "All Time")
-                                ranges.forEach { r ->
-                                    val sel = exportRange == r
-                                    Box(
+                            // Range dropdown selector
+                            val ranges = listOf("Last 30 Days", "Last 7 Days", "Last 48 Hours", "Last 24 Hours", "Today", "All Time")
+                            Box(modifier = Modifier.fillMaxWidth()) {
+                                Surface(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable { rangeDropdownExpanded = true },
+                                    color = PanelElevated,
+                                    shape = RoundedCornerShape(8.dp),
+                                    border = BorderStroke(1.dp, LineBorder)
+                                ) {
+                                    Row(
                                         modifier = Modifier
-                                            .clip(RoundedCornerShape(6.dp))
-                                            .background(if (sel) GoldAccent else PanelElevated)
-                                            .clickable { exportRange = r }
-                                            .padding(horizontal = 10.dp, vertical = 6.dp)
+                                            .fillMaxWidth()
+                                            .padding(horizontal = 14.dp, vertical = 12.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
                                     ) {
                                         Text(
-                                            text = r,
-                                            color = if (sel) BgDark else TextDim,
-                                            fontSize = 12.sp,
-                                            fontWeight = FontWeight.SemiBold
+                                            text = exportRange,
+                                            color = TextPrimary,
+                                            fontSize = 14.sp
+                                        )
+                                        Icon(
+                                            imageVector = Icons.Default.ArrowDropDown,
+                                            contentDescription = null,
+                                            tint = GoldAccent
+                                        )
+                                    }
+                                }
+
+                                DropdownMenu(
+                                    expanded = rangeDropdownExpanded,
+                                    onDismissRequest = { rangeDropdownExpanded = false },
+                                    modifier = Modifier.background(PanelDark)
+                                ) {
+                                    ranges.forEach { r ->
+                                        DropdownMenuItem(
+                                            text = { Text(r, color = if (exportRange == r) GoldBright else TextPrimary) },
+                                            onClick = {
+                                                exportRange = r
+                                                rangeDropdownExpanded = false
+                                            }
                                         )
                                     }
                                 }
                             }
 
-                            Spacer(modifier = Modifier.height(14.dp))
+                            Spacer(modifier = Modifier.height(10.dp))
 
-                            // Action buttons: Download PDF Report & Share Text Report
-                            Button(
+                            // PDF Button (matches Image 2)
+                            OutlinedButton(
                                 onClick = {
                                     val filtered = filterSessionsByRange(allSessions, exportRange)
                                     if (filtered.isEmpty()) {
@@ -437,67 +478,23 @@ fun HistorySettingsScreen(
                                         }
                                     }
                                 },
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = GoldAccent,
-                                    contentColor = BgDark
-                                ),
-                                shape = RoundedCornerShape(8.dp),
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(16.dp))
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text("Download PDF Report (${filterSessionsByRange(allSessions, exportRange).size} sessions)", fontWeight = FontWeight.Bold)
-                            }
-
-                            Spacer(modifier = Modifier.height(8.dp))
-
-                            OutlinedButton(
-                                onClick = {
-                                    val filtered = filterSessionsByRange(allSessions, exportRange)
-                                    val reportText = generateReportText(filtered, exportRange)
-                                    val sendIntent = Intent().apply {
-                                        action = Intent.ACTION_SEND
-                                        putExtra(Intent.EXTRA_TEXT, reportText)
-                                        type = "text/plain"
-                                    }
-                                    context.startActivity(Intent.createChooser(sendIntent, "Share Study Report"))
-                                },
                                 border = BorderStroke(1.dp, LineBorder),
                                 shape = RoundedCornerShape(8.dp),
-                                modifier = Modifier.fillMaxWidth()
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(44.dp)
                             ) {
-                                Icon(Icons.Default.Share, contentDescription = null, tint = TextPrimary, modifier = Modifier.size(16.dp))
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text("Share as Text Summary", color = TextPrimary)
-                            }
-                        }
-                    }
-
-                    // JSON Backup Card
-                    Surface(
-                        modifier = Modifier.fillMaxWidth(),
-                        color = PanelDark,
-                        shape = RoundedCornerShape(12.dp),
-                        border = BorderStroke(1.dp, LineBorder)
-                    ) {
-                        Column(modifier = Modifier.padding(16.dp)) {
-                            Text(
-                                text = "JSON Backup & Restore",
-                                style = TextStyle(
-                                    brush = GoldGradientBrush,
-                                    fontSize = 16.sp,
+                                Text(
+                                    text = "PDF",
+                                    color = GoldBright,
                                     fontWeight = FontWeight.Bold,
-                                    
+                                    fontSize = 14.sp
                                 )
-                            )
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text(
-                                text = "Save your complete session history or restore it on any device.",
-                                color = TextDim,
-                                fontSize = 12.sp
-                            )
-                            Spacer(modifier = Modifier.height(14.dp))
+                            }
 
+                            Spacer(modifier = Modifier.height(10.dp))
+
+                            // Two action buttons: Download JSON (Backup) & Restore JSON (Upload)
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.spacedBy(10.dp)
@@ -510,26 +507,32 @@ fun HistorySettingsScreen(
                                             putExtra(Intent.EXTRA_TEXT, jsonStr)
                                             type = "application/json"
                                         }
-                                        context.startActivity(Intent.createChooser(sendIntent, "Export JSON Backup"))
+                                        context.startActivity(Intent.createChooser(sendIntent, "Download JSON (Backup)"))
                                     },
-                                    border = BorderStroke(1.dp, GoldAccent),
+                                    border = BorderStroke(1.dp, LineBorder),
                                     shape = RoundedCornerShape(8.dp),
-                                    modifier = Modifier.weight(1f)
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .height(52.dp)
                                 ) {
-                                    Icon(Icons.Default.Download, contentDescription = null, tint = GoldLight, modifier = Modifier.size(16.dp))
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text("Export JSON", color = GoldLight)
+                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                        Text("Download JSON", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                                        Text("(Backup)", fontSize = 11.sp, color = TextDim)
+                                    }
                                 }
 
                                 OutlinedButton(
                                     onClick = { showImportDialog = true },
                                     border = BorderStroke(1.dp, LineBorder),
                                     shape = RoundedCornerShape(8.dp),
-                                    modifier = Modifier.weight(1f)
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .height(52.dp)
                                 ) {
-                                    Icon(Icons.Default.Upload, contentDescription = null, tint = TextPrimary, modifier = Modifier.size(16.dp))
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text("Import JSON", color = TextPrimary)
+                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                        Text("Restore JSON", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                                        Text("(Upload)", fontSize = 11.sp, color = TextDim)
+                                    }
                                 }
                             }
                         }
@@ -972,17 +975,34 @@ fun HistorySettingsScreen(
     if (showImportDialog) {
         AlertDialog(
             onDismissRequest = { showImportDialog = false },
-            title = { Text("Import JSON Backup", color = GoldBright) },
+            title = { Text("Restore JSON Backup", color = GoldBright) },
             text = {
                 Column {
-                    Text("Paste valid JSON backup string below:", color = TextDim, fontSize = 12.sp)
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Text("Select a backup file from your phone or paste valid JSON string below:", color = TextDim, fontSize = 12.sp)
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Button(
+                        onClick = {
+                            showImportDialog = false
+                            jsonFilePickerLauncher.launch("application/json")
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = PanelElevated, contentColor = GoldLight),
+                        border = BorderStroke(1.dp, GoldAccent),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(Icons.Default.Upload, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Choose JSON File from Storage")
+                    }
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text("Or paste JSON directly:", color = TextDim, fontSize = 11.sp)
+                    Spacer(modifier = Modifier.height(6.dp))
                     OutlinedTextField(
                         value = jsonImportText,
                         onValueChange = { jsonImportText = it },
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(140.dp),
+                            .height(130.dp),
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = GoldAccent,
                             unfocusedBorderColor = LineBorder,
@@ -998,7 +1018,7 @@ fun HistorySettingsScreen(
                         coroutineScope.launch {
                             try {
                                 val count = viewModel.repository.importFromJson(jsonImportText)
-                                viewModel.showToast("$count sessions restored successfully")
+                                viewModel.showToast("Restore successful: $count sessions added!")
                                 showImportDialog = false
                                 jsonImportText = ""
                             } catch (e: Exception) {
@@ -1027,10 +1047,19 @@ private fun SessionHistoryItem(
     onEdit: () -> Unit,
     onDelete: () -> Unit
 ) {
-    val sdf = SimpleDateFormat("hh:mm a", Locale.getDefault())
-    val timeFormatted = remember(session.timestamp) {
-        sdf.format(Date(session.timestamp))
+    val endTs = session.timestamp
+    val startTs = endTs - (session.minutes.toLong() * 60L * 1000L)
+    val timeFormat = remember { SimpleDateFormat("h:mm a", Locale.US) }
+    val dateFormat = remember { SimpleDateFormat("dd-MM-yyyy", Locale.US) }
+
+    val timeRangeStr = remember(endTs, session.minutes) {
+        "${timeFormat.format(Date(startTs))} - ${timeFormat.format(Date(endTs))}"
     }
+    val dateStr = remember(endTs) {
+        dateFormat.format(Date(endTs))
+    }
+    val workTypeStr = if (session.workType.isBlank()) "N/A" else session.workType
+    val subtitleText = "[$workTypeStr] $timeRangeStr, $dateStr"
 
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -1049,65 +1078,65 @@ private fun SessionHistoryItem(
                 Text(
                     text = session.subject,
                     color = GoldBright,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.SemiBold
                 )
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.padding(top = 3.dp)
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .background(PanelElevated, RoundedCornerShape(4.dp))
-                            .border(1.dp, LineBorder, RoundedCornerShape(4.dp))
-                            .padding(horizontal = 6.dp, vertical = 2.dp)
+
+                if (session.isNonStudy) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Surface(
+                        color = Color(0xFF2A2825),
+                        shape = RoundedCornerShape(4.dp),
+                        border = BorderStroke(1.dp, Color(0xFF4D483F))
                     ) {
                         Text(
-                            text = session.workType,
-                            color = GoldLight,
-                            fontSize = 10.sp
+                            text = "Non-Study",
+                            color = Color(0xFFC0B8AA),
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Medium,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                         )
                     }
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = "${session.date} • $timeFormatted",
-                        color = TextDim,
-                        fontSize = 11.sp
-                    )
                 }
+
+                Spacer(modifier = Modifier.height(3.dp))
+                Text(
+                    text = subtitleText,
+                    color = TextDim,
+                    fontSize = 11.sp
+                )
             }
 
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    text = "${session.minutes} mins",
-                    color = TextPrimary,
+                    text = "${session.minutes} min",
+                    color = GoldLight,
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(end = 4.dp)
+                    modifier = Modifier.padding(end = 6.dp)
                 )
 
                 IconButton(
                     onClick = onEdit,
-                    modifier = Modifier.size(32.dp)
+                    modifier = Modifier.size(28.dp)
                 ) {
                     Icon(
                         imageVector = Icons.Default.Edit,
                         contentDescription = "Edit Session",
                         tint = GoldAccent,
-                        modifier = Modifier.size(17.dp)
+                        modifier = Modifier.size(15.dp)
                     )
                 }
 
                 IconButton(
                     onClick = onDelete,
-                    modifier = Modifier.size(32.dp)
+                    modifier = Modifier.size(28.dp)
                 ) {
                     Icon(
-                        imageVector = Icons.Default.Delete,
+                        imageVector = Icons.Default.Close,
                         contentDescription = "Delete Session",
-                        tint = DangerRed,
-                        modifier = Modifier.size(17.dp)
+                        tint = TextDim,
+                        modifier = Modifier.size(16.dp)
                     )
                 }
             }
@@ -1116,22 +1145,14 @@ private fun SessionHistoryItem(
 }
 
 private fun filterSessionsByRange(sessions: List<StudySessionEntity>, range: String): List<StudySessionEntity> {
-    val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+    val now = System.currentTimeMillis()
     val today = FocusRepository.getTodayString()
-    return when (range) {
-        "Today" -> sessions.filter { it.date == today }
-        "7 Days" -> {
-            val c = Calendar.getInstance()
-            c.add(Calendar.DAY_OF_YEAR, -7)
-            val dStr = sdf.format(c.time)
-            sessions.filter { it.date >= dStr }
-        }
-        "30 Days" -> {
-            val c = Calendar.getInstance()
-            c.add(Calendar.DAY_OF_YEAR, -30)
-            val dStr = sdf.format(c.time)
-            sessions.filter { it.date >= dStr }
-        }
+    return when (range.lowercase(Locale.US)) {
+        "today" -> sessions.filter { it.date == today }
+        "last 24 hours", "24h" -> sessions.filter { now - it.timestamp <= 24L * 3600 * 1000 }
+        "last 48 hours", "48h" -> sessions.filter { now - it.timestamp <= 48L * 3600 * 1000 }
+        "last 7 days", "7 days" -> sessions.filter { now - it.timestamp <= 7L * 86400 * 1000 }
+        "last 30 days", "30 days" -> sessions.filter { now - it.timestamp <= 30L * 86400 * 1000 }
         else -> sessions
     }
 }
