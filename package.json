@@ -2,15 +2,14 @@
   "name": "focus-study-timer",
   "version": "2.0.0",
   "private": true,
-  "description": "Focus Study Timer with SQL backend auth (login, register, forgot password)",
+  "description": "Focus Study Timer - High-performance desktop focus app powered by Firebase",
   "scripts": {
     "dev": "node local_server.js",
     "start": "node local_server.js",
     "build": "echo 'Static assets ready'"
   },
   "dependencies": {
-    "express": "^4.22.2",
-    "nodemailer": "^9.0.3"
+    "express": "^4.22.2"
   },
   "devDependencies": {
     "sharp": "^0.35.3"
