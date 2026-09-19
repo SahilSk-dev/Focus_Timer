@@ -4,6 +4,7 @@
   "private": true,
   "description": "Focus Study Timer with SQL backend auth (login, register, forgot password)",
   "scripts": {
+    "dev": "node local_server.js",
     "start": "node local_server.js",
     "build": "echo 'Static assets ready'"
   },

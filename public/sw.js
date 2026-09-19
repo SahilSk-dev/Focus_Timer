@@ -1,4 +1,4 @@
-const CACHE_NAME = 'focus-timer-cache-v34';
+const CACHE_NAME = 'focus-timer-cache-v39';
 const urlsToCache = [
   './index.html',
   './app.js',
@@ -38,6 +38,16 @@ self.addEventListener('activate', event => {
 
 // Fetch events
 self.addEventListener('fetch', event => {
+  // Only handle GET requests; browsers do not support cache.put for non-GET requests
+  if (event.request.method !== 'GET') {
+    return;
+  }
+
+  // Only intercept same-origin requests; let cross-origin CDNs be handled natively by browser
+  if (!event.request.url.startsWith(self.location.origin)) {
+    return;
+  }
+
   event.respondWith(
     caches.match(event.request, { ignoreSearch: true })
       .then(response => {

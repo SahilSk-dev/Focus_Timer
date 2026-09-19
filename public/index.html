@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="theme-color" content="#040e08">
+<meta name="theme-color" content="#09090b">
 <link rel="manifest" href="./manifest.json">
 <title>Focus Study Timer</title>
 <link rel="icon" type="image/png" href="./icon.png?v=5">
@@ -12,371 +12,422 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
 <link rel="stylesheet" href="./style.css">
 </head>
-<body data-theme="forest">
+<body data-theme="dark">
 
-<div style="display: flex; align-items: center; justify-content: center; gap: 14px; margin-top: 15px; margin-bottom: 15px;">
-  <img src="./icon.svg?v=4" alt="Focus Timer Logo" width="44" height="44" style="filter: drop-shadow(0 4px 12px rgba(16, 185, 129, 0.4)); object-fit: cover;" />
-  <h1 style="margin: 0;">Focus Study Timer</h1>
-</div>
+<div class="desktop-shell" id="desktopShell">
 
-<!-- 🎨 THEME QUICK-SWITCHER BAR -->
-<div class="theme-bar" id="themeBar">
-  <button class="theme-pill active" data-theme="forest">🌿 Nature</button>
-  <button class="theme-pill" data-theme="cyber">🌌 Cyber</button>
-  <button class="theme-pill" data-theme="sunset">🌅 Sunset</button>
-  <button class="theme-pill" data-theme="ocean">🌊 Ocean</button>
-  <button class="theme-pill" data-theme="coffee">☕ Coffee</button>
-  <button class="theme-pill" data-theme="arctic">❄️ Arctic</button>
-</div>
-
-<div class="wrap">
-
-  <div class="authbar" id="authbar">
-    <button class="gbtn" id="googleBtn">Sign in with Google</button>
-  </div>
-
-  <!-- VIEW 1: TIMER -->
-  <div id="view-timer" class="view-section active">
-
-  <div class="subject-section" id="subjectSelectionArea">
-    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-      <label class="field-label" style="margin-bottom:0;">Subject</label>
-      <button id="editModeToggle" style="background:transparent; border:1px solid var(--line-bright); border-radius:4px; color:var(--text-dim); cursor:pointer; font-size:0.85rem; padding:4px 10px; flex:none;" title="Edit Mode">✏️ Edit</button>
-    </div>
-    <div class="sel-chips" id="subjSelectChips"></div>
-    <div class="sel-chips" id="subMenuChips" style="display:none; margin-top:-4px; padding-left:12px;"></div>
-  </div>
-
-  <div class="subject-section" id="workTypeSelectionArea" style="margin-top:16px;">
-    <label class="field-label">Work Type</label>
-    <div class="sel-chips" id="workTypeChips"></div>
-  </div>
-
-  <div class="pomo-row">
-    <span class="pomo-label">Pomodoro Mode (25+5 mins)</span>
-    <div style="display:flex; align-items:center; gap:16px;">
-      <button id="muteBtn" class="audio-btn" title="Mute/Unmute">🔊</button>
-      <label class="switch">
-        <input type="checkbox" id="pomoToggle" title="Pomodoro Mode (25+5 mins)" aria-label="Pomodoro Mode (25+5 mins)">
-        <span class="slider"></span>
-      </label>
-    </div>
-  </div>
-
-  <div class="time-row" id="customTimeRow">
-    <div>
-      <label class="field-label" for="hours">Hours</label>
-      <input type="number" id="hours" min="0" max="12" value="0" inputmode="numeric" autocomplete="off" placeholder="0" title="Hours" aria-label="Hours">
-    </div>
-    <div>
-      <label class="field-label" for="minutes">Minutes</label>
-      <input type="number" id="minutes" min="0" max="59" value="0" inputmode="numeric" autocomplete="off" placeholder="0" title="Minutes" aria-label="Minutes">
-    </div>
-  </div>
-
-  <div class="hint" style="margin-top:6px; font-size:0.8rem;">Leave time empty (0) to use as a stopwatch starting from 0</div>
-
-  <div id="fsContainer" class="fs-container">
-    <button id="fullscreenBtn" class="fs-btn" title="Full Screen">
-      <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/></svg>
-    </button>
-
-    <div class="hint" id="hint">Press Start to begin studying</div>
-    <div class="timer-display" id="display">00:00:00</div>
-    <span class="phase-badge" id="phaseBadge" style="display:none;"></span>
-
-    <div class="btn-row">
-      <button id="startBtn" class="primary">Start</button>
-      <button id="pauseBtn" disabled>Pause</button>
-      <button id="resetBtn">Reset</button>
-    </div>
-
-    <!-- Toast lives INSIDE fs-container so alerts show in fullscreen too -->
-    <div class="toast" id="toast"></div>
-  </div>
-
-  </div> <!-- END VIEW 1 -->
-
-  <!-- VIEW 2: STATS -->
-  <div id="view-stats" class="view-section">
-
-    <!-- Top Performance Header -->
-    <div class="stats-top-bar">
-      <div>
-        <h2 class="stats-main-heading">Performance</h2>
-        <div class="stats-sub-heading">Analytics, consistency & milestone rewards</div>
+  <!-- 🧭 COLLAPSIBLE DESKTOP SIDEBAR -->
+  <aside class="app-sidebar" id="appSidebar">
+    <div class="sidebar-header">
+      <div class="sidebar-brand">
+        <img src="./icon.svg?v=4" alt="Focus Timer Logo" width="34" height="34" class="sidebar-logo" />
+        <span class="brand-text">Focus Timer</span>
       </div>
-      <button class="quick-pdf-btn" id="statsPdfBtn" title="Export PDF Summary">
-        <span>📄</span> PDF
+      <button class="sidebar-toggle-btn" id="sidebarToggleBtn" title="Toggle Sidebar (Expand/Collapse)" aria-label="Toggle Sidebar">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+          <path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/>
+        </svg>
       </button>
     </div>
 
-    <!-- 2x2 Dashboard KPI Grid -->
-    <div class="kpi-grid">
-      <!-- KPI 1: Streak -->
-      <div class="kpi-card">
-        <div class="kpi-header">
-          <span class="kpi-icon">🔥</span>
-          <span class="kpi-label">Day Streak</span>
-        </div>
-        <div class="kpi-val"><span id="streakNum">0</span> <small>days</small></div>
-        <div class="kpi-meta">Best: <b id="streakBest">0</b> days</div>
+    <!-- Navigation Menu Items -->
+    <nav class="sidebar-nav">
+      <div class="nav-item active" data-target="view-timer" title="Focus Timer">
+        <span class="nav-icon">⏱️</span>
+        <span class="nav-text">Timer</span>
       </div>
-
-      <!-- KPI 2: Total Study Time -->
-      <div class="kpi-card">
-        <div class="kpi-header">
-          <span class="kpi-icon">⏱️</span>
-          <span class="kpi-label">Total Focus</span>
-        </div>
-        <div class="kpi-val"><span id="totalFocusHrs">0.0</span> <small>hrs</small></div>
-        <div class="kpi-meta"><span id="totalFocusSessions">0</span> sessions</div>
+      <div class="nav-item" data-target="view-stats" title="Performance & Analytics">
+        <span class="nav-icon">📊</span>
+        <span class="nav-text">Analytics</span>
       </div>
-
-      <!-- KPI 3: Daily Target -->
-      <div class="kpi-card">
-        <div class="kpi-header">
-          <span class="kpi-icon">🎯</span>
-          <span class="kpi-label">Daily Goal</span>
-        </div>
-        <div class="kpi-val">
-          <span id="targetDone">0 mins</span>
-        </div>
-        <div class="kpi-progress">
-          <div class="track"><div class="fill gold" id="targetFill"></div></div>
-          <div class="kpi-target-edit">
-            <span id="targetPct">0%</span>
-            <span class="target-input-wrap">Goal: <input type="number" id="targetInput" min="10" step="10" inputmode="numeric" autocomplete="off" placeholder="Goal" title="Daily Goal in minutes" aria-label="Daily Goal in minutes">m</span>
-          </div>
-        </div>
+      <div class="nav-item" data-target="view-history" title="History & Settings">
+        <span class="nav-icon">⚙️</span>
+        <span class="nav-text">History & Data</span>
       </div>
+    </nav>
 
-      <!-- KPI 4: Scholar Rank / Level -->
-      <div class="kpi-card">
-        <div class="kpi-header">
-          <span class="kpi-icon">🏆</span>
-          <span class="kpi-label">Scholar Rank</span>
-        </div>
-        <div class="kpi-val" id="levelNum">Level 1</div>
-        <div class="kpi-progress">
-          <div class="track"><div class="fill green" id="xpFill"></div></div>
-          <div class="kpi-meta" id="xpMeta">0 / 300 mins</div>
-        </div>
+    <!-- Sidebar User / Auth Footer -->
+    <div class="sidebar-footer">
+      <div class="authbar" id="authbar">
+        <button class="gbtn" id="googleBtn">Sign in with Google</button>
       </div>
     </div>
+  </aside>
 
-    <!-- Trend line -->
-    <div class="compare-line" id="compareLine"></div>
-
-    <!-- Milestones & Badges Section -->
-    <div class="badges-section">
-      <div class="section-header-row">
-        <div>
-          <h3 class="section-title">Milestones & Badges</h3>
-          <div class="section-subtitle">Earn rewards as you build focus habits</div>
-        </div>
-        <span id="badgeCounterPill" class="badge-count-pill">0/9 Earned 🏆</span>
+  <!-- 🖥️ MAIN DESKTOP STAGE -->
+  <main class="main-stage">
+    
+    <!-- Top Action Bar -->
+    <header class="stage-header">
+      <div class="stage-header-left">
+        <button class="mobile-menu-btn" id="mobileMenuBtn" title="Toggle Menu" aria-label="Toggle Menu">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
+            <path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/>
+          </svg>
+        </button>
+        <h1 class="stage-title" id="stageTitle">Focus Timer</h1>
       </div>
 
-      <div class="badge-filter-row">
-        <button class="badge-filter-btn active" data-filter="all">All</button>
-        <button class="badge-filter-btn" data-filter="earned">Earned</button>
-        <button class="badge-filter-btn" data-filter="locked">Locked</button>
-      </div>
-
-      <div id="milestoneBadgesGrid" class="milestone-badges-grid">
-        <!-- Injected via JS -->
-      </div>
-    </div>
-
-    <hr class="divider">
-
-    <!-- 🧠 COGNITIVE DEEP ANALYSIS ENGINE -->
-    <div class="analytics-engine-section">
-      <div class="section-header-row">
-        <div>
-          <h3 class="section-title">🧠 Deep Analysis Engine</h3>
-          <div class="section-subtitle">Cognitive habits, biological rhythm & study stamina</div>
-        </div>
-        <button class="download-analysis-pdf-btn" id="downloadAnalysisPdfBtn" title="Export Complete Analysis to PDF">
-          <span>📑</span> Analysis PDF
+      <div class="stage-header-right">
+        <button id="muteBtn" class="audio-btn" title="Mute/Unmute Audio">🔊</button>
+        <button id="fullscreenBtn" class="fs-btn" title="Full Screen">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+            <path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/>
+          </svg>
         </button>
       </div>
+    </header>
 
-      <!-- Timeframe Filter -->
-      <div class="analytics-timeframe-row">
-        <button class="analytics-timeframe-btn active" data-period="7">Last 7 Days</button>
-        <button class="analytics-timeframe-btn" data-period="30">Last 30 Days</button>
-        <button class="analytics-timeframe-btn" data-period="all">All Time</button>
-      </div>
+    <!-- Desktop Views Container -->
+    <div class="desktop-content-wrap">
 
-      <!-- Empty Notice Banner when current filter has 0 sessions but all-time has data -->
-      <div id="analyticsEmptyNotice" class="analytics-empty-notice" style="display:none;"></div>
+      <!-- ========================================================
+           VIEW 1: TIMER & FOCUS (2-COLUMN DESKTOP WORKSPACE)
+           ======================================================== -->
+      <div id="view-timer" class="view-section active">
+        <div class="timer-desktop-workspace">
+          
+          <!-- Left Column: Hero Focus Clock Stage -->
+          <div class="timer-hero-stage">
+            <div id="fsContainer" class="fs-container">
+              <div class="hint" id="hint">Press Start to begin studying</div>
+              <div class="timer-display" id="display">00:00:00</div>
+              <span class="phase-badge" id="phaseBadge" style="display:none;"></span>
 
-      <!-- Analysis Grid -->
-      <div class="analytics-grid">
-        <!-- Card 1: Circadian Peak Focus Hours -->
-        <div class="analytics-card">
-          <div class="analytics-card-header">
-            <span class="analytics-icon">🌅</span>
-            <span class="analytics-card-title">Circadian Rhythm & Peak Hours</span>
-          </div>
-          <div class="peak-focus-badge" id="peakFocusBadge">Analyzing...</div>
-          <div class="circadian-bars" id="circadianBars">
-            <!-- Morning, Afternoon, Evening, Night injected via JS -->
-          </div>
-        </div>
+              <div class="btn-row">
+                <button id="startBtn" class="primary">Start</button>
+                <button id="pauseBtn" disabled>Pause</button>
+                <button id="resetBtn">Reset</button>
+              </div>
 
-        <!-- Card 2: Deep Work Stamina & Velocity -->
-        <div class="analytics-card">
-          <div class="analytics-card-header">
-            <span class="analytics-icon">⚡</span>
-            <span class="analytics-card-title">Deep Work & Velocity</span>
-          </div>
-          <div class="analytics-stat-row">
-            <div>
-              <div class="analytics-stat-val" id="deepWorkRatioVal">0%</div>
-              <div class="analytics-stat-label">Deep Focus (≥45m)</div>
-            </div>
-            <div>
-              <div class="analytics-stat-val" id="avgSessionVal">0m</div>
-              <div class="analytics-stat-label">Avg Session Length</div>
-            </div>
-            <div>
-              <div class="analytics-stat-val" id="studyVelocityVal">0%</div>
-              <div class="analytics-stat-label">Velocity</div>
+              <!-- Toast lives INSIDE fs-container so alerts show in fullscreen too -->
+              <div class="toast" id="toast"></div>
             </div>
           </div>
-          <div class="track" style="margin-top:12px;"><div class="fill green" id="deepWorkFill" style="width:0%;"></div></div>
-          <div class="analytics-stat-subtext" id="deepWorkSubtext">0 of 0 mins in deep focus blocks</div>
+
+          <!-- Right Column: Focus Configuration & Chips -->
+          <div class="timer-config-panel">
+            <div class="config-card">
+              <div class="subject-section" id="subjectSelectionArea">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                  <label class="field-label" style="margin-bottom:0;">Subject</label>
+                  <button id="editModeToggle" class="edit-mode-btn" title="Edit Mode">✏️ Edit</button>
+                </div>
+                <div class="sel-chips" id="subjSelectChips"></div>
+                <div class="sel-chips" id="subMenuChips" style="display:none; margin-top:-4px; padding-left:12px;"></div>
+              </div>
+
+              <div class="subject-section" id="workTypeSelectionArea" style="margin-top:16px;">
+                <label class="field-label">Work Type</label>
+                <div class="sel-chips" id="workTypeChips"></div>
+              </div>
+            </div>
+
+            <div class="config-card" style="margin-top:16px;">
+              <div class="pomo-row">
+                <span class="pomo-label">Pomodoro Mode (25+5 mins)</span>
+                <label class="switch">
+                  <input type="checkbox" id="pomoToggle" title="Pomodoro Mode (25+5 mins)" aria-label="Pomodoro Mode (25+5 mins)">
+                  <span class="slider"></span>
+                </label>
+              </div>
+
+              <div class="time-row" id="customTimeRow">
+                <div>
+                  <label class="field-label" for="hours">Hours</label>
+                  <input type="number" id="hours" min="0" max="12" value="0" inputmode="numeric" autocomplete="off" placeholder="0" title="Hours" aria-label="Hours">
+                </div>
+                <div>
+                  <label class="field-label" for="minutes">Minutes</label>
+                  <input type="number" id="minutes" min="0" max="59" value="0" inputmode="numeric" autocomplete="off" placeholder="0" title="Minutes" aria-label="Minutes">
+                </div>
+              </div>
+
+              <div class="hint" style="margin-top:8px; font-size:0.8rem;">Leave time empty (0) to use as a stopwatch starting from 0</div>
+            </div>
+          </div>
+
+        </div>
+      </div> <!-- END VIEW 1 -->
+
+      <!-- ========================================================
+           VIEW 2: STATS & ANALYTICS (EXPANSIVE DESKTOP DASHBOARD)
+           ======================================================== -->
+      <div id="view-stats" class="view-section">
+
+        <!-- Top Performance Header -->
+        <div class="stats-top-bar">
+          <div>
+            <h2 class="stats-main-heading">Performance Dashboard</h2>
+            <div class="stats-sub-heading">Analytics, consistency & milestone rewards</div>
+          </div>
+          <button class="quick-pdf-btn" id="statsPdfBtn" title="Export PDF Summary">
+            <span>📄</span> Summary PDF
+          </button>
         </div>
 
-        <!-- Card 3: Subject Equilibrium & Neglect Matrix -->
-        <div class="analytics-card full-width">
-          <div class="analytics-card-header">
-            <span class="analytics-icon">⚖️</span>
-            <span class="analytics-card-title">Subject Equilibrium & Neglect Matrix</span>
+        <!-- 4-Column Horizontal Desktop KPI Grid -->
+        <div class="kpi-grid">
+          <!-- KPI 1: Streak -->
+          <div class="kpi-card">
+            <div class="kpi-header">
+              <span class="kpi-icon">🔥</span>
+              <span class="kpi-label">Day Streak</span>
+            </div>
+            <div class="kpi-val"><span id="streakNum">0</span> <small>days</small></div>
+            <div class="kpi-meta">Best: <b id="streakBest">0</b> days</div>
           </div>
-          <div id="subjectEquilibriumList" class="equilibrium-list">
-            <!-- Subject breakdown injected via JS -->
+
+          <!-- KPI 2: Total Study Time -->
+          <div class="kpi-card">
+            <div class="kpi-header">
+              <span class="kpi-icon">⏱️</span>
+              <span class="kpi-label">Total Focus</span>
+            </div>
+            <div class="kpi-val"><span id="totalFocusHrs">0.0</span> <small>hrs</small></div>
+            <div class="kpi-meta"><span id="totalFocusSessions">0</span> sessions</div>
+          </div>
+
+          <!-- KPI 3: Daily Target -->
+          <div class="kpi-card">
+            <div class="kpi-header">
+              <span class="kpi-icon">🎯</span>
+              <span class="kpi-label">Daily Goal</span>
+            </div>
+            <div class="kpi-val">
+              <span id="targetDone">0 mins</span>
+            </div>
+            <div class="kpi-progress">
+              <div class="track"><div class="fill gold" id="targetFill"></div></div>
+              <div class="kpi-target-edit">
+                <span id="targetPct">0%</span>
+                <span class="target-input-wrap">Goal: <input type="number" id="targetInput" min="10" step="10" inputmode="numeric" autocomplete="off" placeholder="Goal" title="Daily Goal in minutes" aria-label="Daily Goal in minutes">m</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- KPI 4: Scholar Rank / Level -->
+          <div class="kpi-card">
+            <div class="kpi-header">
+              <span class="kpi-icon">🏆</span>
+              <span class="kpi-label">Scholar Rank</span>
+            </div>
+            <div class="kpi-val" id="levelNum">Level 1</div>
+            <div class="kpi-progress">
+              <div class="track"><div class="fill green" id="xpFill"></div></div>
+              <div class="kpi-meta" id="xpMeta">0 / 300 mins</div>
+            </div>
           </div>
         </div>
 
-        <!-- Card 4: Cognitive Work-Type Distribution -->
-        <div class="analytics-card">
-          <div class="analytics-card-header">
-            <span class="analytics-icon">🧩</span>
-            <span class="analytics-card-title">Cognitive Method Modality</span>
+        <!-- Trend line -->
+        <div class="compare-line" id="compareLine"></div>
+
+        <!-- 🧠 COGNITIVE DEEP ANALYSIS ENGINE -->
+        <div class="analytics-engine-section">
+          <div class="section-header-row">
+            <div>
+              <h3 class="section-title">🧠 Cognitive Deep Analysis Engine</h3>
+              <div class="section-subtitle">Cognitive habits, biological rhythm & study stamina</div>
+            </div>
+            <button class="download-analysis-pdf-btn" id="downloadAnalysisPdfBtn" title="Export Complete Analysis to PDF">
+              <span>📑</span> Full Analysis PDF
+            </button>
           </div>
-          <div id="cognitiveWorkTypeList" class="worktype-breakdown-list">
-            <!-- Work types injected via JS -->
+
+          <!-- Timeframe Filter -->
+          <div class="analytics-timeframe-row">
+            <button class="analytics-timeframe-btn active" data-period="7">Last 7 Days</button>
+            <button class="analytics-timeframe-btn" data-period="30">Last 30 Days</button>
+            <button class="analytics-timeframe-btn" data-period="all">All Time</button>
+          </div>
+
+          <!-- Empty Notice Banner when current filter has 0 sessions but all-time has data -->
+          <div id="analyticsEmptyNotice" class="analytics-empty-notice" style="display:none;"></div>
+
+          <!-- Desktop Analytics Grid -->
+          <div class="analytics-grid">
+            <!-- Card 1: Circadian Peak Focus Hours -->
+            <div class="analytics-card">
+              <div class="analytics-card-header">
+                <span class="analytics-icon">🌅</span>
+                <span class="analytics-card-title">Circadian Rhythm & Peak Hours</span>
+              </div>
+              <div class="peak-focus-badge" id="peakFocusBadge">Analyzing...</div>
+              <div class="circadian-bars" id="circadianBars"></div>
+            </div>
+
+            <!-- Card 2: Deep Work Stamina & Velocity -->
+            <div class="analytics-card">
+              <div class="analytics-card-header">
+                <span class="analytics-icon">⚡</span>
+                <span class="analytics-card-title">Deep Work & Velocity</span>
+              </div>
+              <div class="analytics-stat-row">
+                <div>
+                  <div class="analytics-stat-val" id="deepWorkRatioVal">0%</div>
+                  <div class="analytics-stat-label">Deep Focus (≥45m)</div>
+                </div>
+                <div>
+                  <div class="analytics-stat-val" id="avgSessionVal">0m</div>
+                  <div class="analytics-stat-label">Avg Session</div>
+                </div>
+                <div>
+                  <div class="analytics-stat-val" id="studyVelocityVal">0%</div>
+                  <div class="analytics-stat-label">Velocity</div>
+                </div>
+              </div>
+              <div class="track" style="margin-top:12px;"><div class="fill green" id="deepWorkFill" style="width:0%;"></div></div>
+              <div class="analytics-stat-subtext" id="deepWorkSubtext">0 of 0 mins in deep focus blocks</div>
+            </div>
+
+            <!-- Card 3: Subject Equilibrium & Neglect Matrix -->
+            <div class="analytics-card full-width">
+              <div class="analytics-card-header">
+                <span class="analytics-icon">⚖️</span>
+                <span class="analytics-card-title">Subject Equilibrium & Neglect Matrix</span>
+              </div>
+              <div id="subjectEquilibriumList" class="equilibrium-list"></div>
+            </div>
+
+            <!-- Card 4: Cognitive Work-Type Distribution -->
+            <div class="analytics-card">
+              <div class="analytics-card-header">
+                <span class="analytics-icon">🧩</span>
+                <span class="analytics-card-title">Cognitive Method Modality</span>
+              </div>
+              <div id="cognitiveWorkTypeList" class="worktype-breakdown-list"></div>
+            </div>
+
+            <!-- Card 5: Smart Diagnostic Insights -->
+            <div class="analytics-card">
+              <div class="analytics-card-header">
+                <span class="analytics-icon">💡</span>
+                <span class="analytics-card-title">Diagnostic Insights</span>
+              </div>
+              <div id="smartDiagnosticList" class="diagnostic-insights-list"></div>
+            </div>
           </div>
         </div>
 
-        <!-- Card 5: Smart Diagnostic Insights -->
-        <div class="analytics-card">
-          <div class="analytics-card-header">
-            <span class="analytics-icon">💡</span>
-            <span class="analytics-card-title">Diagnostic Insights</span>
+        <hr class="divider">
+
+        <!-- 2-Column Section: Activity Chart + 7-Day Top Subjects -->
+        <div class="stats-desktop-row">
+          <div class="stats-desktop-col">
+            <div class="stats-header">
+              <div class="stats-title">Activity Breakdown</div>
+              <div class="tabs">
+                <button id="tabDaily" class="active">Today</button>
+                <button id="tabWeekly">7 Days</button>
+              </div>
+            </div>
+            <div class="chart" id="chart"></div>
+            <div class="today-total" id="todayTotal"></div>
           </div>
-          <div id="smartDiagnosticList" class="diagnostic-insights-list">
-            <!-- Injected automated smart observations -->
+
+          <div class="stats-desktop-col">
+            <div class="stats-title" style="margin-bottom:14px; display:flex; justify-content:space-between; align-items:center;">
+              <span>Top Subjects (7 Days)</span>
+              <span style="font-size:0.82rem; font-weight:600; color:var(--accent-bright);">Leaderboard</span>
+            </div>
+            <div id="subjectRankingList" class="subj-rank-list"></div>
           </div>
         </div>
-      </div>
-    </div>
 
-    <hr class="divider">
+        <hr class="divider">
 
-    <!-- Activity Section -->
-    <div class="stats-header">
-      <div class="stats-title">Activity Breakdown</div>
-      <div class="tabs">
-        <button id="tabDaily" class="active">Today</button>
-        <button id="tabWeekly">7 Days</button>
-      </div>
-    </div>
-    <div class="chart" id="chart"></div>
-    <div class="today-total" id="todayTotal"></div>
+        <!-- Heatmap -->
+        <div class="stats-title" style="margin-bottom:14px;">Consistency Heatmap (84 Days)</div>
+        <div class="heatmap-scroll"><div class="heatmap-grid" id="heatmap"></div></div>
+        <div class="heatmap-legend">
+          Less <div class="hcell level-0"></div><div class="hcell level-1"></div><div class="hcell level-2"></div><div class="hcell level-3"></div> More
+        </div>
 
-    <hr class="divider">
+        <hr class="divider">
 
-    <!-- 7-Day Subject Analytics -->
-    <div class="stats-title" style="margin-bottom:14px; display:flex; justify-content:space-between; align-items:center;">
-      <span>Top Subjects (7 Days)</span>
-      <span style="font-size:0.82rem; font-weight:600; color:var(--accent-bright);">Leaderboard</span>
-    </div>
-    <div id="subjectRankingList" class="subj-rank-list">
-      <!-- Ranks injected via JS -->
-    </div>
+        <!-- Milestones & Badges Section -->
+        <div class="badges-section">
+          <div class="section-header-row">
+            <div>
+              <h3 class="section-title">Milestones & Badges</h3>
+              <div class="section-subtitle">Earn rewards as you build focus habits</div>
+            </div>
+            <span id="badgeCounterPill" class="badge-count-pill">0/9 Earned 🏆</span>
+          </div>
 
-    <hr class="divider">
+          <div class="badge-filter-row">
+            <button class="badge-filter-btn active" data-filter="all">All</button>
+            <button class="badge-filter-btn" data-filter="earned">Earned</button>
+            <button class="badge-filter-btn" data-filter="locked">Locked</button>
+          </div>
 
-    <!-- Heatmap -->
-    <div class="stats-title" style="margin-bottom:14px;">Consistency Heatmap (84 Days)</div>
-    <div class="heatmap-scroll"><div class="heatmap-grid" id="heatmap"></div></div>
-    <div class="heatmap-legend">
-      Less <div class="hcell level-0"></div><div class="hcell level-1"></div><div class="hcell level-2"></div><div class="hcell level-3"></div> More
-    </div>
+          <div id="milestoneBadgesGrid" class="milestone-badges-grid"></div>
+        </div>
 
-  </div> <!-- END VIEW 2 -->
+      </div> <!-- END VIEW 2 -->
 
-  <!-- VIEW 3: HISTORY & SETTINGS -->
-  <div id="view-history" class="view-section">
+      <!-- ========================================================
+           VIEW 3: HISTORY & SETTINGS (2-COLUMN DESKTOP WORKSPACE)
+           ======================================================== -->
+      <div id="view-history" class="view-section">
+        <div class="history-desktop-workspace">
+          
+          <!-- Left Column: Session History Audit Log -->
+          <div class="history-audit-col">
+            <div class="stats-title" style="margin-bottom:14px;">Session History</div>
+            <div class="history-list" id="historyList"></div>
+          </div>
 
-  <div class="stats-title" style="margin-bottom:14px;">Session History</div>
-  <div class="history-list" id="historyList"></div>
-  <div class="stats-title" style="margin-bottom:14px;">Data Backup & Export</div>
-  <div class="export-row">
-    <select id="exportRange" class="export-select" title="Export Timeframe Range" aria-label="Export Timeframe Range">
-      <option value="today">Today</option>
-      <option value="24h">Last 24h</option>
-      <option value="48h">Last 48h</option>
-      <option value="7">Last 7 Days</option>
-      <option value="30" selected>Last 30 Days</option>
-      <option value="all">All Time</option>
-    </select>
-    <div style="display:flex; gap:10px; width:100%;">
-      <button class="export-btn pdf" id="exportPdfBtn">PDF</button>
-    </div>
-    <div style="display:flex; gap:10px; width:100%;">
-      <button class="export-btn" id="backupJsonBtn">Download JSON (Backup)</button>
-      <button class="export-btn" id="restoreJsonBtn">Restore JSON (Upload)</button>
-      <input type="file" id="restoreFileInput" accept=".json" style="display:none">
-    </div>
-  </div>
+          <!-- Right Column: Data Backup & Management -->
+          <div class="history-tools-col">
+            <div class="tools-card">
+              <div class="stats-title" style="margin-bottom:14px;">Data Backup & Export</div>
+              <div class="export-row">
+                <select id="exportRange" class="export-select" title="Export Timeframe Range" aria-label="Export Timeframe Range">
+                  <option value="today">Today</option>
+                  <option value="24h">Last 24h</option>
+                  <option value="48h">Last 48h</option>
+                  <option value="7">Last 7 Days</option>
+                  <option value="30" selected>Last 30 Days</option>
+                  <option value="all">All Time</option>
+                </select>
+                <div style="display:flex; gap:10px; width:100%;">
+                  <button class="export-btn pdf" id="exportPdfBtn">PDF Export</button>
+                </div>
+                <div style="display:flex; gap:10px; width:100%;">
+                  <button class="export-btn" id="backupJsonBtn">Download JSON (Backup)</button>
+                  <button class="export-btn" id="restoreJsonBtn">Restore JSON (Upload)</button>
+                  <input type="file" id="restoreFileInput" accept=".json" style="display:none">
+                </div>
+              </div>
+            </div>
 
-  <div class="stats-title" style="margin-top:14px; margin-bottom:14px; color:#ef4444;">Bulk Delete (Date Range)</div>
-  <div class="export-row">
-    <div style="display:flex; gap:10px; width:100%; align-items:center;">
-      <div style="flex:1;">
-        <label class="field-label" for="bulkDelFrom" style="font-size:0.8rem; color:var(--text-dim);">From Date</label>
-        <input type="date" id="bulkDelFrom" class="modal-input" style="width:100%; margin-top:4px;" title="From Date" aria-label="From Date" placeholder="YYYY-MM-DD">
-      </div>
-      <div style="flex:1;">
-        <label class="field-label" for="bulkDelTo" style="font-size:0.8rem; color:var(--text-dim);">To Date</label>
-        <input type="date" id="bulkDelTo" class="modal-input" style="width:100%; margin-top:4px;" title="To Date" aria-label="To Date" placeholder="YYYY-MM-DD">
-      </div>
-    </div>
-    <button class="export-btn" id="bulkDeleteBtn" style="border-color:#ef4444; color:#ef4444; margin-top:10px;">Delete Sessions</button>
-  </div>
+            <div class="tools-card" style="margin-top:16px;">
+              <div class="stats-title" style="margin-bottom:14px; color:#ef4444;">Bulk Delete (Date Range)</div>
+              <div class="export-row">
+                <div style="display:flex; gap:10px; width:100%; align-items:center;">
+                  <div style="flex:1;">
+                    <label class="field-label" for="bulkDelFrom" style="font-size:0.8rem; color:var(--text-dim);">From Date</label>
+                    <input type="date" id="bulkDelFrom" class="modal-input" style="width:100%; margin-top:4px;" title="From Date" aria-label="From Date" placeholder="YYYY-MM-DD">
+                  </div>
+                  <div style="flex:1;">
+                    <label class="field-label" for="bulkDelTo" style="font-size:0.8rem; color:var(--text-dim);">To Date</label>
+                    <input type="date" id="bulkDelTo" class="modal-input" style="width:100%; margin-top:4px;" title="To Date" aria-label="To Date" placeholder="YYYY-MM-DD">
+                  </div>
+                </div>
+                <button class="export-btn" id="bulkDeleteBtn" style="border-color:#ef4444; color:#ef4444; margin-top:10px;">Delete Sessions</button>
+              </div>
+            </div>
+          </div>
 
-  </div> <!-- END VIEW 3 -->
+        </div>
+      </div> <!-- END VIEW 3 -->
 
-</div> <!-- END wrap -->
+    </div> <!-- END desktop-content-wrap -->
+  </main>
 
-<!-- Bottom Navigation -->
-<nav class="bottom-nav">
-  <div class="nav-item active" data-target="view-timer">
-    <div class="nav-chip">⏱️ Timer</div>
-  </div>
-  <div class="nav-item" data-target="view-stats">
-    <div class="nav-chip">📊 Stats</div>
-  </div>
-  <div class="nav-item" data-target="view-history">
-    <div class="nav-chip">⚙️ Settings</div>
-  </div>
-</nav>
+</div> <!-- END desktop-shell -->
 
 <!-- Edit/Delete Modal -->
 <div class="modal-overlay" id="editModal">

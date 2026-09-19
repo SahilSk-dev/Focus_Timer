@@ -27,11 +27,11 @@ app.use((req, res, next) => {
   res.setHeader('Referrer-Policy', 'no-referrer');
   res.setHeader('Content-Security-Policy',
     "default-src 'self'; " +
-    "script-src 'self' https://www.gstatic.com https://cdnjs.cloudflare.com; " +
-    "style-src 'self' 'unsafe-inline'; " +
+    "script-src 'self' 'unsafe-inline' https://www.gstatic.com https://cdnjs.cloudflare.com; " +
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
     "img-src 'self' data: blob: https:; " +
-    "connect-src 'self' https://firestore.googleapis.com https://*.firebaseio.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://www.googleapis.com https://accounts.google.com https://translate.googleapis.com wss://*.firebaseio.com; " +
-    "font-src 'self' data: https://fonts.gstatic.com; " +
+    "connect-src 'self' https://firestore.googleapis.com https://*.firebaseio.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://www.googleapis.com https://accounts.google.com https://translate.googleapis.com https://cdnjs.cloudflare.com https://www.gstatic.com https://fonts.googleapis.com https://fonts.gstatic.com wss://*.firebaseio.com; " +
+    "font-src 'self' data: https://fonts.gstatic.com https://fonts.googleapis.com; " +
     "frame-ancestors 'self'; " +
     "base-uri 'self'; form-action 'self'");
   next();
@@ -73,13 +73,16 @@ CREATE TABLE IF NOT EXISTS prefs(
 CREATE TABLE IF NOT EXISTS tokens(
   token TEXT PRIMARY KEY,
   user_id INTEGER NOT NULL,
-  expires_at INTEGER NOT NULL
+  created_at INTEGER NOT NULL
 );
 CREATE TABLE IF NOT EXISTS otps(
-  email TEXT PRIMARY KEY,
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  email TEXT NOT NULL,
   code TEXT NOT NULL,
+  token TEXT,
   expires_at INTEGER NOT NULL,
-  attempts INTEGER NOT NULL DEFAULT 0
+  attempts INTEGER NOT NULL DEFAULT 0,
+  used INTEGER NOT NULL DEFAULT 0
 );
 CREATE TABLE IF NOT EXISTS magic_links(
   token TEXT PRIMARY KEY,

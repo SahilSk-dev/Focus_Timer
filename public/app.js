@@ -36,7 +36,49 @@ function localGet(key, fallback){
 function localSet(key, val){
   try{ localStorage.setItem(key, JSON.stringify(val)); }catch(e){}
 }
-function sanitizeHTML(str) { return str.replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+function escapeHTML(str) {
+  if (str === null || str === undefined) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+function sanitizeHTML(str) {
+  return escapeHTML(str);
+}
+
+/* ---------- Screen Wake Lock (keeps display active while focusing) ---------- */
+let wakeLockSentinel = null;
+
+async function requestWakeLock() {
+  try {
+    if ('wakeLock' in navigator && !wakeLockSentinel) {
+      wakeLockSentinel = await navigator.wakeLock.request('screen');
+      wakeLockSentinel.addEventListener('release', () => {
+        wakeLockSentinel = null;
+      });
+    }
+  } catch (err) {
+    console.debug('Wake lock request skipped:', err.message);
+  }
+}
+
+async function releaseWakeLock() {
+  if (wakeLockSentinel) {
+    try {
+      await wakeLockSentinel.release();
+    } catch (e) {}
+    wakeLockSentinel = null;
+  }
+}
+
+document.addEventListener('visibilitychange', async () => {
+  if (document.visibilityState === 'visible' && running) {
+    await requestWakeLock();
+  }
+});
 
 const DEFAULT_SUBJECTS = [
   { name: 'Bengali', isCore: true, sub: ['Text', 'Grammar'] },
@@ -59,8 +101,7 @@ let unsubNonStudySessions = null;
 /* ---------- data layer ---------- */
 async function loadAll(){
   if(currentUser){
-    const thirtyDaysAgo = Date.now() - (30 * 24 * 60 * 60 * 1000);
-    const q = query(collection(db,'users',currentUser.uid,'sessions'), where('ts', '>=', thirtyDaysAgo));
+    const q = collection(db, 'users', currentUser.uid, 'sessions');
     
     if (unsubSessions) unsubSessions();
     unsubSessions = onSnapshot(q, (snap) => {
@@ -68,7 +109,7 @@ async function loadAll(){
       refreshEverything();
     });
 
-    const qNS = query(collection(db,'users',currentUser.uid,'nonStudySessions'), where('ts', '>=', thirtyDaysAgo));
+    const qNS = collection(db, 'users', currentUser.uid, 'nonStudySessions');
     if (unsubNonStudySessions) unsubNonStudySessions();
     unsubNonStudySessions = onSnapshot(qNS, (snap) => {
       nonStudySessions = snap.docs.map(d => ({ id:d.id, ...d.data(), isNonStudy: true }));
@@ -403,10 +444,20 @@ let selectedWorkType = '';
 let isTimerActive = false;
 let isEditMode = false;
 
-document.getElementById('editModeToggle').addEventListener('click', () => {
-  isEditMode = !isEditMode;
-  renderSelectionChips();
-});
+const editModeToggle = document.getElementById('editModeToggle');
+if (editModeToggle) {
+  editModeToggle.addEventListener('click', () => {
+    isEditMode = !isEditMode;
+    if (isEditMode) {
+      editModeToggle.classList.add('active');
+      editModeToggle.innerHTML = '✓ Done';
+    } else {
+      editModeToggle.classList.remove('active');
+      editModeToggle.innerHTML = '✏️ Edit';
+    }
+    renderSelectionChips();
+  });
+}
 
 function renderSelectionChips(){
   const area1 = document.getElementById('subjSelectChips');
@@ -426,7 +477,8 @@ function renderSelectionChips(){
     const isA = (s.name === selectedSubject) ? 'active' : '';
     let visualClass = '';
     if(isTimerActive) visualClass = isA ? 'timer-glow' : 'inactive-dim';
-    return `<div class="sel-chip ${isC} ${isA} ${visualClass}" data-name="${s.name}">${s.name}</div>`;
+    const safeName = escapeHTML(s.name);
+    return `<div class="sel-chip ${isC} ${isA} ${visualClass}" data-name="${safeName}">${safeName}</div>`;
   }).join('') + (!isTimerActive && isEditMode ? `<div class="sel-chip add-chip" data-action="add-subject" style="border:1px dashed var(--accent); color:var(--accent); background:transparent;">＋ Subject</div>` : '');
 
   const subjObj = prefs.subjects.find(s => s.name === selectedSubject);
@@ -438,7 +490,8 @@ function renderSelectionChips(){
         const isA = (sub === selectedSubMenu) ? 'active' : '';
         let visualClass = '';
         if(isTimerActive) visualClass = isA ? 'timer-glow' : 'inactive-dim';
-        return `<div class="sel-chip ${isA} ${visualClass}" data-sub="${sub}">↳ ${sub}</div>`;
+        const safeSub = escapeHTML(sub);
+        return `<div class="sel-chip ${isA} ${visualClass}" data-sub="${safeSub}">↳ ${safeSub}</div>`;
       }).join('') + (!isTimerActive && isEditMode ? `<div class="sel-chip add-chip" data-action="add-sub" style="border:1px dashed var(--accent); color:var(--accent); background:transparent;">＋ Sub-Subject</div>` : '');
     } else {
       selectedSubMenu = '';
@@ -453,7 +506,8 @@ function renderSelectionChips(){
     const isA = (w === selectedWorkType) ? 'active' : '';
     let visualClass = '';
     if(isTimerActive) visualClass = isA ? 'timer-glow' : 'inactive-dim';
-    return `<div class="sel-chip ${isA} ${visualClass}" data-w="${w}">${w}</div>`;
+    const safeW = escapeHTML(w);
+    return `<div class="sel-chip ${isA} ${visualClass}" data-w="${safeW}">${safeW}</div>`;
   }).join('') + (!isTimerActive && isEditMode ? `<div class="sel-chip add-chip" data-action="add-worktype" style="border:1px dashed var(--accent); color:var(--accent); background:transparent;">＋ Work Type</div>` : '');
 }
 
@@ -663,38 +717,6 @@ document.getElementById('addModalSave').addEventListener('click', async () => {
   closeAddModal();
 });
 
-/* ============================================================
-   🎨 MULTI-THEME SYSTEM (Emerald Forest, Cyber, Sunset, Ocean, Coffee, Arctic)
-   ============================================================ */
-function initTheme() {
-  const savedTheme = localStorage.getItem('st_app_theme') || (prefs && prefs.theme) || 'forest';
-  applyTheme(savedTheme, false);
-
-  const themePills = document.querySelectorAll('.theme-pill');
-  themePills.forEach(pill => {
-    pill.addEventListener('click', () => {
-      const themeId = pill.dataset.theme;
-      applyTheme(themeId, true);
-    });
-  });
-}
-
-function applyTheme(themeId, persist = true) {
-  if (!themeId) themeId = 'forest';
-  document.body.setAttribute('data-theme', themeId);
-  const themePills = document.querySelectorAll('.theme-pill');
-  themePills.forEach(pill => {
-    pill.classList.toggle('active', pill.dataset.theme === themeId);
-  });
-  if (persist) {
-    localStorage.setItem('st_app_theme', themeId);
-    if (typeof prefs === 'object' && prefs !== null) {
-      prefs.theme = themeId;
-      savePrefs();
-    }
-  }
-}
-
 // Stub for dial to prevent reference errors
 function updateDial() {}
 
@@ -777,6 +799,7 @@ async function finish(){
   const saveTotal = totalSeconds;
   running=false; remaining=0; totalSeconds=0;
   clearInterval(tickHandle);
+  releaseWakeLock();
   
   isTimerActive = false;
   renderSelectionChips();
@@ -850,6 +873,7 @@ function startTimer(fromResume=false){
   isTimerActive = true; renderSelectionChips();
   
   displayEl.classList.add('glowing-timer-active');
+  requestWakeLock();
   
   render(); clearInterval(tickHandle); tickHandle = setInterval(tick,30);
   
@@ -862,6 +886,7 @@ function startTimer(fromResume=false){
 
 function pauseTimer(){
   running=false;
+  releaseWakeLock();
   if(stopwatchMode){
     remaining = (Date.now()-startAt)/1000;
   } else {
@@ -882,6 +907,7 @@ async function resetTimer(){
   const wasRunning = running;
   const wasStopwatch = stopwatchMode;
   running=false; clearInterval(tickHandle);
+  releaseWakeLock();
 
   let finalElapsed = 0;
   if(wasStopwatch){
@@ -1742,11 +1768,12 @@ function renderDeepAnalytics() {
       eqList.innerHTML = report.subjectEquilibrium.map(s => {
         const badgeClass = s.isNeglected ? 'warning' : 'good';
         const badgeText = s.daysAgo === 0 ? 'Active today' : (s.daysAgo === 1 ? 'Yesterday' : `${s.daysAgo}d ago`);
+        const safeName = escapeHTML(s.name);
         return `
           <div class="equilibrium-item">
             <div class="equilibrium-left">
               <div class="equilibrium-name">
-                <span>${s.name}</span>
+                <span>${safeName}</span>
                 <span style="font-size:0.7rem; color:var(--text-dim);">(${s.pct}%)</span>
               </div>
               <div class="equilibrium-bar-wrap">
@@ -1770,10 +1797,11 @@ function renderDeepAnalytics() {
       cwtList.innerHTML = `<div style="text-align:center; padding:12px; color:var(--text-dim); font-size:0.8rem;">No activity recorded.</div>`;
     } else {
       cwtList.innerHTML = report.cognitiveWorkTypes.map(w => {
+        const safeWork = escapeHTML(w.name);
         return `
           <div class="worktype-row">
             <div class="worktype-header">
-              <span>${w.name}</span>
+              <span>${safeWork}</span>
               <span><strong>${w.mins}m</strong> (${w.pct}%)</span>
             </div>
             <div class="circadian-track">
@@ -1791,7 +1819,7 @@ function renderDeepAnalytics() {
     diagList.innerHTML = report.smartInsights.map(item => `
       <div class="diagnostic-item">
         <div class="diagnostic-icon">${item.icon}</div>
-        <div>${item.text}</div>
+        <div>${escapeHTML(item.text)}</div>
       </div>
     `).join('');
   }
@@ -2077,13 +2105,17 @@ function renderHistory(){
   list.innerHTML = sorted.map(s=>{
     const isNS = s.isNonStudy || (s.id && String(s.id).startsWith('ns'));
     const badge = isNS ? `<span style="background:var(--line); padding:2px 6px; border-radius:4px; font-size:0.7rem; display:inline-block; width:max-content;">Non-Study</span>` : '';
+    const safeSubject = escapeHTML(s.subject);
+    const safeWorkType = escapeHTML(s.workType || 'Other');
+    const safeId = escapeHTML(s.id);
+    const timeStr = s.ts ? formatTimeRange(s.ts, s.minutes) : escapeHTML(s.date);
     return `
     <div class="hist-row">
       <div class="hist-left">
-        ${s.subject} ${badge}
-        <span class="hist-meta">[${s.workType || 'Other'}] &nbsp; ${s.ts ? formatTimeRange(s.ts, s.minutes) : s.date}</span>
+        ${safeSubject} ${badge}
+        <span class="hist-meta">[${safeWorkType}] &nbsp; ${timeStr}</span>
       </div>
-      <div class="hist-right"><span class="hist-min">${s.minutes} min</span><button class="del-btn" data-id="${s.id}">×</button></div>
+      <div class="hist-right"><span class="hist-min">${Number(s.minutes) || 0} min</span><button class="del-btn" data-id="${safeId}">×</button></div>
     </div>`;
   }).join('');
   list.querySelectorAll('.del-btn').forEach(b=>{
@@ -2254,26 +2286,64 @@ document.getElementById('restoreFileInput').addEventListener('change', (e)=>{
   reader.onload = async (ev) => {
     try {
       const data = JSON.parse(ev.target.result);
-      if(!data.sessions || !data.nonStudySessions) { showToast('Invalid backup file'); return; }
+      if (!data || (!Array.isArray(data.sessions) && !Array.isArray(data.nonStudySessions))) {
+        showToast('Invalid backup file');
+        return;
+      }
       
-      let newSessCount = 0; let newNonStudyCount = 0;
-      for (const nsRaw of data.nonStudySessions) {
-        const ns = { ...nsRaw, subject: sanitizeHTML(nsRaw.subject), workType: sanitizeHTML(nsRaw.workType || '') };
-        if(!nonStudySessions.find(s => s.id === ns.id && s.ts === ns.ts)) {
-          nonStudySessions.push(ns); newNonStudyCount++;
-          if(currentUser) { await setDoc(doc(db, 'users', currentUser.uid, 'nonStudySessions', ns.id), ns); }
-        }
-      }
-      if(!currentUser){ localSet('st_nonstudy_sessions', nonStudySessions); }
+      let newSessCount = 0;
+      let newNonStudyCount = 0;
 
-      for (const sRaw of data.sessions) {
-        const s = { ...sRaw, subject: sanitizeHTML(sRaw.subject), workType: sanitizeHTML(sRaw.workType || '') };
-        if(!sessions.find(curr => curr.id === s.id && curr.ts === s.ts)) {
-          sessions.push(s); newSessCount++;
-          if(currentUser) { await setDoc(doc(db, 'users', currentUser.uid, 'sessions', s.id), s); }
+      const rawNonStudy = Array.isArray(data.nonStudySessions) ? data.nonStudySessions : [];
+      for (const nsRaw of rawNonStudy) {
+        if (!nsRaw || !nsRaw.date || !nsRaw.subject) continue;
+        const ts = Number(nsRaw.ts) || Date.now();
+        const nsId = String(nsRaw.id || ('ns_' + ts));
+        const ns = {
+          ...nsRaw,
+          id: nsId,
+          ts,
+          date: String(nsRaw.date),
+          subject: escapeHTML(nsRaw.subject),
+          workType: escapeHTML(nsRaw.workType || 'Other'),
+          minutes: Math.max(0, Math.round(Number(nsRaw.minutes)) || 0),
+          isNonStudy: true
+        };
+        if (ns.minutes <= 0) continue;
+        if (!nonStudySessions.find(s => s.id === ns.id || (s.ts === ns.ts && s.date === ns.date && s.subject === ns.subject))) {
+          nonStudySessions.push(ns);
+          newNonStudyCount++;
+          if (currentUser) {
+            await setDoc(doc(db, 'users', currentUser.uid, 'nonStudySessions', ns.id), ns);
+          }
         }
       }
-      if(!currentUser){ localSet(LS_SESSIONS, sessions); }
+      if (!currentUser) { localSet('st_nonstudy_sessions', nonStudySessions); }
+
+      const rawSessions = Array.isArray(data.sessions) ? data.sessions : [];
+      for (const sRaw of rawSessions) {
+        if (!sRaw || !sRaw.date || !sRaw.subject) continue;
+        const ts = Number(sRaw.ts) || Date.now();
+        const sId = String(sRaw.id || ('s_' + ts));
+        const s = {
+          ...sRaw,
+          id: sId,
+          ts,
+          date: String(sRaw.date),
+          subject: escapeHTML(sRaw.subject),
+          workType: escapeHTML(sRaw.workType || 'Other'),
+          minutes: Math.max(0, Math.round(Number(sRaw.minutes)) || 0)
+        };
+        if (s.minutes <= 0) continue;
+        if (!sessions.find(curr => curr.id === s.id || (curr.ts === s.ts && curr.date === s.date && curr.subject === s.subject))) {
+          sessions.push(s);
+          newSessCount++;
+          if (currentUser) {
+            await setDoc(doc(db, 'users', currentUser.uid, 'sessions', s.id), s);
+          }
+        }
+      }
+      if (!currentUser) { localSet(LS_SESSIONS, sessions); }
       await refreshEverything();
       showToast(`Restore successful: ${newSessCount} study, ${newNonStudyCount} non-study added!`);
     } catch(err) {
@@ -2345,13 +2415,10 @@ function initTimerFromLocalState(){
    the correct elapsed time (or finishes if it already expired). */
 
 (async function init(){
-  initTheme();
+  try { localStorage.removeItem('st_app_theme'); } catch(e) {}
+  document.body.setAttribute('data-theme', 'dark');
   renderAuthBar();
   await loadAll();
-  
-  if(prefs && prefs.theme){
-    applyTheme(prefs.theme, false);
-  }
   
   if(selectedSubject !== '' && !prefs.subjects.find(s => s.name === selectedSubject)) {
     selectedSubject = prefs.subjects[0]?.name || '';
@@ -2373,14 +2440,80 @@ if ('serviceWorker' in navigator) {
   });
 }
 
-/* ---------- Bottom Navigation ---------- */
-document.querySelectorAll('.bottom-nav .nav-item').forEach(item => {
+/* ---------- Desktop & Responsive Navigation ---------- */
+const stageTitleEl = document.getElementById('stageTitle');
+const stageTitles = {
+  'view-timer': 'Focus Timer',
+  'view-stats': 'Performance Dashboard',
+  'view-history': 'History & Data'
+};
+
+const desktopShell = document.getElementById('desktopShell');
+const appSidebar = document.getElementById('appSidebar');
+const sidebarToggleBtn = document.getElementById('sidebarToggleBtn');
+const mobileMenuBtn = document.getElementById('mobileMenuBtn');
+
+// Restore sidebar collapse preference from local storage
+if (localStorage.getItem('ft_sidebar_collapsed') === '1' && desktopShell) {
+  desktopShell.classList.add('sidebar-collapsed');
+}
+
+if (sidebarToggleBtn && desktopShell) {
+  sidebarToggleBtn.addEventListener('click', () => {
+    desktopShell.classList.toggle('sidebar-collapsed');
+    const isCollapsed = desktopShell.classList.contains('sidebar-collapsed');
+    localStorage.setItem('ft_sidebar_collapsed', isCollapsed ? '1' : '0');
+  });
+}
+
+if (mobileMenuBtn && appSidebar) {
+  mobileMenuBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    appSidebar.classList.toggle('mobile-open');
+  });
+}
+
+// Close mobile sidebar when clicking outside on mobile viewports
+document.addEventListener('click', (e) => {
+  if (appSidebar && appSidebar.classList.contains('mobile-open')) {
+    if (!appSidebar.contains(e.target) && (!mobileMenuBtn || !mobileMenuBtn.contains(e.target))) {
+      appSidebar.classList.remove('mobile-open');
+    }
+  }
+});
+
+function switchView(targetId) {
+  document.querySelectorAll('.sidebar-nav .nav-item, .nav-item').forEach(nav => {
+    if (nav.getAttribute('data-target') === targetId) {
+      nav.classList.add('active');
+    } else {
+      nav.classList.remove('active');
+    }
+  });
+
+  document.querySelectorAll('.view-section').forEach(view => view.classList.remove('active'));
+  const targetView = document.getElementById(targetId);
+  if (targetView) targetView.classList.add('active');
+
+  if (stageTitleEl && stageTitles[targetId]) {
+    stageTitleEl.textContent = stageTitles[targetId];
+  }
+
+  if (appSidebar) {
+    appSidebar.classList.remove('mobile-open');
+  }
+
+  // Refresh charts and badges when entering stats
+  if (targetId === 'view-stats') {
+    renderCharts();
+    renderMilestoneBadges();
+  }
+}
+
+document.querySelectorAll('.sidebar-nav .nav-item, .nav-item').forEach(item => {
   item.addEventListener('click', () => {
-    document.querySelectorAll('.bottom-nav .nav-item').forEach(nav => nav.classList.remove('active'));
-    item.classList.add('active');
-    document.querySelectorAll('.view-section').forEach(view => view.classList.remove('active'));
     const targetId = item.getAttribute('data-target');
-    document.getElementById(targetId).classList.add('active');
+    if (targetId) switchView(targetId);
   });
 });
 
@@ -2502,6 +2635,7 @@ function renderSubjectAnalytics() {
   listContainer.innerHTML = sorted.map((entry, index) => {
     const name = entry[0];
     const mins = entry[1];
+    const safeName = escapeHTML(name);
     
     let badgeClass = 'normal';
     let badgeIcon = `${index + 1}`;
@@ -2513,8 +2647,8 @@ function renderSubjectAnalytics() {
     return `
       <div class="subj-rank-item">
         <div class="badge ${badgeClass}">${badgeIcon}</div>
-        <div class="rank-subj-name">${name}</div>
-        <div class="rank-subj-time">${mins} mins</div>
+        <div class="rank-subj-name">${safeName}</div>
+        <div class="rank-subj-time">${Number(mins) || 0} mins</div>
       </div>
     `;
   }).join('');
