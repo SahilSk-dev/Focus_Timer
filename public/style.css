@@ -1072,6 +1072,310 @@ button.primary:not(:disabled):hover {
 }
 
 /* ============================================================
+   🏆 PERFORMANCE DASHBOARD & MILESTONE BADGES
+   ============================================================ */
+.stats-top-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 14px;
+}
+.stats-main-heading {
+  font-family: var(--font-display);
+  font-size: 1.35rem;
+  font-weight: 700;
+  margin: 0;
+  color: var(--text);
+  letter-spacing: -0.3px;
+}
+.stats-sub-heading {
+  font-size: 0.76rem;
+  color: var(--text-dim);
+  margin-top: 2px;
+}
+.quick-pdf-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--panel-elevated);
+  border: 1px solid var(--line);
+  color: var(--accent-bright);
+  font-size: 0.8rem;
+  font-weight: 700;
+  padding: 6px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.quick-pdf-btn:hover {
+  border-color: var(--accent);
+  background: rgba(16, 185, 129, 0.15);
+  box-shadow: 0 0 10px rgba(16, 185, 129, 0.2);
+}
+
+/* 2x2 KPI Dashboard Grid */
+.kpi-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.kpi-card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  position: relative;
+  transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.kpi-card:hover {
+  border-color: var(--line-bright);
+}
+.kpi-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+.kpi-icon {
+  font-size: 1.1rem;
+}
+.kpi-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.kpi-val {
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1.2;
+}
+.kpi-val small {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--text-dim);
+}
+.kpi-meta {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+.kpi-progress {
+  width: 100%;
+  margin-top: 6px;
+}
+.kpi-target-edit {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 4px;
+  font-size: 0.72rem;
+  color: var(--text-dim);
+}
+.target-input-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+.target-input-wrap input {
+  width: 44px;
+  padding: 2px 4px;
+  background: var(--panel-elevated);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  color: var(--text);
+  font-size: 0.75rem;
+  text-align: center;
+}
+
+/* Badges Section */
+.badges-section {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 16px;
+  margin-top: 14px;
+  margin-bottom: 14px;
+}
+.section-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 12px;
+}
+.section-title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  margin: 0;
+  color: var(--text);
+}
+.section-subtitle {
+  font-size: 0.75rem;
+  color: var(--text-dim);
+  margin-top: 2px;
+}
+.badge-count-pill {
+  background: rgba(245, 158, 11, 0.12);
+  border: 1px solid rgba(245, 158, 11, 0.4);
+  color: #f59e0b;
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 20px;
+  white-space: nowrap;
+}
+.badge-filter-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.badge-filter-btn {
+  background: var(--panel-elevated);
+  border: 1px solid var(--line);
+  color: var(--text-dim);
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 4px 12px;
+  border-radius: 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.badge-filter-btn.active {
+  background: var(--accent);
+  color: var(--btn-text);
+  border-color: var(--accent);
+  font-weight: 700;
+}
+.badge-filter-btn:not(.active):hover {
+  border-color: var(--line-bright);
+  color: var(--text);
+}
+
+.milestone-badges-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+@media (min-width: 540px) {
+  .milestone-badges-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+.milestone-badge-card {
+  background: var(--panel-elevated);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 12px 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+  position: relative;
+  user-select: none;
+}
+.milestone-badge-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0,0,0,0.35);
+  border-color: var(--line-bright);
+}
+.milestone-badge-card.unlocked {
+  border-color: rgba(245, 158, 11, 0.45);
+  background: linear-gradient(180deg, rgba(245, 158, 11, 0.08) 0%, var(--panel-elevated) 100%);
+}
+.milestone-badge-card.locked {
+  opacity: 0.65;
+  filter: grayscale(0.25);
+}
+.mbadge-icon-wrap {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.45rem;
+  margin-bottom: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--line);
+  transition: transform 0.2s;
+}
+.milestone-badge-card:hover .mbadge-icon-wrap {
+  transform: scale(1.08);
+}
+.milestone-badge-card.unlocked .mbadge-icon-wrap {
+  background: radial-gradient(circle, rgba(245, 158, 11, 0.25) 0%, rgba(245, 158, 11, 0.05) 70%);
+  border-color: #f59e0b;
+  box-shadow: 0 0 12px rgba(245, 158, 11, 0.35);
+}
+.mbadge-title {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1.2;
+  margin-bottom: 4px;
+}
+.mbadge-desc {
+  font-size: 0.68rem;
+  color: var(--text-dim);
+  line-height: 1.25;
+  margin-bottom: 8px;
+  min-height: 28px;
+}
+.mbadge-progress-wrap {
+  width: 100%;
+  margin-top: auto;
+}
+.mbadge-progress-bar {
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.1);
+  overflow: hidden;
+  width: 100%;
+  margin-bottom: 4px;
+}
+.mbadge-progress-fill {
+  height: 100%;
+  border-radius: 2px;
+  background: var(--accent);
+  transition: width 0.3s;
+}
+.milestone-badge-card.unlocked .mbadge-progress-fill {
+  background: linear-gradient(90deg, #f59e0b, #fbbf24);
+}
+.mbadge-progress-text {
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  display: flex;
+  justify-content: space-between;
+}
+.mbadge-status-tag {
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 4px;
+  display: inline-block;
+  margin-top: 4px;
+}
+.milestone-badge-card.unlocked .mbadge-status-tag {
+  color: #f59e0b;
+  background: rgba(245, 158, 11, 0.15);
+}
+.milestone-badge-card.locked .mbadge-status-tag {
+  color: var(--text-muted);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+/* ============================================================
    🌅 LANDSCAPE (ROTATED MOBILE / DESK CLOCK MODE)
    ============================================================ */
 @media (orientation: landscape) and (max-height: 600px) and (pointer: coarse) {

@@ -1001,9 +1001,17 @@ function renderLevel(){
   const XP_PER_LEVEL = 300; 
   const level = Math.floor(total/XP_PER_LEVEL)+1;
   const xp = total % XP_PER_LEVEL;
-  document.getElementById('levelNum').textContent = 'Level ' + level;
-  document.getElementById('xpMeta').textContent = xp+' / '+XP_PER_LEVEL+' mins';
-  document.getElementById('xpFill').style.width = Math.round(xp/XP_PER_LEVEL*100)+'%';
+  const levelNumEl = document.getElementById('levelNum');
+  if (levelNumEl) levelNumEl.textContent = 'Level ' + level;
+  const xpMetaEl = document.getElementById('xpMeta');
+  if (xpMetaEl) xpMetaEl.textContent = xp+' / '+XP_PER_LEVEL+' mins';
+  const xpFillEl = document.getElementById('xpFill');
+  if (xpFillEl) xpFillEl.style.width = Math.round(xp/XP_PER_LEVEL*100)+'%';
+
+  const totalFocusHrsEl = document.getElementById('totalFocusHrs');
+  if (totalFocusHrsEl) totalFocusHrsEl.textContent = (total / 60).toFixed(1);
+  const totalFocusSessionsEl = document.getElementById('totalFocusSessions');
+  if (totalFocusSessionsEl) totalFocusSessionsEl.textContent = sessions.length;
 }
 
 /* ---------- week comparison ---------- */
@@ -1061,9 +1069,20 @@ function renderStats(){
 }
 
 /* ---------- streak ---------- */
+let currentStreakVal = 0;
+let bestStreakVal = 0;
+
 function renderStreak(){
   const uniqueDates = [...new Set(sessions.map(s=>s.date))].sort();
-  if(uniqueDates.length===0){ document.getElementById('streakNum').textContent='0'; document.getElementById('streakBest').textContent='0'; return; }
+  if(uniqueDates.length===0){
+    currentStreakVal = 0;
+    bestStreakVal = 0;
+    const sNum = document.getElementById('streakNum');
+    if (sNum) sNum.textContent = '0';
+    const sBest = document.getElementById('streakBest');
+    if (sBest) sBest.textContent = '0';
+    return;
+  }
   const dateSet = new Set(uniqueDates);
   let current=0; let cursor=new Date();
   if(!dateSet.has(todayStr(cursor))) cursor.setDate(cursor.getDate()-1);
@@ -1078,9 +1097,255 @@ function renderStreak(){
     if(run>best) best=run;
   }
   best=Math.max(best,current);
-  document.getElementById('streakNum').textContent=current;
-  document.getElementById('streakBest').textContent=best;
+  currentStreakVal = current;
+  bestStreakVal = best;
+  const sNum = document.getElementById('streakNum');
+  if (sNum) sNum.textContent = current;
+  const sBest = document.getElementById('streakBest');
+  if (sBest) sBest.textContent = best;
 }
+
+/* ---------- milestone badges system ---------- */
+let currentBadgeFilter = 'all';
+
+function calculateMilestoneBadges() {
+  const totalStudyMinutes = sessions.reduce((a, s) => a + s.minutes, 0);
+  const totalHours = Math.floor(totalStudyMinutes / 60);
+  const maxSessionMin = sessions.reduce((max, s) => Math.max(max, s.minutes || 0), 0);
+  const totalSessions = sessions.length;
+  const streakToUse = Math.max(currentStreakVal, bestStreakVal);
+
+  return [
+    {
+      id: "first_step",
+      title: "First Step",
+      description: "Completed your first study session",
+      icon: "🌟",
+      category: "Consistency",
+      currentVal: Math.min(totalSessions, 1),
+      targetVal: 1,
+      unit: "session",
+      isUnlocked: totalSessions >= 1
+    },
+    {
+      id: "streak_3",
+      title: "3-Day Streak",
+      description: "Maintained study focus for 3 consecutive days",
+      icon: "⚡",
+      category: "Streak",
+      currentVal: Math.min(streakToUse, 3),
+      targetVal: 3,
+      unit: "days",
+      isUnlocked: streakToUse >= 3
+    },
+    {
+      id: "streak_7",
+      title: "7-Day Warrior",
+      description: "Maintained study streak for a full week",
+      icon: "🔥",
+      category: "Streak",
+      currentVal: Math.min(streakToUse, 7),
+      targetVal: 7,
+      unit: "days",
+      isUnlocked: streakToUse >= 7
+    },
+    {
+      id: "streak_10",
+      title: "10-Day Streak",
+      description: "Disciplined focus for 10 days in a row",
+      icon: "🏆",
+      category: "Streak",
+      currentVal: Math.min(streakToUse, 10),
+      targetVal: 10,
+      unit: "days",
+      isUnlocked: streakToUse >= 10
+    },
+    {
+      id: "streak_30",
+      title: "30-Day Master",
+      description: "Elite consistency: 30-day continuous study habit",
+      icon: "👑",
+      category: "Streak",
+      currentVal: Math.min(streakToUse, 30),
+      targetVal: 30,
+      unit: "days",
+      isUnlocked: streakToUse >= 30
+    },
+    {
+      id: "hours_10",
+      title: "10 Hours Club",
+      description: "Completed 10 hours of focused study",
+      icon: "⏱️",
+      category: "Study Hours",
+      currentVal: Math.min(totalHours, 10),
+      targetVal: 10,
+      unit: "hours",
+      isUnlocked: totalHours >= 10
+    },
+    {
+      id: "hours_50",
+      title: "50 Hours Studied",
+      description: "Scholar milestone: 50 hours of total study time",
+      icon: "🎓",
+      category: "Study Hours",
+      currentVal: Math.min(totalHours, 50),
+      targetVal: 50,
+      unit: "hours",
+      isUnlocked: totalHours >= 50
+    },
+    {
+      id: "hours_100",
+      title: "100 Hours Titan",
+      description: "Mastery milestone: 100 hours of deep study",
+      icon: "💎",
+      category: "Study Hours",
+      currentVal: Math.min(totalHours, 100),
+      targetVal: 100,
+      unit: "hours",
+      isUnlocked: totalHours >= 100
+    },
+    {
+      id: "deep_focus",
+      title: "Deep Focus",
+      description: "Completed a continuous session of 60+ mins",
+      icon: "🧘",
+      category: "Focus",
+      currentVal: maxSessionMin >= 60 ? 1 : 0,
+      targetVal: 1,
+      unit: "session",
+      isUnlocked: maxSessionMin >= 60
+    }
+  ];
+}
+
+function renderMilestoneBadges() {
+  const container = document.getElementById('milestoneBadgesGrid');
+  const counterPill = document.getElementById('badgeCounterPill');
+  if (!container) return;
+
+  const badges = calculateMilestoneBadges();
+  const unlockedCount = badges.filter(b => b.isUnlocked).length;
+  if (counterPill) {
+    counterPill.textContent = `${unlockedCount}/${badges.length} Earned 🏆`;
+  }
+
+  const filtered = badges.filter(b => {
+    if (currentBadgeFilter === 'earned') return b.isUnlocked;
+    if (currentBadgeFilter === 'locked') return !b.isUnlocked;
+    return true;
+  });
+
+  if (filtered.length === 0) {
+    container.innerHTML = `<div style="grid-column:1/-1; text-align:center; padding:20px; color:var(--text-dim); font-size:0.85rem;">No badges match this filter.</div>`;
+    return;
+  }
+
+  container.innerHTML = filtered.map(b => {
+    const pct = Math.min(100, Math.round((b.currentVal / b.targetVal) * 100));
+    const statusClass = b.isUnlocked ? 'unlocked' : 'locked';
+    const statusTag = b.isUnlocked ? 'Earned ✓' : 'Locked 🔒';
+
+    return `
+      <div class="milestone-badge-card ${statusClass}" data-id="${b.id}">
+        <div class="mbadge-icon-wrap">${b.icon}</div>
+        <div class="mbadge-title">${b.title}</div>
+        <div class="mbadge-desc">${b.description}</div>
+        <div class="mbadge-progress-wrap">
+          <div class="mbadge-progress-bar">
+            <div class="mbadge-progress-fill" style="width:${pct}%"></div>
+          </div>
+          <div class="mbadge-progress-text">
+            <span>${b.currentVal}/${b.targetVal} ${b.unit}</span>
+            <span>${pct}%</span>
+          </div>
+        </div>
+        <div class="mbadge-status-tag">${statusTag}</div>
+      </div>
+    `;
+  }).join('');
+
+  container.querySelectorAll('.milestone-badge-card').forEach(card => {
+    card.addEventListener('click', () => {
+      const bId = card.getAttribute('data-id');
+      const badge = badges.find(x => x.id === bId);
+      if (badge) openBadgeDetailModal(badge);
+    });
+  });
+}
+
+function openBadgeDetailModal(badge) {
+  const modal = document.getElementById('badgeDetailModal');
+  if (!modal) return;
+  const iconEl = document.getElementById('badgeModalIcon');
+  if (iconEl) iconEl.textContent = badge.icon;
+  const titleEl = document.getElementById('badgeModalTitle');
+  if (titleEl) titleEl.textContent = badge.title;
+  const catEl = document.getElementById('badgeModalCategory');
+  if (catEl) catEl.textContent = `${badge.category} Milestone`;
+  const descEl = document.getElementById('badgeModalDesc');
+  if (descEl) descEl.textContent = badge.description;
+  const progValEl = document.getElementById('badgeModalProgressVal');
+  if (progValEl) progValEl.textContent = `${badge.currentVal} / ${badge.targetVal} ${badge.unit}`;
+  
+  const pct = Math.min(100, Math.round((badge.currentVal / badge.targetVal) * 100));
+  const fillEl = document.getElementById('badgeModalFill');
+  if (fillEl) fillEl.style.width = pct + '%';
+  
+  const statusEl = document.getElementById('badgeModalStatus');
+  if (statusEl) {
+    if (badge.isUnlocked) {
+      statusEl.textContent = '✨ Earned & Unlocked!';
+      statusEl.style.color = '#f59e0b';
+    } else {
+      const rem = badge.targetVal - badge.currentVal;
+      statusEl.textContent = `🔒 Locked • ${rem} more ${badge.unit} needed`;
+      statusEl.style.color = 'var(--text-dim)';
+    }
+  }
+
+  modal.classList.add('show');
+}
+
+// Attach filter button listeners once DOM is ready
+document.addEventListener('DOMContentLoaded', () => {
+  setupMilestoneEvents();
+});
+
+function setupMilestoneEvents() {
+  document.querySelectorAll('.badge-filter-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.badge-filter-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      currentBadgeFilter = btn.getAttribute('data-filter');
+      renderMilestoneBadges();
+    });
+  });
+
+  const badgeModalClose = document.getElementById('badgeModalClose');
+  if (badgeModalClose) {
+    badgeModalClose.addEventListener('click', () => {
+      document.getElementById('badgeDetailModal')?.classList.remove('show');
+    });
+  }
+  const badgeDetailModal = document.getElementById('badgeDetailModal');
+  if (badgeDetailModal) {
+    badgeDetailModal.addEventListener('click', (e) => {
+      if (e.target.id === 'badgeDetailModal') {
+        e.target.classList.remove('show');
+      }
+    });
+  }
+
+  const statsPdfBtn = document.getElementById('statsPdfBtn');
+  if (statsPdfBtn) {
+    statsPdfBtn.addEventListener('click', () => {
+      const exportBtn = document.getElementById('exportPdfBtn');
+      if (exportBtn) exportBtn.click();
+    });
+  }
+}
+// Run immediately as well since module may execute after DOMContentLoaded
+setupMilestoneEvents();
 
 /* ---------- heatmap ---------- */
 function renderHeatmap(){
@@ -1342,7 +1607,7 @@ document.getElementById('restoreFileInput').addEventListener('change', (e)=>{
 
 /* ---------- refresh everything ---------- */
 async function refreshEverything(){
-  renderTarget(); renderLevel(); renderCompare(); renderStats(); renderStreak(); renderHeatmap(); renderHistory(); renderSubjectAnalytics();
+  renderTarget(); renderLevel(); renderCompare(); renderStats(); renderStreak(); renderMilestoneBadges(); renderHeatmap(); renderHistory(); renderSubjectAnalytics();
 }
 
 /* ---------- init / resume timer across reload (local only) ---------- */

@@ -100,72 +100,127 @@
   <!-- VIEW 2: STATS -->
   <div id="view-stats" class="view-section">
 
-  <div class="card">
-    <div class="card-row">
-      <div class="streak-left">
-        <svg class="flame" viewBox="0 0 24 24" fill="none">
-          <path class="flame-path" d="M12 2C12 2 7 7.5 7 12.5C7 15.5 9 18 12 18C15 18 17 15.5 17 12.5C17 11 16.3 9.7 15.5 8.7C15.7 10 15 11 14 11C13.5 11 13.2 10.6 13.2 10C13.2 8.8 14 8 14 6C14 4.5 13 3 12 2Z"/>
-          <path d="M9.5 14.5C9.5 16.4 10.6 18 12 18C13.4 18 14.5 16.6 14.5 15C14.5 13.8 13.8 13 13 12.3C13.1 13 12.7 13.5 12.2 13.5C11.9 13.5 11.7 13.2 11.7 12.9C11.7 12.2 12 11.8 12 11C12 10.2 11.6 9.6 11 9C11 9 9.5 11.8 9.5 14.5Z" fill="#040e08"/>
-        </svg>
-        <div>
-          <div class="streak-num" id="streakNum">0</div>
-          <div class="streak-label">Day Streak</div>
+    <!-- Top Performance Header -->
+    <div class="stats-top-bar">
+      <div>
+        <h2 class="stats-main-heading">Performance</h2>
+        <div class="stats-sub-heading">Analytics, consistency & milestone rewards</div>
+      </div>
+      <button class="quick-pdf-btn" id="statsPdfBtn" title="Export PDF Summary">
+        <span>📄</span> PDF
+      </button>
+    </div>
+
+    <!-- 2x2 Dashboard KPI Grid -->
+    <div class="kpi-grid">
+      <!-- KPI 1: Streak -->
+      <div class="kpi-card">
+        <div class="kpi-header">
+          <span class="kpi-icon">🔥</span>
+          <span class="kpi-label">Day Streak</span>
+        </div>
+        <div class="kpi-val"><span id="streakNum">0</span> <small>days</small></div>
+        <div class="kpi-meta">Best: <b id="streakBest">0</b> days</div>
+      </div>
+
+      <!-- KPI 2: Total Study Time -->
+      <div class="kpi-card">
+        <div class="kpi-header">
+          <span class="kpi-icon">⏱️</span>
+          <span class="kpi-label">Total Focus</span>
+        </div>
+        <div class="kpi-val"><span id="totalFocusHrs">0.0</span> <small>hrs</small></div>
+        <div class="kpi-meta"><span id="totalFocusSessions">0</span> sessions</div>
+      </div>
+
+      <!-- KPI 3: Daily Target -->
+      <div class="kpi-card">
+        <div class="kpi-header">
+          <span class="kpi-icon">🎯</span>
+          <span class="kpi-label">Daily Goal</span>
+        </div>
+        <div class="kpi-val">
+          <span id="targetDone">0 mins</span>
+        </div>
+        <div class="kpi-progress">
+          <div class="track"><div class="fill gold" id="targetFill"></div></div>
+          <div class="kpi-target-edit">
+            <span id="targetPct">0%</span>
+            <span class="target-input-wrap">Goal: <input type="number" id="targetInput" min="10" step="10" inputmode="numeric" autocomplete="off">m</span>
+          </div>
         </div>
       </div>
-      <div class="streak-best">Best<br><b id="streakBest">0</b> days</div>
-    </div>
-  </div>
 
-  <div class="card">
-    <div class="card-row">
-      <div class="card-title" style="margin-bottom:0;">Daily Target</div>
-      <div class="target-edit">Target <input type="number" id="targetInput" min="10" step="10" inputmode="numeric" autocomplete="off"> mins</div>
-    </div>
-    <div class="track"><div class="fill gold" id="targetFill"></div></div>
-    <div class="progress-meta"><span id="targetDone">0 mins</span><span id="targetPct">0%</span></div>
-  </div>
-
-  <div class="card">
-    <div class="card-row">
-      <div>
-        <div class="card-title" style="margin-bottom:2px;">Level</div>
-        <div class="level-num" id="levelNum">Level 1</div>
+      <!-- KPI 4: Scholar Rank / Level -->
+      <div class="kpi-card">
+        <div class="kpi-header">
+          <span class="kpi-icon">🏆</span>
+          <span class="kpi-label">Scholar Rank</span>
+        </div>
+        <div class="kpi-val" id="levelNum">Level 1</div>
+        <div class="kpi-progress">
+          <div class="track"><div class="fill green" id="xpFill"></div></div>
+          <div class="kpi-meta" id="xpMeta">0 / 300 mins</div>
+        </div>
       </div>
-      <div style="text-align:right; font-family:var(--font-main); font-size:0.8rem; color:var(--text-dim);" id="xpMeta">0 / 300 mins</div>
     </div>
-    <div class="track"><div class="fill green" id="xpFill"></div></div>
-  </div>
 
-  <div class="compare-line" id="compareLine"></div>
+    <!-- Trend line -->
+    <div class="compare-line" id="compareLine"></div>
 
-  <div class="stats-header">
-    <div class="stats-title">Stats</div>
-    <div class="tabs">
-      <button id="tabDaily" class="active">Daily</button>
-      <button id="tabWeekly">Weekly</button>
+    <!-- Milestones & Badges Section -->
+    <div class="badges-section">
+      <div class="section-header-row">
+        <div>
+          <h3 class="section-title">Milestones & Badges</h3>
+          <div class="section-subtitle">Earn rewards as you build focus habits</div>
+        </div>
+        <span id="badgeCounterPill" class="badge-count-pill">0/9 Earned 🏆</span>
+      </div>
+
+      <div class="badge-filter-row">
+        <button class="badge-filter-btn active" data-filter="all">All</button>
+        <button class="badge-filter-btn" data-filter="earned">Earned</button>
+        <button class="badge-filter-btn" data-filter="locked">Locked</button>
+      </div>
+
+      <div id="milestoneBadgesGrid" class="milestone-badges-grid">
+        <!-- Injected via JS -->
+      </div>
     </div>
-  </div>
-  <div class="chart" id="chart"></div>
-  <div class="today-total" id="todayTotal"></div>
 
-  <hr class="divider">
+    <hr class="divider">
 
-  <!-- 7-Day Subject Analytics & Badges -->
-  <div class="stats-title" style="margin-bottom:14px; display:flex; justify-content:space-between; align-items:center;">
-    <span>Last 7 Days Ranking</span>
-    <span style="font-size:0.82rem; font-weight:600; color:var(--accent-bright);">🏆 Top Ranks</span>
-  </div>
-  <div id="subjectRankingList" class="subj-rank-list">
-    <!-- Ranks injected via JS -->
-  </div>
+    <!-- Activity Section -->
+    <div class="stats-header">
+      <div class="stats-title">Activity Breakdown</div>
+      <div class="tabs">
+        <button id="tabDaily" class="active">Today</button>
+        <button id="tabWeekly">7 Days</button>
+      </div>
+    </div>
+    <div class="chart" id="chart"></div>
+    <div class="today-total" id="todayTotal"></div>
 
-  <hr class="divider">
+    <hr class="divider">
 
-  <div class="stats-title" style="margin-bottom:14px;">Last 12 Weeks</div>
-  <div class="heatmap-scroll"><div class="heatmap-grid" id="heatmap"></div></div>
-  <div class="heatmap-legend">
-    Less <div class="hcell level-0"></div><div class="hcell level-1"></div><div class="hcell level-2"></div><div class="hcell level-3"></div> More
-  </div>
+    <!-- 7-Day Subject Analytics -->
+    <div class="stats-title" style="margin-bottom:14px; display:flex; justify-content:space-between; align-items:center;">
+      <span>Top Subjects (7 Days)</span>
+      <span style="font-size:0.82rem; font-weight:600; color:var(--accent-bright);">Leaderboard</span>
+    </div>
+    <div id="subjectRankingList" class="subj-rank-list">
+      <!-- Ranks injected via JS -->
+    </div>
+
+    <hr class="divider">
+
+    <!-- Heatmap -->
+    <div class="stats-title" style="margin-bottom:14px;">Consistency Heatmap (84 Days)</div>
+    <div class="heatmap-scroll"><div class="heatmap-grid" id="heatmap"></div></div>
+    <div class="heatmap-legend">
+      Less <div class="hcell level-0"></div><div class="hcell level-1"></div><div class="hcell level-2"></div><div class="hcell level-3"></div> More
+    </div>
 
   </div> <!-- END VIEW 2 -->
 
@@ -263,6 +318,29 @@
     <div class="modal-btn-row" style="justify-content: flex-end;">
       <button class="modal-btn cancel" id="addModalCancel">Cancel</button>
       <button class="modal-btn primary" id="addModalSave">Add</button>
+    </div>
+  </div>
+</div>
+
+<!-- Badge Detail Modal -->
+<div class="modal-overlay" id="badgeDetailModal">
+  <div class="modal-box" style="text-align:center;">
+    <div id="badgeModalIcon" style="font-size:3.2rem; margin-bottom:10px; filter: drop-shadow(0 0 16px var(--accent-glow));">🏆</div>
+    <div class="modal-title" id="badgeModalTitle" style="font-size:1.25rem; margin-bottom:4px;">10-Day Streak</div>
+    <div id="badgeModalCategory" style="font-size:0.75rem; color:var(--accent-bright); text-transform:uppercase; letter-spacing:1px; font-weight:700; margin-bottom:10px;">Streak Milestone</div>
+    <p id="badgeModalDesc" style="color:var(--text-dim); font-size:0.88rem; line-height:1.4; margin-bottom:14px;">Maintain study focus for 10 consecutive days</p>
+    
+    <div id="badgeModalProgressBox" style="background:var(--panel-elevated); border:1px solid var(--line); border-radius:10px; padding:12px; margin-bottom:16px;">
+      <div style="display:flex; justify-content:space-between; font-size:0.8rem; font-weight:600; margin-bottom:6px;">
+        <span id="badgeModalProgressLabel" style="color:var(--text-dim);">Progress</span>
+        <span id="badgeModalProgressVal" style="color:var(--text);">10 / 10 days</span>
+      </div>
+      <div class="track"><div class="fill gold" id="badgeModalFill" style="width:100%;"></div></div>
+      <div id="badgeModalStatus" style="font-size:0.8rem; font-weight:700; margin-top:8px; color:#f59e0b;">✨ Earned & Unlocked!</div>
+    </div>
+
+    <div class="modal-btn-row" style="justify-content:center;">
+      <button class="modal-btn primary" id="badgeModalClose" style="min-width:110px;">Close</button>
     </div>
   </div>
 </div>
