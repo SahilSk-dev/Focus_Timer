@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="theme-color" content="#040e08">
 <link rel="manifest" href="./manifest.json">
 <title>Focus Study Timer</title>
@@ -57,7 +57,7 @@
     <div style="display:flex; align-items:center; gap:16px;">
       <button id="muteBtn" class="audio-btn" title="Mute/Unmute">🔊</button>
       <label class="switch">
-        <input type="checkbox" id="pomoToggle">
+        <input type="checkbox" id="pomoToggle" title="Pomodoro Mode (25+5 mins)" aria-label="Pomodoro Mode (25+5 mins)">
         <span class="slider"></span>
       </label>
     </div>
@@ -65,12 +65,12 @@
 
   <div class="time-row" id="customTimeRow">
     <div>
-      <label class="field-label">Hours</label>
-      <input type="number" id="hours" min="0" max="12" value="0" inputmode="numeric" autocomplete="off">
+      <label class="field-label" for="hours">Hours</label>
+      <input type="number" id="hours" min="0" max="12" value="0" inputmode="numeric" autocomplete="off" placeholder="0" title="Hours" aria-label="Hours">
     </div>
     <div>
-      <label class="field-label">Minutes</label>
-      <input type="number" id="minutes" min="0" max="59" value="0" inputmode="numeric" autocomplete="off">
+      <label class="field-label" for="minutes">Minutes</label>
+      <input type="number" id="minutes" min="0" max="59" value="0" inputmode="numeric" autocomplete="off" placeholder="0" title="Minutes" aria-label="Minutes">
     </div>
   </div>
 
@@ -146,7 +146,7 @@
           <div class="track"><div class="fill gold" id="targetFill"></div></div>
           <div class="kpi-target-edit">
             <span id="targetPct">0%</span>
-            <span class="target-input-wrap">Goal: <input type="number" id="targetInput" min="10" step="10" inputmode="numeric" autocomplete="off">m</span>
+            <span class="target-input-wrap">Goal: <input type="number" id="targetInput" min="10" step="10" inputmode="numeric" autocomplete="off" placeholder="Goal" title="Daily Goal in minutes" aria-label="Daily Goal in minutes">m</span>
           </div>
         </div>
       </div>
@@ -209,6 +209,9 @@
         <button class="analytics-timeframe-btn" data-period="30">Last 30 Days</button>
         <button class="analytics-timeframe-btn" data-period="all">All Time</button>
       </div>
+
+      <!-- Empty Notice Banner when current filter has 0 sessions but all-time has data -->
+      <div id="analyticsEmptyNotice" class="analytics-empty-notice" style="display:none;"></div>
 
       <!-- Analysis Grid -->
       <div class="analytics-grid">
@@ -325,7 +328,7 @@
   <div class="history-list" id="historyList"></div>
   <div class="stats-title" style="margin-bottom:14px;">Data Backup & Export</div>
   <div class="export-row">
-    <select id="exportRange" class="export-select">
+    <select id="exportRange" class="export-select" title="Export Timeframe Range" aria-label="Export Timeframe Range">
       <option value="today">Today</option>
       <option value="24h">Last 24h</option>
       <option value="48h">Last 48h</option>
@@ -347,12 +350,12 @@
   <div class="export-row">
     <div style="display:flex; gap:10px; width:100%; align-items:center;">
       <div style="flex:1;">
-        <label style="font-size:0.8rem; color:var(--text-dim);">From Date</label>
-        <input type="date" id="bulkDelFrom" class="modal-input" style="width:100%; margin-top:4px;">
+        <label class="field-label" for="bulkDelFrom" style="font-size:0.8rem; color:var(--text-dim);">From Date</label>
+        <input type="date" id="bulkDelFrom" class="modal-input" style="width:100%; margin-top:4px;" title="From Date" aria-label="From Date" placeholder="YYYY-MM-DD">
       </div>
       <div style="flex:1;">
-        <label style="font-size:0.8rem; color:var(--text-dim);">To Date</label>
-        <input type="date" id="bulkDelTo" class="modal-input" style="width:100%; margin-top:4px;">
+        <label class="field-label" for="bulkDelTo" style="font-size:0.8rem; color:var(--text-dim);">To Date</label>
+        <input type="date" id="bulkDelTo" class="modal-input" style="width:100%; margin-top:4px;" title="To Date" aria-label="To Date" placeholder="YYYY-MM-DD">
       </div>
     </div>
     <button class="export-btn" id="bulkDeleteBtn" style="border-color:#ef4444; color:#ef4444; margin-top:10px;">Delete Sessions</button>
@@ -380,7 +383,7 @@
   <div class="modal-box">
     <div class="modal-title" id="modalTitle">Edit</div>
     <div class="modal-input">
-      <input type="text" id="modalInput" autocomplete="off">
+      <input type="text" id="modalInput" autocomplete="off" placeholder="Subject or category name" title="Edit name" aria-label="Edit name">
     </div>
     <div class="modal-btn-row">
       <button class="modal-btn cancel" id="modalCancel">Cancel</button>

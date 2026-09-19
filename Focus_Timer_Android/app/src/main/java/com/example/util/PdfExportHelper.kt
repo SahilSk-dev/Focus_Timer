@@ -330,9 +330,10 @@ object PdfExportHelper {
         canvas.drawRect(36f, y, 559f, y + 50f, gridPaint)
 
         val sign = if (report.velocityPercentage >= 0) "+" else ""
+        val velText = if (report.totalMinutes > 0) "$sign${report.velocityPercentage}%" else "0%"
         canvas.drawText("Total Focus: ${String.format(Locale.US, "%.1f", report.totalHours)} hrs (${report.totalMinutes}m)", 46f, y + 15f, statValPaint)
-        canvas.drawText("Deep Work Ratio: ${report.deepWorkRatio}% (≥45m blocks)", 230f, y + 15f, statValPaint)
-        canvas.drawText("Study Velocity: $sign${report.velocityPercentage}%", 420f, y + 15f, statValPaint)
+        canvas.drawText("Deep Work Ratio: ${report.deepWorkRatio}% (>= 45m blocks)", 230f, y + 15f, statValPaint)
+        canvas.drawText("Study Velocity: $velText", 420f, y + 15f, statValPaint)
 
         canvas.drawText("Total Sessions: ${report.sessionCount}", 46f, y + 30f, statKeyPaint)
         canvas.drawText("Avg Session Length: ${report.avgSessionMinutes} mins", 230f, y + 30f, statKeyPaint)
@@ -357,7 +358,8 @@ object PdfExportHelper {
             canvas.drawRect(36f, y, 559f, y + 15f, bg)
             canvas.drawRect(36f, y, 559f, y + 15f, gridPaint)
 
-            canvas.drawText(b.label, 46f, y + 11f, cellTextPaint)
+            val cleanLabel = b.label.replace(Regex("[\uD83C-\uDBFF\uDC00-\uDFFF]+"), "").trim()
+            canvas.drawText(cleanLabel, 46f, y + 11f, cellTextPaint)
             canvas.drawText("${b.minutes} mins", 260f, y + 11f, cellTextPaint)
             canvas.drawText("${String.format(Locale.US, "%.1f", b.minutes / 60.0)} hrs", 370f, y + 11f, cellTextPaint)
             canvas.drawText("${b.percentageOfTotal}%", 470f, y + 11f, cellTextPaint)
@@ -390,7 +392,7 @@ object PdfExportHelper {
                 canvas.drawRect(36f, y, 559f, y + 15f, gridPaint)
 
                 val lastStr = if (s.daysAgo == 0) "Today" else if (s.daysAgo == 1) "Yesterday" else "${s.daysAgo}d ago"
-                val statusStr = if (s.isNeglected) "Neglected (≥3d)" else "Balanced"
+                val statusStr = if (s.isNeglected) "Neglected (>= 3d)" else "Balanced"
 
                 canvas.drawText(s.subjectName, 46f, y + 11f, cellTextPaint)
                 canvas.drawText("${String.format(Locale.US, "%.1f", s.hours)}h", 210f, y + 11f, cellTextPaint)
@@ -410,14 +412,17 @@ object PdfExportHelper {
         report.smartInsights.take(4).forEach { item ->
             canvas.drawRect(36f, y, 559f, y + 20f, altRowBgPaint)
             canvas.drawRect(36f, y, 559f, y + 20f, gridPaint)
-            val fullText = "${item.icon} ${item.title}: ${item.description}"
+            val cleanIcon = item.icon.replace(Regex("[\uD83C-\uDBFF\uDC00-\uDFFF]+"), "").trim()
+            val prefix = if (cleanIcon.isNotBlank()) "$cleanIcon " else ""
+            val fullText = "$prefix${item.title}: ${item.description}"
             val clippedText = if (fullText.length > 95) fullText.take(92) + "..." else fullText
             canvas.drawText(clippedText, 44f, y + 13f, cellTextPaint)
             y += 21f
         }
 
         // Footer
-        canvas.drawText("Focus Study Timer • Cognitive Analysis Report • Page $pageNumber", 36f, 822f, footerPaint)
+        canvas.drawText("Focus Study Timer | Cognitive Analysis Report | Page $pageNumber", 36f, 822f, footerPaint)
+
         pdfDocument.finishPage(page)
 
         // Write to Cache

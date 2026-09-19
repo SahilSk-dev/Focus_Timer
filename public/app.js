@@ -1348,6 +1348,88 @@ function setupMilestoneEvents() {
 setupMilestoneEvents();
 
 /* ============================================================
+   TRANSLATION & PDF TEXT CLEANING HELPERS
+   ============================================================ */
+const b2eSubject = {
+  'বাংলা': 'Bengali', 'ইংরেজি': 'English', 'অংক': 'Math', 
+  'জীবন বিজ্ঞান': 'Life Science', 'ভৌত বিজ্ঞান': 'Physical Science', 
+  'ইতিহাস': 'History', 'ভূগোল': 'Geography'
+};
+const b2eWorkType = {
+  'রিভিশন': 'Revision', 'নতুন পড়া': 'New Topic', 'মুখস্থ করা': 'Memorize', 
+  'রিডিং পড়া': 'Reading', 'প্রশ্ন উত্তর প্র্যাকটিস': 'Practice', 
+  'নোট তৈরি': 'Notes', 'অন্যান্য': 'Other'
+};
+
+function toBanglish(str) {
+  if (!str) return '';
+  const map = {
+    'অ':'o','আ':'a','ই':'i','ঈ':'i','উ':'u','ঊ':'u','ঋ':'ri','এ':'e','ঐ':'oi','ও':'o','ঔ':'ou',
+    'ক':'k','খ':'kh','গ':'g','ঘ':'gh','ঙ':'ng','চ':'ch','ছ':'ch','জ':'j','ঝ':'jh','ঞ':'n',
+    'ট':'t','ঠ':'th','ড':'d','ঢ':'dh','ণ':'n','ত':'t','থ':'th','দ':'d','ধ':'dh','ন':'n',
+    'প':'p','ফ':'f','ব':'b','ভ':'v','ম':'m','য':'j','র':'r','ল':'l','শ':'sh','ষ':'sh','স':'s','হ':'h',
+    'ড়':'r','ঢ়':'rh','য়':'y','ৎ':'t','ং':'ng','ঁ':'','ঃ':'h',
+    'া':'a','ি':'i','ী':'i','ু':'u','ূ':'u','ৃ':'ri','ে':'e','ৈ':'oi','ো':'o','ৌ':'ou','্':''
+  };
+  let res = '';
+  for(let i=0; i<str.length; i++){
+    res += map[str[i]] !== undefined ? map[str[i]] : str[i];
+  }
+  return res.replace(/a+/g, 'a').replace(/i+/g, 'i');
+}
+
+function cleanPdfText(str) {
+  if (str === null || str === undefined) return '';
+  let s = String(str);
+  
+  // Strip HTML tags
+  s = s.replace(/<[^>]*>/g, '');
+  
+  // Mathematical and directional symbols
+  s = s.replace(/≥/g, '>=');
+  s = s.replace(/≤/g, '<=');
+  s = s.replace(/▲/g, '(+)');
+  s = s.replace(/▼/g, '(-)');
+  s = s.replace(/•/g, '-');
+  s = s.replace(/[–—]/g, '-');
+  s = s.replace(/[""]/g, '"');
+  s = s.replace(/['']/g, "'");
+
+  // Map known emojis to clean text tags
+  s = s.replace(/🌅/g, '[Morning]');
+  s = s.replace(/☀️/g, '[Afternoon]');
+  s = s.replace(/🌆/g, '[Evening]');
+  s = s.replace(/🌙/g, '[Night]');
+  s = s.replace(/🧠/g, '[Deep Work]');
+  s = s.replace(/⏱️?/g, '[Pacing]');
+  s = s.replace(/⚠️/g, '[Warning]');
+  s = s.replace(/⚖️?/g, '[Equilibrium]');
+  s = s.replace(/📈/g, '[Velocity]');
+  s = s.replace(/💡/g, '[Insight]');
+  s = s.replace(/🏆/g, '[Badge]');
+  s = s.replace(/🔥/g, '[Streak]');
+  s = s.replace(/⚡/g, '[Focus]');
+  s = s.replace(/🧩/g, '[Modality]');
+  s = s.replace(/📑/g, '[Report]');
+  s = s.replace(/ℹ️?/g, '[Notice]');
+
+  // Translate Bengali subjects or work types if present
+  Object.keys(b2eSubject).forEach(k => {
+    if (s.includes(k)) s = s.split(k).join(b2eSubject[k]);
+  });
+  Object.keys(b2eWorkType).forEach(k => {
+    if (s.includes(k)) s = s.split(k).join(b2eWorkType[k]);
+  });
+  if (/[\u0980-\u09FF]/.test(s)) {
+    s = toBanglish(s);
+  }
+
+  // Strip any remaining characters outside standard printable ASCII range
+  s = s.replace(/[^\x20-\x7E\n]/g, '');
+  return s.trim();
+}
+
+/* ============================================================
    🧠 COGNITIVE DEEP ANALYSIS ENGINE
    ============================================================ */
 let currentAnalyticsPeriod = '7'; // '7', '30', or 'all'
@@ -1390,7 +1472,7 @@ function computeAnalyticsReport(period) {
   // Study Velocity (% change vs prior period)
   const priorMinutes = priorSessions.reduce((a, s) => a + s.minutes, 0);
   let velocity = 0;
-  if (priorMinutes > 0) {
+  if (priorMinutes > 0 && totalMinutes > 0) {
     velocity = Math.round(((totalMinutes - priorMinutes) / priorMinutes) * 100);
   } else if (totalMinutes > 0 && period !== 'all') {
     velocity = 100;
@@ -1398,10 +1480,10 @@ function computeAnalyticsReport(period) {
 
   // Circadian Time-of-Day Distribution (Morning 5-11, Afternoon 12-16, Evening 17-21, Night 22-4)
   const circadianBuckets = {
-    morning: { label: '🌅 Morning (5am - 12pm)', mins: 0, count: 0 },
-    afternoon: { label: '☀️ Afternoon (12pm - 5pm)', mins: 0, count: 0 },
-    evening: { label: '🌆 Evening (5pm - 10pm)', mins: 0, count: 0 },
-    night: { label: '🌙 Night (10pm - 5am)', mins: 0, count: 0 }
+    morning: { label: '🌅 Morning (5am - 12pm)', cleanLabel: 'Morning (05:00 AM - 12:00 PM)', mins: 0, count: 0 },
+    afternoon: { label: '☀️ Afternoon (12pm - 5pm)', cleanLabel: 'Afternoon (12:00 PM - 05:00 PM)', mins: 0, count: 0 },
+    evening: { label: '🌆 Evening (5pm - 10pm)', cleanLabel: 'Evening (05:00 PM - 10:00 PM)', mins: 0, count: 0 },
+    night: { label: '🌙 Night (10pm - 5am)', cleanLabel: 'Night (10:00 PM - 05:00 AM)', mins: 0, count: 0 }
   };
   const hourlyMins = new Array(24).fill(0);
 
@@ -1433,7 +1515,9 @@ function computeAnalyticsReport(period) {
     const hr = h % 12 === 0 ? 12 : h % 12;
     return `${hr}:00 ${ampm}`;
   };
-  const peakFocusWindow = `${formatHour(peakStartHour)} - ${formatHour(peakStartHour + 2)}`;
+  const peakFocusWindow = max2Hour > 0 
+    ? `${formatHour(peakStartHour)} - ${formatHour(peakStartHour + 2)}` 
+    : 'N/A (No study in period)';
 
   // Subject Equilibrium & Neglect Matrix
   const subjMap = {};
@@ -1486,8 +1570,7 @@ function computeAnalyticsReport(period) {
       icon: '🌅',
       text: `<strong>Circadian Prime:</strong> Your peak focus window is <strong>${peakFocusWindow}</strong> (${bucketPct}% of study). Prioritize challenging analytical concepts during this period.`
     });
-  }
-  if (totalMinutes > 0) {
+
     if (deepWorkRatio >= 60) {
       smartInsights.push({
         icon: '🧠',
@@ -1499,34 +1582,46 @@ function computeAnalyticsReport(period) {
         text: `<strong>Focus Pacing:</strong> <strong>${100 - deepWorkRatio}%</strong> of your time is spent in short sprints. Consider lengthening study blocks to deepen immersion.`
       });
     }
-  }
-  const neglectedSubjects = subjectEquilibrium.filter(s => s.isNeglected);
-  if (neglectedSubjects.length > 0) {
-    const names = neglectedSubjects.slice(0, 2).map(s => `${s.name} (${s.daysAgo}d ago)`).join(', ');
-    smartInsights.push({
-      icon: '⚠️',
-      text: `<strong>Subject Neglect Warning:</strong> ${names} untouched recently. Schedule a recall session to prevent forgetting curve decay.`
-    });
-  } else if (subjectEquilibrium.length > 1) {
-    smartInsights.push({
-      icon: '⚖️',
-      text: `<strong>Subject Equilibrium:</strong> All active subjects were studied within the last 48 hours. Well-balanced curriculum distribution.`
-    });
-  }
-  if (period !== 'all' && (totalMinutes > 0 || priorMinutes > 0)) {
-    const arrow = velocity >= 0 ? '▲' : '▼';
-    const trendWord = velocity >= 0 ? 'acceleration' : 'dip';
-    smartInsights.push({
-      icon: '📈',
-      text: `<strong>Study Velocity:</strong> ${arrow} <strong>${Math.abs(velocity)}%</strong> ${trendWord} compared to the previous timeframe.`
-    });
-  }
 
-  if (smartInsights.length === 0) {
-    smartInsights.push({
-      icon: '💡',
-      text: 'Log study sessions to unlock automated circadian analysis, stamina scores, and curriculum balance feedback.'
-    });
+    const neglectedSubjects = subjectEquilibrium.filter(s => s.isNeglected);
+    if (neglectedSubjects.length > 0) {
+      const names = neglectedSubjects.slice(0, 2).map(s => `${s.name} (${s.daysAgo}d ago)`).join(', ');
+      smartInsights.push({
+        icon: '⚠️',
+        text: `<strong>Subject Neglect Warning:</strong> ${names} untouched recently. Schedule a recall session to prevent forgetting curve decay.`
+      });
+    } else if (subjectEquilibrium.length > 1) {
+      smartInsights.push({
+        icon: '⚖️',
+        text: `<strong>Subject Equilibrium:</strong> All active subjects were studied within the last 48 hours. Well-balanced curriculum distribution.`
+      });
+    }
+
+    if (period !== 'all' && (totalMinutes > 0 || priorMinutes > 0)) {
+      const arrow = velocity >= 0 ? '▲' : '▼';
+      const trendWord = velocity >= 0 ? 'acceleration' : 'dip';
+      smartInsights.push({
+        icon: '📈',
+        text: `<strong>Study Velocity:</strong> ${arrow} <strong>${Math.abs(velocity)}%</strong> ${trendWord} compared to the previous timeframe.`
+      });
+    }
+  } else {
+    // totalMinutes === 0
+    if (allStudy.length > 0) {
+      const dates = allStudy.map(s => s.date).sort();
+      const oldest = dates[0];
+      const newest = dates[dates.length - 1];
+      const allMins = allStudy.reduce((a, s) => a + s.minutes, 0);
+      smartInsights.push({
+        icon: 'ℹ️',
+        text: `<strong>Historical Data Available:</strong> No study sessions logged in <strong>${period === 'all' ? 'All Time' : 'Last ' + period + ' Days'}</strong>. You have <strong>${allStudy.length}</strong> total sessions (<strong>${(allMins / 60).toFixed(1)} hrs</strong>) recorded between <strong>${oldest}</strong> and <strong>${newest}</strong>. Switch to <strong>'All Time'</strong> to view complete metrics.`
+      });
+    } else {
+      smartInsights.push({
+        icon: '💡',
+        text: 'Log study sessions to unlock automated circadian analysis, stamina scores, and curriculum balance feedback.'
+      });
+    }
   }
 
   return {
@@ -1544,12 +1639,48 @@ function computeAnalyticsReport(period) {
     subjectEquilibrium,
     cognitiveWorkTypes,
     smartInsights,
-    filteredSessions: filtered
+    filteredSessions: filtered,
+    allStudyTotalCount: allStudy.length,
+    allStudyTotalMinutes: allStudy.reduce((a, s) => a + s.minutes, 0)
   };
 }
 
 function renderDeepAnalytics() {
   const report = computeAnalyticsReport(currentAnalyticsPeriod);
+
+  // Notice banner when 0 sessions in selected period but history exists
+  const noticeContainer = document.getElementById('analyticsEmptyNotice');
+  if (noticeContainer) {
+    if (report.totalMinutes === 0 && report.allStudyTotalCount > 0) {
+      noticeContainer.style.display = 'block';
+      const pLabel = currentAnalyticsPeriod === 'all' ? 'All Time' : `Last ${currentAnalyticsPeriod} Days`;
+      noticeContainer.innerHTML = `
+        <div class="analytics-empty-notice-card">
+          <div class="notice-left">
+            <span class="notice-icon">ℹ️</span>
+            <div>
+              <div class="notice-title">No sessions in selected timeframe (${pLabel})</div>
+              <div class="notice-desc">You have <strong>${report.allStudyTotalCount}</strong> study sessions recorded in your profile. Switch to All Time to view them.</div>
+            </div>
+          </div>
+          <button id="analyticsSwitchAllTimeBtn" class="notice-btn">Switch to All Time</button>
+        </div>
+      `;
+      const switchBtn = document.getElementById('analyticsSwitchAllTimeBtn');
+      if (switchBtn) {
+        switchBtn.addEventListener('click', () => {
+          document.querySelectorAll('.analytics-timeframe-btn').forEach(b => b.classList.remove('active'));
+          const allBtn = document.querySelector('.analytics-timeframe-btn[data-period="all"]');
+          if (allBtn) allBtn.classList.add('active');
+          currentAnalyticsPeriod = 'all';
+          renderDeepAnalytics();
+        });
+      }
+    } else {
+      noticeContainer.style.display = 'none';
+      noticeContainer.innerHTML = '';
+    }
+  }
 
   // Peak focus badge
   const peakBadge = document.getElementById('peakFocusBadge');
@@ -1586,9 +1717,14 @@ function renderDeepAnalytics() {
   if (avgVal) avgVal.textContent = `${report.avgSessionMin}m`;
   const velVal = document.getElementById('studyVelocityVal');
   if (velVal) {
-    const sign = report.velocity >= 0 ? '+' : '';
-    velVal.textContent = `${sign}${report.velocity}%`;
-    velVal.style.color = report.velocity >= 0 ? 'var(--accent-bright)' : '#ef4444';
+    if (report.totalMinutes > 0) {
+      const sign = report.velocity >= 0 ? '+' : '';
+      velVal.textContent = `${sign}${report.velocity}%`;
+      velVal.style.color = report.velocity >= 0 ? 'var(--accent-bright)' : '#ef4444';
+    } else {
+      velVal.textContent = '0%';
+      velVal.style.color = 'var(--text-dim)';
+    }
   }
   const dwFill = document.getElementById('deepWorkFill');
   if (dwFill) dwFill.style.width = `${report.deepWorkRatio}%`;
@@ -1696,31 +1832,64 @@ async function exportAnalysisPdf() {
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(8.5);
     doc.setTextColor(167, 243, 208);
-    doc.text(`Reporting Timeframe: ${periodLabel}  |  Generated: ${today}`, 14, 29);
+    doc.text(`Reporting Timeframe: ${cleanPdfText(periodLabel)}  |  Generated: ${today}`, 14, 29);
+
+    let currentY = 42;
+
+    // If selected period has 0 sessions but user has historical data, provide full All-Time analysis
+    const hasHistory = report.totalMinutes === 0 && report.allStudyTotalCount > 0;
+    const effectiveReport = hasHistory ? computeAnalyticsReport('all') : report;
+
+    if (hasHistory) {
+      const fromLimit = currentAnalyticsPeriod === '7' ? daysAgoStr(6) : daysAgoStr(29);
+      doc.autoTable({
+        startY: currentY,
+        head: [['NOTICE: SELECTED TIMEFRAME HAS 0 SESSIONS (' + cleanPdfText(periodLabel).toUpperCase() + ')']],
+        body: [[
+          cleanPdfText(
+            `No study sessions were recorded during ${periodLabel} (${fromLimit} to ${today}).\n` +
+            `Your account contains ${report.allStudyTotalCount} historical study sessions (${effectiveReport.totalHours} hrs total focus).\n` +
+            `Below is your complete All-Time Historical Breakdown & Session Audit.`
+          )
+        ]],
+        theme: 'grid',
+        headStyles: { fillColor: [217, 119, 6], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 9 },
+        styles: { fontSize: 8.5, cellPadding: 3, textColor: [120, 53, 15] },
+        margin: { left: 14, right: 14 }
+      });
+      currentY = doc.lastAutoTable.finalY + 6;
+    }
 
     // 2. Executive KPIs Table
-    const sign = report.velocity >= 0 ? '+' : '';
+    const velText = report.totalMinutes > 0 
+      ? `${report.velocity >= 0 ? '+' : ''}${report.velocity}% vs prior period`
+      : (hasHistory ? `All-Time: ${effectiveReport.totalHours} hrs` : 'N/A (0 min in period)');
+
     const execRows = [
       [
-        `Total Focus: ${report.totalHours} hrs (${report.totalMinutes} mins)`,
-        `Total Sessions: ${report.sessionCount}`,
-        `Active Days: ${report.activeDaysCount}`
+        cleanPdfText(`Total Focus: ${effectiveReport.totalHours} hrs (${effectiveReport.totalMinutes} mins)`),
+        cleanPdfText(`Total Sessions: ${effectiveReport.sessionCount}`),
+        cleanPdfText(`Active Days: ${effectiveReport.activeDaysCount}`)
       ],
       [
-        `Deep Work Ratio: ${report.deepWorkRatio}% (≥45m blocks)`,
-        `Avg Session Length: ${report.avgSessionMin} mins`,
-        `Study Velocity: ${sign}${report.velocity}% vs prior period`
+        cleanPdfText(`Deep Work Ratio: ${effectiveReport.deepWorkRatio}% (>= 45m blocks)`),
+        cleanPdfText(`Avg Session Length: ${effectiveReport.avgSessionMin} mins`),
+        cleanPdfText(`Study Velocity: ${velText}`)
       ],
       [
-        `Circadian Peak Focus Window: ${report.peakFocusWindow}`,
-        `Streak Status: ${currentStreakVal} days current (Best: ${bestStreakVal})`,
-        `Data Integrity: Verified Local/Cloud`
+        cleanPdfText(`Circadian Peak Focus Window: ${effectiveReport.peakFocusWindow}`),
+        cleanPdfText(`Streak Status: ${currentStreakVal} days current (Best: ${bestStreakVal})`),
+        cleanPdfText(`Data Integrity: Verified Local/Cloud`)
       ]
     ];
 
+    const kpiTitle = hasHistory 
+      ? `EXECUTIVE FOCUS PERFORMANCE SUMMARY (ALL-TIME HISTORICAL DATA)`
+      : `EXECUTIVE PERFORMANCE & FOCUS STAMINA SUMMARY (${cleanPdfText(periodLabel).toUpperCase()})`;
+
     doc.autoTable({
-      startY: 42,
-      head: [['EXECUTIVE PERFORMANCE & FOCUS STAMINA SUMMARY', '', '']],
+      startY: currentY,
+      head: [[kpiTitle, '', '']],
       body: execRows,
       theme: 'grid',
       headStyles: { fillColor: [16, 185, 129], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 9.5 },
@@ -1728,12 +1897,17 @@ async function exportAnalysisPdf() {
       margin: { left: 14, right: 14 }
     });
 
-    let currentY = doc.lastAutoTable.finalY + 8;
+    currentY = doc.lastAutoTable.finalY + 8;
 
     // 3. Circadian Rhythm Table
-    const circRows = Object.values(report.circadianBuckets).map(b => {
-      const pct = report.totalMinutes > 0 ? Math.round((b.mins / report.totalMinutes) * 100) : 0;
-      return [b.label, `${(b.mins / 60).toFixed(1)} hrs`, `${b.mins} mins`, `${pct}%`];
+    const circRows = [
+      ['Morning (05:00 AM - 12:00 PM)', effectiveReport.circadianBuckets.morning],
+      ['Afternoon (12:00 PM - 05:00 PM)', effectiveReport.circadianBuckets.afternoon],
+      ['Evening (05:00 PM - 10:00 PM)', effectiveReport.circadianBuckets.evening],
+      ['Night (10:00 PM - 05:00 AM)', effectiveReport.circadianBuckets.night]
+    ].map(([label, b]) => {
+      const pct = effectiveReport.totalMinutes > 0 ? Math.round((b.mins / effectiveReport.totalMinutes) * 100) : 0;
+      return [label, `${(b.mins / 60).toFixed(1)} hrs`, `${b.mins} mins`, `${pct}%`];
     });
 
     doc.autoTable({
@@ -1749,10 +1923,10 @@ async function exportAnalysisPdf() {
     currentY = doc.lastAutoTable.finalY + 8;
 
     // 4. Subject Equilibrium Table
-    const subjRows = report.subjectEquilibrium.map(s => {
+    const subjRows = effectiveReport.subjectEquilibrium.map(s => {
       const statusText = s.daysAgo === 0 ? 'Active Today' : (s.daysAgo === 1 ? 'Yesterday' : `${s.daysAgo} days ago`);
-      const alert = s.isNeglected ? 'ATTENTION: Neglected (≥3d)' : 'Balanced';
-      return [s.name, `${s.hours} hrs`, `${s.mins} mins`, `${s.pct}%`, statusText, alert];
+      const alert = s.isNeglected ? 'ATTENTION: Neglected (>= 3d)' : 'Balanced';
+      return [cleanPdfText(s.name), `${s.hours} hrs`, `${s.mins} mins`, `${s.pct}%`, statusText, alert];
     });
 
     doc.autoTable({
@@ -1767,15 +1941,15 @@ async function exportAnalysisPdf() {
 
     currentY = doc.lastAutoTable.finalY + 8;
 
-    if (currentY > 220) {
+    if (currentY > 215) {
       doc.addPage();
       currentY = 20;
     }
 
     // 5. Cognitive Work Modality Breakdown Table
-    const workRows = report.cognitiveWorkTypes.map(w => {
+    const workRows = effectiveReport.cognitiveWorkTypes.map(w => {
       const activeType = ['Revision', 'Practice', 'Mock Test'].includes(w.name) ? 'Active Recall / Test' : 'Content Acquisition / Notes';
-      return [w.name, `${w.mins} mins`, `${w.pct}%`, activeType];
+      return [cleanPdfText(w.name), `${w.mins} mins`, `${w.pct}%`, activeType];
     });
 
     doc.autoTable({
@@ -1791,20 +1965,19 @@ async function exportAnalysisPdf() {
     currentY = doc.lastAutoTable.finalY + 8;
 
     // 6. Diagnostic Insights Box
-    if (currentY > 230) {
+    if (currentY > 225) {
       doc.addPage();
       currentY = 20;
     }
 
-    const insightRows = report.smartInsights.map(i => {
-      const cleanText = i.text.replace(/<[^>]*>/g, '');
-      return [`${i.icon} ${cleanText}`];
+    const insightRows = effectiveReport.smartInsights.map(i => {
+      return [cleanPdfText(`${i.icon || '[Insight]'} ${i.text}`)];
     });
 
     doc.autoTable({
       startY: currentY,
       head: [['AI DIAGNOSTIC OBSERVATIONS & ACTIONABLE RECOMMENDATIONS']],
-      body: insightRows,
+      body: insightRows.length > 0 ? insightRows : [['[Insight] Maintain consistent daily study routines to build momentum.']],
       theme: 'grid',
       headStyles: { fillColor: [16, 185, 129], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 9 },
       styles: { fontSize: 8.5, cellPadding: 3, textColor: [15, 23, 42] },
@@ -1819,14 +1992,18 @@ async function exportAnalysisPdf() {
       currentY = 20;
     }
 
-    const sessionRows = report.filteredSessions.slice(0, 45).map(s => {
+    const sessionRows = effectiveReport.filteredSessions.slice(0, 50).map(s => {
       const timeStr = s.ts ? formatTimeRange(s.ts, s.minutes) : s.date;
-      return [s.date, timeStr, s.subject, s.workType || 'Other', `${s.minutes}m`];
+      return [s.date, cleanPdfText(timeStr), cleanPdfText(s.subject), cleanPdfText(s.workType || 'Other'), `${s.minutes}m`];
     });
+
+    const auditHeader = hasHistory 
+      ? `SESSION AUDIT LOG (ALL TIME HISTORICAL SESSIONS: ${effectiveReport.sessionCount})`
+      : `SESSION AUDIT LOG (${cleanPdfText(periodLabel).toUpperCase()})`;
 
     doc.autoTable({
       startY: currentY,
-      head: [['SESSION AUDIT LOG (RECENT)', 'TIME WINDOW', 'SUBJECT', 'WORK TYPE', 'MINUTES']],
+      head: [[auditHeader, 'TIME WINDOW', 'SUBJECT', 'WORK TYPE', 'MINUTES']],
       body: sessionRows.length > 0 ? sessionRows : [['No sessions recorded in this period', '-', '-', '-', '-']],
       theme: 'striped',
       headStyles: { fillColor: [71, 85, 105], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8.5 },
@@ -1840,10 +2017,11 @@ async function exportAnalysisPdf() {
       doc.setPage(i);
       doc.setFontSize(8);
       doc.setTextColor(148, 163, 184);
-      doc.text(`Page ${i} of ${pageCount}  •  Focus Study Timer Cognitive Analytics Report`, 105, 290, { align: 'center' });
+      doc.text(`Page ${i} of ${pageCount}  |  Focus Study Timer Cognitive Analytics Report`, 105, 290, { align: 'center' });
     }
 
-    doc.save(`Focus_Study_Analysis_Report_${periodLabel.replace(/\s+/g, '_')}_${today}.pdf`);
+    const filename = `Focus_Study_Analysis_Report_${periodLabel.replace(/\s+/g, '_')}_${today}.pdf`;
+    doc.save(filename);
     showToast('📑 Analysis PDF downloaded successfully!');
   } catch (err) {
     console.error('PDF export error:', err);
@@ -1938,33 +2116,8 @@ function getExportSessions(){
   return allSess.filter(s => s.date >= limitDate);
 }
 
-const b2eSubject = {
-  'বাংলা': 'Bengali', 'ইংরেজি': 'English', 'অংক': 'Math', 
-  'জীবন বিজ্ঞান': 'Life Science', 'ভৌত বিজ্ঞান': 'Physical Science', 
-  'ইতিহাস': 'History', 'ভূগোল': 'Geography'
-};
-const b2eWorkType = {
-  'রিভিশন': 'Revision', 'নতুন পড়া': 'New Topic', 'মুখস্থ করা': 'Memorize', 
-  'রিডিং পড়া': 'Reading', 'প্রশ্ন উত্তর প্র্যাকটিস': 'Practice', 
-  'নোট তৈরি': 'Notes', 'অন্যান্য': 'Other'
-};
+// Note: b2eSubject, b2eWorkType, and toBanglish are defined in the Translation & PDF section above.
 
-function toBanglish(str) {
-  if (!str) return '';
-  const map = {
-    'অ':'o','আ':'a','ই':'i','ঈ':'i','উ':'u','ঊ':'u','ঋ':'ri','এ':'e','ঐ':'oi','ও':'o','ঔ':'ou',
-    'ক':'k','খ':'kh','গ':'g','ঘ':'gh','ঙ':'ng','চ':'ch','ছ':'ch','জ':'j','ঝ':'jh','ঞ':'n',
-    'ট':'t','ঠ':'th','ড':'d','ঢ':'dh','ণ':'n','ত':'t','থ':'th','দ':'d','ধ':'dh','ন':'n',
-    'প':'p','ফ':'f','ব':'b','ভ':'v','ম':'m','য':'j','র':'r','ল':'l','শ':'sh','ষ':'sh','স':'s','হ':'h',
-    'ড়':'r','ঢ়':'rh','য়':'y','ৎ':'t','ং':'ng','ঁ':'','ঃ':'h',
-    'া':'a','ি':'i','ী':'i','ু':'u','ূ':'u','ৃ':'ri','ে':'e','ৈ':'oi','ো':'o','ৌ':'ou','্':''
-  };
-  let res = '';
-  for(let i=0; i<str.length; i++){
-    res += map[str[i]] !== undefined ? map[str[i]] : str[i];
-  }
-  return res.replace(/a+/g, 'a').replace(/i+/g, 'i');
-}
 
 async function translateBatch(strings) {
   if (!strings || strings.length === 0) return {};

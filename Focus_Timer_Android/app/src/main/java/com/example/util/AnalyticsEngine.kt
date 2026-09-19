@@ -101,13 +101,14 @@ object AnalyticsEngine {
 
         // Velocity
         val priorMinutes = priorSessions.sumOf { it.minutes }
-        val velocityPercentage = if (priorMinutes > 0) {
+        val velocityPercentage = if (priorMinutes > 0 && totalMinutes > 0) {
             (((totalMinutes - priorMinutes).toFloat() / priorMinutes) * 100).toInt()
         } else if (totalMinutes > 0 && daysLimit != null) {
             100
         } else {
             0
         }
+
 
         // Circadian Time-of-Day Distribution
         var morningMins = 0
@@ -156,7 +157,11 @@ object AnalyticsEngine {
             }
             return "$hr:00 $ampm"
         }
-        val peakFocusWindow = "${formatHourStr(peakStartHour)} - ${formatHourStr(peakStartHour + 2)}"
+        val peakFocusWindow = if (max2H > 0) {
+            "${formatHourStr(peakStartHour)} - ${formatHourStr(peakStartHour + 2)}"
+        } else {
+            "N/A (No study in period)"
+        }
 
         // Subject Equilibrium & Neglect Matrix
         val lastDatePerSubject = mutableMapOf<String, String>()
@@ -267,16 +272,29 @@ object AnalyticsEngine {
                     )
                 )
             }
-        }
-
-        if (smartInsights.isEmpty()) {
-            smartInsights.add(
-                SmartInsight(
-                    icon = "💡",
-                    title = "Building Insights",
-                    description = "Complete study sessions to generate personalized circadian rhythm, stamina, and curriculum balance feedback."
+        } else {
+            // totalMinutes == 0
+            if (studySessions.isNotEmpty()) {
+                val sortedDates = studySessions.map { it.date }.sorted()
+                val oldest = sortedDates.first()
+                val newest = sortedDates.last()
+                val allHours = String.format(Locale.US, "%.1f", studySessions.sumOf { it.minutes } / 60.0)
+                smartInsights.add(
+                    SmartInsight(
+                        icon = "[INFO]",
+                        title = "Historical Data Available",
+                        description = "No sessions logged in ${timeframe.label}. You have ${studySessions.size} total sessions ($allHours hrs) between $oldest and $newest. Switch to 'All Time' to view full history."
+                    )
                 )
-            )
+            } else {
+                smartInsights.add(
+                    SmartInsight(
+                        icon = "💡",
+                        title = "Building Insights",
+                        description = "Complete study sessions to generate personalized circadian rhythm, stamina, and curriculum balance feedback."
+                    )
+                )
+            }
         }
 
         return AnalyticsReport(
