@@ -1812,17 +1812,6 @@ function renderDeepAnalytics() {
       }).join('');
     }
   }
-
-  // Smart Diagnostic Insights
-  const diagList = document.getElementById('smartDiagnosticList');
-  if (diagList) {
-    diagList.innerHTML = report.smartInsights.map(item => `
-      <div class="diagnostic-item">
-        <div class="diagnostic-icon">${item.icon}</div>
-        <div>${escapeHTML(item.text)}</div>
-      </div>
-    `).join('');
-  }
 }
 
 /* ---------- full analysis pdf export ---------- */
