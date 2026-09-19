@@ -1,41 +1,33 @@
 {
   "project_info": {
-    "project_number": "602759203883",
-    "project_id": "my-portal-f20f1",
-    "storage_bucket": "my-portal-f20f1.firebasestorage.app"
+    "project_number": "486309866833",
+    "project_id": "sahil-workspace-ab8af",
+    "storage_bucket": "sahil-workspace-ab8af.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:602759203883:android:6130665cb965325a3b2e6e",
+        "mobilesdk_app_id": "1:486309866833:android:551bd1037e4a6816a27770",
         "android_client_info": {
           "package_name": "com.sahil.focusstudy"
         }
       },
       "oauth_client": [
         {
-          "client_id": "602759203883-4oisgco0cuck5ta0npcb9kd8qalqo8eg.apps.googleusercontent.com",
-          "client_type": 1,
-          "android_info": {
-            "package_name": "com.sahil.focusstudy",
-            "certificate_hash": "f4f9d3e8b7b1cf2f483fa70081a41f730f55bf3e"
-          }
-        },
-        {
-          "client_id": "602759203883-l97ieof4p2p1dvbe3f864bv24i5bqt68.apps.googleusercontent.com",
+          "client_id": "486309866833-g02tgb2ip175690ns4p885csmh89q8ip.apps.googleusercontent.com",
           "client_type": 3
         }
       ],
       "api_key": [
         {
-          "current_key": "AIzaSyA4ZdANZWpoDKZ0pUjUX1EZwfgJbBZ9LpQ"
+          "current_key": "AIzaSyDweyXuvVIAR3EVuv5Er1m3uxQlPRvHkr0"
         }
       ],
       "services": {
         "appinvite_service": {
           "other_platform_oauth_client": [
             {
-              "client_id": "602759203883-l97ieof4p2p1dvbe3f864bv24i5bqt68.apps.googleusercontent.com",
+              "client_id": "486309866833-g02tgb2ip175690ns4p885csmh89q8ip.apps.googleusercontent.com",
               "client_type": 3
             }
           ]

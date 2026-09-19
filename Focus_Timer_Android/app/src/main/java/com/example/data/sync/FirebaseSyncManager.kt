@@ -35,7 +35,7 @@ class FirebaseSyncManager(
 ) {
     companion object {
         private const val TAG = "FirebaseSyncManager"
-        const val WEB_CLIENT_ID = "602759203883-l97ieof4p2p1dvbe3f864bv24i5bqt68.apps.googleusercontent.com"
+        const val WEB_CLIENT_ID = "486309866833-g02tgb2ip175690ns4p885csmh89q8ip.apps.googleusercontent.com"
     }
 
     private val auth: FirebaseAuth by lazy { FirebaseAuth.getInstance() }

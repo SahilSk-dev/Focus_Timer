@@ -8,13 +8,13 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyB1eP2u9-9ydGDzCe7HEVOtHkgld6_Bm9A",
-  authDomain: "my-new-project-a510e.firebaseapp.com",
-  projectId: "my-new-project-a510e",
-  storageBucket: "my-new-project-a510e.firebasestorage.app",
-  messagingSenderId: "589824399304",
-  appId: "1:589824399304:web:9e93181ccc258c316b52fd",
-  measurementId: "G-88XV4T1K3B"
+  apiKey: "AIzaSyAWlmrAVHlBy2ugbGch6HpSJpp9ikfPbJ4",
+  authDomain: "sahil-workspace-ab8af.firebaseapp.com",
+  projectId: "sahil-workspace-ab8af",
+  storageBucket: "sahil-workspace-ab8af.firebasestorage.app",
+  messagingSenderId: "486309866833",
+  appId: "1:486309866833:web:0e695c6720734ff7a27770",
+  measurementId: "G-KRF20FSKVF"
 };
 const fbApp = initializeApp(firebaseConfig);
 const auth = getAuth(fbApp);
