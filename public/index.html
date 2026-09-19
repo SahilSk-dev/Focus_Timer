@@ -191,6 +191,100 @@
 
     <hr class="divider">
 
+    <!-- 🧠 COGNITIVE DEEP ANALYSIS ENGINE -->
+    <div class="analytics-engine-section">
+      <div class="section-header-row">
+        <div>
+          <h3 class="section-title">🧠 Deep Analysis Engine</h3>
+          <div class="section-subtitle">Cognitive habits, biological rhythm & study stamina</div>
+        </div>
+        <button class="download-analysis-pdf-btn" id="downloadAnalysisPdfBtn" title="Export Complete Analysis to PDF">
+          <span>📑</span> Analysis PDF
+        </button>
+      </div>
+
+      <!-- Timeframe Filter -->
+      <div class="analytics-timeframe-row">
+        <button class="analytics-timeframe-btn active" data-period="7">Last 7 Days</button>
+        <button class="analytics-timeframe-btn" data-period="30">Last 30 Days</button>
+        <button class="analytics-timeframe-btn" data-period="all">All Time</button>
+      </div>
+
+      <!-- Analysis Grid -->
+      <div class="analytics-grid">
+        <!-- Card 1: Circadian Peak Focus Hours -->
+        <div class="analytics-card">
+          <div class="analytics-card-header">
+            <span class="analytics-icon">🌅</span>
+            <span class="analytics-card-title">Circadian Rhythm & Peak Hours</span>
+          </div>
+          <div class="peak-focus-badge" id="peakFocusBadge">Analyzing...</div>
+          <div class="circadian-bars" id="circadianBars">
+            <!-- Morning, Afternoon, Evening, Night injected via JS -->
+          </div>
+        </div>
+
+        <!-- Card 2: Deep Work Stamina & Velocity -->
+        <div class="analytics-card">
+          <div class="analytics-card-header">
+            <span class="analytics-icon">⚡</span>
+            <span class="analytics-card-title">Deep Work & Velocity</span>
+          </div>
+          <div class="analytics-stat-row">
+            <div>
+              <div class="analytics-stat-val" id="deepWorkRatioVal">0%</div>
+              <div class="analytics-stat-label">Deep Focus (≥45m)</div>
+            </div>
+            <div>
+              <div class="analytics-stat-val" id="avgSessionVal">0m</div>
+              <div class="analytics-stat-label">Avg Session Length</div>
+            </div>
+            <div>
+              <div class="analytics-stat-val" id="studyVelocityVal">0%</div>
+              <div class="analytics-stat-label">Velocity</div>
+            </div>
+          </div>
+          <div class="track" style="margin-top:12px;"><div class="fill green" id="deepWorkFill" style="width:0%;"></div></div>
+          <div class="analytics-stat-subtext" id="deepWorkSubtext">0 of 0 mins in deep focus blocks</div>
+        </div>
+
+        <!-- Card 3: Subject Equilibrium & Neglect Matrix -->
+        <div class="analytics-card full-width">
+          <div class="analytics-card-header">
+            <span class="analytics-icon">⚖️</span>
+            <span class="analytics-card-title">Subject Equilibrium & Neglect Matrix</span>
+          </div>
+          <div id="subjectEquilibriumList" class="equilibrium-list">
+            <!-- Subject breakdown injected via JS -->
+          </div>
+        </div>
+
+        <!-- Card 4: Cognitive Work-Type Distribution -->
+        <div class="analytics-card">
+          <div class="analytics-card-header">
+            <span class="analytics-icon">🧩</span>
+            <span class="analytics-card-title">Cognitive Method Modality</span>
+          </div>
+          <div id="cognitiveWorkTypeList" class="worktype-breakdown-list">
+            <!-- Work types injected via JS -->
+          </div>
+        </div>
+
+        <!-- Card 5: Smart Diagnostic Insights -->
+        <div class="analytics-card">
+          <div class="analytics-card-header">
+            <span class="analytics-icon">💡</span>
+            <span class="analytics-card-title">Diagnostic Insights</span>
+          </div>
+          <div id="smartDiagnosticList" class="diagnostic-insights-list">
+            <!-- Injected automated smart observations -->
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <hr class="divider">
+
     <!-- Activity Section -->
     <div class="stats-header">
       <div class="stats-title">Activity Breakdown</div>

@@ -76,6 +76,9 @@ import com.example.ui.theme.PanelElevated
 import com.example.ui.theme.SuccessGreen
 import com.example.ui.theme.TextDim
 import com.example.ui.theme.TextPrimary
+import com.example.util.AnalyticsEngine
+import com.example.util.AnalyticsReport
+import com.example.util.AnalyticsTimeframe
 import com.example.util.PdfExportHelper
 import com.example.viewmodel.FocusViewModel
 import java.text.SimpleDateFormat
@@ -159,6 +162,12 @@ fun StatsScreen(
             "locked" -> allBadges.filter { !it.isUnlocked }
             else -> allBadges
         }
+    }
+
+    // Cognitive Deep Analysis Engine computation
+    var analyticsTimeframe by remember { mutableStateOf(AnalyticsTimeframe.LAST_7_DAYS) }
+    val analyticsReport = remember(studySessions, analyticsTimeframe) {
+        AnalyticsEngine.computeReport(studySessions, analyticsTimeframe)
     }
 
     Column(
@@ -449,6 +458,24 @@ fun StatsScreen(
                 )
             }
         }
+
+        Spacer(modifier = Modifier.height(20.dp))
+
+        // ============================================================
+        // 3.5 COGNITIVE DEEP ANALYSIS ENGINE
+        // ============================================================
+        DeepAnalysisEngineSection(
+            report = analyticsReport,
+            currentTimeframe = analyticsTimeframe,
+            onTimeframeSelected = { analyticsTimeframe = it },
+            onExportPdf = {
+                try {
+                    PdfExportHelper.generateAndShareAnalysisPdf(context, analyticsReport)
+                } catch (e: Exception) {
+                    viewModel.showToast("Analysis PDF failed: ${e.localizedMessage}")
+                }
+            }
+        )
 
         Spacer(modifier = Modifier.height(22.dp))
 
@@ -1360,4 +1387,354 @@ private fun calculate7DaysRanking(sessions: List<StudySessionEntity>): List<Rank
         map[mainSubj] = (map[mainSubj] ?: 0) + s.minutes
     }
     return map.entries.sortedByDescending { it.value }.map { RankItem(it.key, it.value) }
+}
+
+@Composable
+private fun DeepAnalysisEngineSection(
+    report: AnalyticsReport,
+    currentTimeframe: AnalyticsTimeframe,
+    onTimeframeSelected: (AnalyticsTimeframe) -> Unit,
+    onExportPdf: () -> Unit
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = PanelDark,
+        shape = RoundedCornerShape(14.dp),
+        border = BorderStroke(1.dp, LineBorder)
+    ) {
+        Column(modifier = Modifier.padding(14.dp)) {
+            // Header
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column {
+                    Text(
+                        text = "🧠 Deep Analysis Engine",
+                        style = TextStyle(
+                            brush = GoldGradientBrush,
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    )
+                    Text(
+                        text = "Cognitive habits, biological rhythm & stamina",
+                        color = TextDim,
+                        fontSize = 11.sp
+                    )
+                }
+
+                Surface(
+                    modifier = Modifier.clickable { onExportPdf() },
+                    shape = RoundedCornerShape(8.dp),
+                    color = PanelElevated,
+                    border = BorderStroke(1.dp, LineBorder)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.PictureAsPdf,
+                            contentDescription = "Analysis PDF",
+                            tint = GoldLight,
+                            modifier = Modifier.size(13.dp)
+                        )
+                        Text(
+                            text = "Analysis PDF",
+                            color = GoldLight,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Timeframe Selector Chips
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                AnalyticsTimeframe.values().forEach { tf ->
+                    val isSelected = tf == currentTimeframe
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(if (isSelected) GoldAccent else PanelElevated)
+                            .border(1.dp, if (isSelected) GoldAccent else LineBorder, RoundedCornerShape(12.dp))
+                            .clickable { onTimeframeSelected(tf) }
+                            .padding(horizontal = 10.dp, vertical = 4.dp)
+                    ) {
+                        Text(
+                            text = tf.label,
+                            color = if (isSelected) BgDark else TextDim,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // 1. Circadian Peak Focus Card
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                color = PanelElevated,
+                shape = RoundedCornerShape(10.dp),
+                border = BorderStroke(1.dp, LineBorder)
+            ) {
+                Column(modifier = Modifier.padding(12.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "🌅 Circadian Peak Focus",
+                            color = TextPrimary,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Box(
+                            modifier = Modifier
+                                .background(GoldAccent.copy(alpha = 0.15f), RoundedCornerShape(4.dp))
+                                .border(1.dp, GoldAccent, RoundedCornerShape(4.dp))
+                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                        ) {
+                            Text(
+                                text = "Peak: ${report.peakFocusWindow}",
+                                color = GoldBright,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    val maxCirc = (report.circadianBuckets.maxOfOrNull { it.minutes } ?: 1).coerceAtLeast(1)
+                    report.circadianBuckets.forEach { bucket ->
+                        val pctFloat = (bucket.minutes.toFloat() / maxCirc).coerceIn(0f, 1f)
+                        Column(modifier = Modifier.padding(vertical = 3.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(text = bucket.label, color = TextDim, fontSize = 11.sp)
+                                Text(
+                                    text = "${bucket.minutes}m (${bucket.percentageOfTotal}%)",
+                                    color = TextPrimary,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(4.dp)
+                                    .clip(RoundedCornerShape(2.dp))
+                                    .background(Color.White.copy(alpha = 0.08f))
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth(pctFloat)
+                                        .height(4.dp)
+                                        .clip(RoundedCornerShape(2.dp))
+                                        .background(SuccessGreen)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // 2. Deep Work Stamina & Velocity Card
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                color = PanelElevated,
+                shape = RoundedCornerShape(10.dp),
+                border = BorderStroke(1.dp, LineBorder)
+            ) {
+                Column(modifier = Modifier.padding(12.dp)) {
+                    Text(
+                        text = "⚡ Deep Work & Velocity",
+                        color = TextPrimary,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
+                            Text(text = "${report.deepWorkRatio}%", color = TextPrimary, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                            Text(text = "Deep Work (≥45m)", color = TextDim, fontSize = 10.sp, textAlign = TextAlign.Center)
+                        }
+                        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
+                            Text(text = "${report.avgSessionMinutes}m", color = TextPrimary, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                            Text(text = "Avg Duration", color = TextDim, fontSize = 10.sp, textAlign = TextAlign.Center)
+                        }
+                        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
+                            val sign = if (report.velocityPercentage >= 0) "+" else ""
+                            val col = if (report.velocityPercentage >= 0) SuccessGreen else Color(0xFFEF4444)
+                            Text(text = "$sign${report.velocityPercentage}%", color = col, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                            Text(text = "Velocity", color = TextDim, fontSize = 10.sp, textAlign = TextAlign.Center)
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(4.dp)
+                            .clip(RoundedCornerShape(2.dp))
+                            .background(Color.White.copy(alpha = 0.08f))
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth((report.deepWorkRatio.toFloat() / 100f).coerceIn(0f, 1f))
+                                .height(4.dp)
+                                .clip(RoundedCornerShape(2.dp))
+                                .background(GoldAccent)
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "${report.deepWorkMinutes} of ${report.totalMinutes} mins in sustained blocks",
+                        color = TextDim,
+                        fontSize = 10.sp
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // 3. Subject Equilibrium & Neglect Matrix Card
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                color = PanelElevated,
+                shape = RoundedCornerShape(10.dp),
+                border = BorderStroke(1.dp, LineBorder)
+            ) {
+                Column(modifier = Modifier.padding(12.dp)) {
+                    Text(
+                        text = "⚖️ Subject Equilibrium & Neglect Matrix",
+                        color = TextPrimary,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    if (report.subjectEquilibrium.isEmpty()) {
+                        Text(text = "No subjects recorded in this period.", color = TextDim, fontSize = 11.sp)
+                    } else {
+                        report.subjectEquilibrium.take(6).forEach { subj ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 4.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Text(text = subj.subjectName, color = TextPrimary, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text(text = "(${subj.percentage}%)", color = TextDim, fontSize = 10.sp)
+                                    }
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth(0.85f)
+                                            .height(3.dp)
+                                            .clip(RoundedCornerShape(1.5.dp))
+                                            .background(Color.White.copy(alpha = 0.08f))
+                                    ) {
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxWidth((subj.percentage.toFloat() / 100f).coerceIn(0f, 1f))
+                                                .height(3.dp)
+                                                .clip(RoundedCornerShape(1.5.dp))
+                                                .background(GoldAccent)
+                                        )
+                                    }
+                                }
+
+                                Column(horizontalAlignment = Alignment.End) {
+                                    Text(
+                                        text = "${String.format(Locale.US, "%.1f", subj.hours)}h",
+                                        color = TextPrimary,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    val statusText = if (subj.daysAgo == 0) "Today" else if (subj.daysAgo == 1) "Yesterday" else "${subj.daysAgo}d ago"
+                                    val statusColor = if (subj.isNeglected) Color(0xFFEF4444) else SuccessGreen
+                                    Text(
+                                        text = if (subj.isNeglected) "⚠️ $statusText" else statusText,
+                                        color = statusColor,
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // 4. Smart Diagnostic Insights Card
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                color = PanelElevated,
+                shape = RoundedCornerShape(10.dp),
+                border = BorderStroke(1.dp, LineBorder)
+            ) {
+                Column(modifier = Modifier.padding(12.dp)) {
+                    Text(
+                        text = "💡 Diagnostic Observations",
+                        color = TextPrimary,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    report.smartInsights.forEach { insight ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Text(text = insight.icon, fontSize = 14.sp)
+                            Column {
+                                Text(
+                                    text = insight.title,
+                                    color = GoldBright,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    text = insight.description,
+                                    color = TextDim,
+                                    fontSize = 11.sp,
+                                    lineHeight = 15.sp
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
 }

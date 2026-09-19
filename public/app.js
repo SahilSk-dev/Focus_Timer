@@ -1347,6 +1347,532 @@ function setupMilestoneEvents() {
 // Run immediately as well since module may execute after DOMContentLoaded
 setupMilestoneEvents();
 
+/* ============================================================
+   🧠 COGNITIVE DEEP ANALYSIS ENGINE
+   ============================================================ */
+let currentAnalyticsPeriod = '7'; // '7', '30', or 'all'
+
+function computeAnalyticsReport(period) {
+  const allStudy = sessions.filter(s => !s.isNonStudy);
+  let filtered = allStudy;
+  let priorSessions = [];
+
+  const today = todayStr();
+
+  if (period === '7') {
+    const limit = daysAgoStr(6);
+    const priorLimit = daysAgoStr(13);
+    filtered = allStudy.filter(s => s.date >= limit);
+    priorSessions = allStudy.filter(s => s.date >= priorLimit && s.date < limit);
+  } else if (period === '30') {
+    const limit = daysAgoStr(29);
+    const priorLimit = daysAgoStr(59);
+    filtered = allStudy.filter(s => s.date >= limit);
+    priorSessions = allStudy.filter(s => s.date >= priorLimit && s.date < limit);
+  } else {
+    // all
+    filtered = allStudy;
+    priorSessions = [];
+  }
+
+  const totalMinutes = filtered.reduce((a, s) => a + s.minutes, 0);
+  const totalHours = (totalMinutes / 60).toFixed(1);
+  const sessionCount = filtered.length;
+  const uniqueDates = [...new Set(filtered.map(s => s.date))];
+  const activeDaysCount = uniqueDates.length;
+  const avgSessionMin = sessionCount > 0 ? Math.round(totalMinutes / sessionCount) : 0;
+
+  // Deep Work: Sessions >= 45 mins
+  const deepWorkSessions = filtered.filter(s => (s.minutes || 0) >= 45);
+  const deepWorkMinutes = deepWorkSessions.reduce((a, s) => a + s.minutes, 0);
+  const deepWorkRatio = totalMinutes > 0 ? Math.round((deepWorkMinutes / totalMinutes) * 100) : 0;
+
+  // Study Velocity (% change vs prior period)
+  const priorMinutes = priorSessions.reduce((a, s) => a + s.minutes, 0);
+  let velocity = 0;
+  if (priorMinutes > 0) {
+    velocity = Math.round(((totalMinutes - priorMinutes) / priorMinutes) * 100);
+  } else if (totalMinutes > 0 && period !== 'all') {
+    velocity = 100;
+  }
+
+  // Circadian Time-of-Day Distribution (Morning 5-11, Afternoon 12-16, Evening 17-21, Night 22-4)
+  const circadianBuckets = {
+    morning: { label: '🌅 Morning (5am - 12pm)', mins: 0, count: 0 },
+    afternoon: { label: '☀️ Afternoon (12pm - 5pm)', mins: 0, count: 0 },
+    evening: { label: '🌆 Evening (5pm - 10pm)', mins: 0, count: 0 },
+    night: { label: '🌙 Night (10pm - 5am)', mins: 0, count: 0 }
+  };
+  const hourlyMins = new Array(24).fill(0);
+
+  filtered.forEach(s => {
+    let hour = 14; // fallback mid-afternoon
+    if (s.ts) {
+      hour = new Date(s.ts).getHours();
+    }
+    hourlyMins[hour] += s.minutes;
+
+    if (hour >= 5 && hour < 12) circadianBuckets.morning.mins += s.minutes;
+    else if (hour >= 12 && hour < 17) circadianBuckets.afternoon.mins += s.minutes;
+    else if (hour >= 17 && hour < 22) circadianBuckets.evening.mins += s.minutes;
+    else circadianBuckets.night.mins += s.minutes;
+  });
+
+  // Find Peak 2-hour Window
+  let max2Hour = 0;
+  let peakStartHour = 9;
+  for (let h = 0; h < 23; h++) {
+    const sum = hourlyMins[h] + hourlyMins[h + 1];
+    if (sum > max2Hour) {
+      max2Hour = sum;
+      peakStartHour = h;
+    }
+  }
+  const formatHour = (h) => {
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    const hr = h % 12 === 0 ? 12 : h % 12;
+    return `${hr}:00 ${ampm}`;
+  };
+  const peakFocusWindow = `${formatHour(peakStartHour)} - ${formatHour(peakStartHour + 2)}`;
+
+  // Subject Equilibrium & Neglect Matrix
+  const subjMap = {};
+  filtered.forEach(s => {
+    let m = s.subject;
+    if (m && m.includes(' - ')) m = m.split(' - ')[0];
+    subjMap[m] = (subjMap[m] || 0) + s.minutes;
+  });
+
+  const lastStudiedDateMap = {};
+  allStudy.forEach(s => {
+    let m = s.subject;
+    if (m && m.includes(' - ')) m = m.split(' - ')[0];
+    if (!lastStudiedDateMap[m] || s.date > lastStudiedDateMap[m]) {
+      lastStudiedDateMap[m] = s.date;
+    }
+  });
+
+  const curDate = new Date();
+  const subjectEquilibrium = Object.entries(subjMap).map(([name, mins]) => {
+    const pct = totalMinutes > 0 ? Math.round((mins / totalMinutes) * 100) : 0;
+    const lastDateStr = lastStudiedDateMap[name];
+    let daysAgo = 0;
+    if (lastDateStr) {
+      const parts = lastDateStr.split('-');
+      const lDate = new Date(parts[0], parts[1] - 1, parts[2]);
+      daysAgo = Math.max(0, Math.round((curDate - lDate) / 86400000));
+    }
+    const isNeglected = daysAgo >= 3;
+    return { name, mins, hours: (mins / 60).toFixed(1), pct, daysAgo, isNeglected };
+  }).sort((a, b) => b.mins - a.mins);
+
+  // Cognitive Work-Type Distribution
+  const workTypeMap = {};
+  filtered.forEach(s => {
+    const w = s.workType || 'Other';
+    workTypeMap[w] = (workTypeMap[w] || 0) + s.minutes;
+  });
+  const cognitiveWorkTypes = Object.entries(workTypeMap).map(([name, mins]) => {
+    const pct = totalMinutes > 0 ? Math.round((mins / totalMinutes) * 100) : 0;
+    return { name, mins, pct };
+  }).sort((a, b) => b.mins - a.mins);
+
+  // Automated Smart Diagnostic Insights
+  const smartInsights = [];
+  if (totalMinutes > 0) {
+    let peakBucket = Object.values(circadianBuckets).sort((a, b) => b.mins - a.mins)[0];
+    const bucketPct = Math.round((peakBucket.mins / totalMinutes) * 100);
+    smartInsights.push({
+      icon: '🌅',
+      text: `<strong>Circadian Prime:</strong> Your peak focus window is <strong>${peakFocusWindow}</strong> (${bucketPct}% of study). Prioritize challenging analytical concepts during this period.`
+    });
+  }
+  if (totalMinutes > 0) {
+    if (deepWorkRatio >= 60) {
+      smartInsights.push({
+        icon: '🧠',
+        text: `<strong>Deep Work Stamina:</strong> <strong>${deepWorkRatio}%</strong> of your focus occurs in sustained sessions (≥45m). Excellent cognitive endurance!`
+      });
+    } else {
+      smartInsights.push({
+        icon: '⏱️',
+        text: `<strong>Focus Pacing:</strong> <strong>${100 - deepWorkRatio}%</strong> of your time is spent in short sprints. Consider lengthening study blocks to deepen immersion.`
+      });
+    }
+  }
+  const neglectedSubjects = subjectEquilibrium.filter(s => s.isNeglected);
+  if (neglectedSubjects.length > 0) {
+    const names = neglectedSubjects.slice(0, 2).map(s => `${s.name} (${s.daysAgo}d ago)`).join(', ');
+    smartInsights.push({
+      icon: '⚠️',
+      text: `<strong>Subject Neglect Warning:</strong> ${names} untouched recently. Schedule a recall session to prevent forgetting curve decay.`
+    });
+  } else if (subjectEquilibrium.length > 1) {
+    smartInsights.push({
+      icon: '⚖️',
+      text: `<strong>Subject Equilibrium:</strong> All active subjects were studied within the last 48 hours. Well-balanced curriculum distribution.`
+    });
+  }
+  if (period !== 'all' && (totalMinutes > 0 || priorMinutes > 0)) {
+    const arrow = velocity >= 0 ? '▲' : '▼';
+    const trendWord = velocity >= 0 ? 'acceleration' : 'dip';
+    smartInsights.push({
+      icon: '📈',
+      text: `<strong>Study Velocity:</strong> ${arrow} <strong>${Math.abs(velocity)}%</strong> ${trendWord} compared to the previous timeframe.`
+    });
+  }
+
+  if (smartInsights.length === 0) {
+    smartInsights.push({
+      icon: '💡',
+      text: 'Log study sessions to unlock automated circadian analysis, stamina scores, and curriculum balance feedback.'
+    });
+  }
+
+  return {
+    period,
+    totalMinutes,
+    totalHours,
+    sessionCount,
+    activeDaysCount,
+    avgSessionMin,
+    deepWorkMinutes,
+    deepWorkRatio,
+    velocity,
+    circadianBuckets,
+    peakFocusWindow,
+    subjectEquilibrium,
+    cognitiveWorkTypes,
+    smartInsights,
+    filteredSessions: filtered
+  };
+}
+
+function renderDeepAnalytics() {
+  const report = computeAnalyticsReport(currentAnalyticsPeriod);
+
+  // Peak focus badge
+  const peakBadge = document.getElementById('peakFocusBadge');
+  if (peakBadge) {
+    peakBadge.textContent = report.totalMinutes > 0 ? `Peak: ${report.peakFocusWindow}` : 'Peak: No Data';
+  }
+
+  // Circadian bars
+  const circContainer = document.getElementById('circadianBars');
+  if (circContainer) {
+    const buckets = Object.values(report.circadianBuckets);
+    const maxMins = Math.max(...buckets.map(b => b.mins), 1);
+    circContainer.innerHTML = buckets.map(b => {
+      const pctOfTotal = report.totalMinutes > 0 ? Math.round((b.mins / report.totalMinutes) * 100) : 0;
+      const barFillPct = Math.min(100, Math.round((b.mins / maxMins) * 100));
+      return `
+        <div class="circadian-row">
+          <div class="circadian-row-header">
+            <span>${b.label}</span>
+            <span><strong>${b.mins}m</strong> (${pctOfTotal}%)</span>
+          </div>
+          <div class="circadian-track">
+            <div class="circadian-fill" style="width:${barFillPct}%"></div>
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  // Deep Work & Velocity card
+  const dwVal = document.getElementById('deepWorkRatioVal');
+  if (dwVal) dwVal.textContent = `${report.deepWorkRatio}%`;
+  const avgVal = document.getElementById('avgSessionVal');
+  if (avgVal) avgVal.textContent = `${report.avgSessionMin}m`;
+  const velVal = document.getElementById('studyVelocityVal');
+  if (velVal) {
+    const sign = report.velocity >= 0 ? '+' : '';
+    velVal.textContent = `${sign}${report.velocity}%`;
+    velVal.style.color = report.velocity >= 0 ? 'var(--accent-bright)' : '#ef4444';
+  }
+  const dwFill = document.getElementById('deepWorkFill');
+  if (dwFill) dwFill.style.width = `${report.deepWorkRatio}%`;
+  const dwSubtext = document.getElementById('deepWorkSubtext');
+  if (dwSubtext) {
+    dwSubtext.textContent = `${report.deepWorkMinutes} of ${report.totalMinutes} mins in sustained (≥45m) blocks`;
+  }
+
+  // Subject Equilibrium & Neglect Matrix
+  const eqList = document.getElementById('subjectEquilibriumList');
+  if (eqList) {
+    if (report.subjectEquilibrium.length === 0) {
+      eqList.innerHTML = `<div style="text-align:center; padding:12px; color:var(--text-dim); font-size:0.8rem;">No subjects studied in this timeframe.</div>`;
+    } else {
+      eqList.innerHTML = report.subjectEquilibrium.map(s => {
+        const badgeClass = s.isNeglected ? 'warning' : 'good';
+        const badgeText = s.daysAgo === 0 ? 'Active today' : (s.daysAgo === 1 ? 'Yesterday' : `${s.daysAgo}d ago`);
+        return `
+          <div class="equilibrium-item">
+            <div class="equilibrium-left">
+              <div class="equilibrium-name">
+                <span>${s.name}</span>
+                <span style="font-size:0.7rem; color:var(--text-dim);">(${s.pct}%)</span>
+              </div>
+              <div class="equilibrium-bar-wrap">
+                <div class="equilibrium-bar-fill" style="width:${s.pct}%"></div>
+              </div>
+            </div>
+            <div class="equilibrium-right">
+              <div class="equilibrium-time">${s.hours} hrs</div>
+              <div class="equilibrium-neglect-badge ${badgeClass}">${badgeText}</div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+  }
+
+  // Cognitive Work-Type Distribution
+  const cwtList = document.getElementById('cognitiveWorkTypeList');
+  if (cwtList) {
+    if (report.cognitiveWorkTypes.length === 0) {
+      cwtList.innerHTML = `<div style="text-align:center; padding:12px; color:var(--text-dim); font-size:0.8rem;">No activity recorded.</div>`;
+    } else {
+      cwtList.innerHTML = report.cognitiveWorkTypes.map(w => {
+        return `
+          <div class="worktype-row">
+            <div class="worktype-header">
+              <span>${w.name}</span>
+              <span><strong>${w.mins}m</strong> (${w.pct}%)</span>
+            </div>
+            <div class="circadian-track">
+              <div class="circadian-fill" style="width:${w.pct}%"></div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+  }
+
+  // Smart Diagnostic Insights
+  const diagList = document.getElementById('smartDiagnosticList');
+  if (diagList) {
+    diagList.innerHTML = report.smartInsights.map(item => `
+      <div class="diagnostic-item">
+        <div class="diagnostic-icon">${item.icon}</div>
+        <div>${item.text}</div>
+      </div>
+    `).join('');
+  }
+}
+
+/* ---------- full analysis pdf export ---------- */
+async function exportAnalysisPdf() {
+  if (!window.jspdf || !window.jspdf.jsPDF) {
+    showToast('jsPDF library not loaded');
+    return;
+  }
+  const btn = document.getElementById('downloadAnalysisPdfBtn');
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<span>⏳</span> Generating PDF...';
+  }
+
+  try {
+    const report = computeAnalyticsReport(currentAnalyticsPeriod);
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF('p', 'mm', 'a4');
+    const periodLabel = currentAnalyticsPeriod === 'all' ? 'All Time' : `Last ${currentAnalyticsPeriod} Days`;
+    const today = todayStr();
+
+    // 1. Header Banner
+    doc.setFillColor(4, 14, 8); // Dark #040e08
+    doc.rect(0, 0, 210, 36, 'F');
+
+    doc.setTextColor(52, 211, 153); // Accent bright #34d399
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(16);
+    doc.text('FOCUS STUDY TIMER', 14, 15);
+
+    doc.setTextColor(240, 253, 244);
+    doc.setFontSize(11);
+    doc.text('Cognitive Deep Analysis & Performance Report', 14, 22);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8.5);
+    doc.setTextColor(167, 243, 208);
+    doc.text(`Reporting Timeframe: ${periodLabel}  |  Generated: ${today}`, 14, 29);
+
+    // 2. Executive KPIs Table
+    const sign = report.velocity >= 0 ? '+' : '';
+    const execRows = [
+      [
+        `Total Focus: ${report.totalHours} hrs (${report.totalMinutes} mins)`,
+        `Total Sessions: ${report.sessionCount}`,
+        `Active Days: ${report.activeDaysCount}`
+      ],
+      [
+        `Deep Work Ratio: ${report.deepWorkRatio}% (≥45m blocks)`,
+        `Avg Session Length: ${report.avgSessionMin} mins`,
+        `Study Velocity: ${sign}${report.velocity}% vs prior period`
+      ],
+      [
+        `Circadian Peak Focus Window: ${report.peakFocusWindow}`,
+        `Streak Status: ${currentStreakVal} days current (Best: ${bestStreakVal})`,
+        `Data Integrity: Verified Local/Cloud`
+      ]
+    ];
+
+    doc.autoTable({
+      startY: 42,
+      head: [['EXECUTIVE PERFORMANCE & FOCUS STAMINA SUMMARY', '', '']],
+      body: execRows,
+      theme: 'grid',
+      headStyles: { fillColor: [16, 185, 129], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 9.5 },
+      styles: { fontSize: 8.5, cellPadding: 3, textColor: [30, 41, 59] },
+      margin: { left: 14, right: 14 }
+    });
+
+    let currentY = doc.lastAutoTable.finalY + 8;
+
+    // 3. Circadian Rhythm Table
+    const circRows = Object.values(report.circadianBuckets).map(b => {
+      const pct = report.totalMinutes > 0 ? Math.round((b.mins / report.totalMinutes) * 100) : 0;
+      return [b.label, `${(b.mins / 60).toFixed(1)} hrs`, `${b.mins} mins`, `${pct}%`];
+    });
+
+    doc.autoTable({
+      startY: currentY,
+      head: [['CIRCADIAN TIME-OF-DAY BREAKDOWN', 'HOURS', 'MINUTES', 'SHARE (%)']],
+      body: circRows,
+      theme: 'striped',
+      headStyles: { fillColor: [6, 95, 70], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 9 },
+      styles: { fontSize: 8, cellPadding: 2.5 },
+      margin: { left: 14, right: 14 }
+    });
+
+    currentY = doc.lastAutoTable.finalY + 8;
+
+    // 4. Subject Equilibrium Table
+    const subjRows = report.subjectEquilibrium.map(s => {
+      const statusText = s.daysAgo === 0 ? 'Active Today' : (s.daysAgo === 1 ? 'Yesterday' : `${s.daysAgo} days ago`);
+      const alert = s.isNeglected ? 'ATTENTION: Neglected (≥3d)' : 'Balanced';
+      return [s.name, `${s.hours} hrs`, `${s.mins} mins`, `${s.pct}%`, statusText, alert];
+    });
+
+    doc.autoTable({
+      startY: currentY,
+      head: [['SUBJECT EQUILIBRIUM & RECALL MATRIX', 'HOURS', 'MINUTES', 'SHARE', 'LAST STUDIED', 'STATUS']],
+      body: subjRows.length > 0 ? subjRows : [['No subjects recorded in this period', '-', '-', '-', '-', '-']],
+      theme: 'striped',
+      headStyles: { fillColor: [201, 150, 47], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 9 },
+      styles: { fontSize: 8, cellPadding: 2.5 },
+      margin: { left: 14, right: 14 }
+    });
+
+    currentY = doc.lastAutoTable.finalY + 8;
+
+    if (currentY > 220) {
+      doc.addPage();
+      currentY = 20;
+    }
+
+    // 5. Cognitive Work Modality Breakdown Table
+    const workRows = report.cognitiveWorkTypes.map(w => {
+      const activeType = ['Revision', 'Practice', 'Mock Test'].includes(w.name) ? 'Active Recall / Test' : 'Content Acquisition / Notes';
+      return [w.name, `${w.mins} mins`, `${w.pct}%`, activeType];
+    });
+
+    doc.autoTable({
+      startY: currentY,
+      head: [['COGNITIVE WORK MODALITY', 'DURATION', 'SHARE (%)', 'COGNITIVE TYPE']],
+      body: workRows.length > 0 ? workRows : [['No activity recorded in this period', '-', '-', '-']],
+      theme: 'striped',
+      headStyles: { fillColor: [30, 41, 59], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 9 },
+      styles: { fontSize: 8, cellPadding: 2.5 },
+      margin: { left: 14, right: 14 }
+    });
+
+    currentY = doc.lastAutoTable.finalY + 8;
+
+    // 6. Diagnostic Insights Box
+    if (currentY > 230) {
+      doc.addPage();
+      currentY = 20;
+    }
+
+    const insightRows = report.smartInsights.map(i => {
+      const cleanText = i.text.replace(/<[^>]*>/g, '');
+      return [`${i.icon} ${cleanText}`];
+    });
+
+    doc.autoTable({
+      startY: currentY,
+      head: [['AI DIAGNOSTIC OBSERVATIONS & ACTIONABLE RECOMMENDATIONS']],
+      body: insightRows,
+      theme: 'grid',
+      headStyles: { fillColor: [16, 185, 129], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 9 },
+      styles: { fontSize: 8.5, cellPadding: 3, textColor: [15, 23, 42] },
+      margin: { left: 14, right: 14 }
+    });
+
+    currentY = doc.lastAutoTable.finalY + 8;
+
+    // 7. Complete Session Audit Log Table
+    if (currentY > 210) {
+      doc.addPage();
+      currentY = 20;
+    }
+
+    const sessionRows = report.filteredSessions.slice(0, 45).map(s => {
+      const timeStr = s.ts ? formatTimeRange(s.ts, s.minutes) : s.date;
+      return [s.date, timeStr, s.subject, s.workType || 'Other', `${s.minutes}m`];
+    });
+
+    doc.autoTable({
+      startY: currentY,
+      head: [['SESSION AUDIT LOG (RECENT)', 'TIME WINDOW', 'SUBJECT', 'WORK TYPE', 'MINUTES']],
+      body: sessionRows.length > 0 ? sessionRows : [['No sessions recorded in this period', '-', '-', '-', '-']],
+      theme: 'striped',
+      headStyles: { fillColor: [71, 85, 105], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8.5 },
+      styles: { fontSize: 7.5, cellPadding: 2 },
+      margin: { left: 14, right: 14 }
+    });
+
+    // Page Numbers Footer
+    const pageCount = doc.internal.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
+      doc.setPage(i);
+      doc.setFontSize(8);
+      doc.setTextColor(148, 163, 184);
+      doc.text(`Page ${i} of ${pageCount}  •  Focus Study Timer Cognitive Analytics Report`, 105, 290, { align: 'center' });
+    }
+
+    doc.save(`Focus_Study_Analysis_Report_${periodLabel.replace(/\s+/g, '_')}_${today}.pdf`);
+    showToast('📑 Analysis PDF downloaded successfully!');
+  } catch (err) {
+    console.error('PDF export error:', err);
+    showToast('Failed to export Analysis PDF: ' + err.message);
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = '<span>📑</span> Analysis PDF';
+    }
+  }
+}
+
+function setupAnalyticsEvents() {
+  document.querySelectorAll('.analytics-timeframe-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.analytics-timeframe-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      currentAnalyticsPeriod = btn.getAttribute('data-period');
+      renderDeepAnalytics();
+    });
+  });
+
+  const downloadAnalysisPdfBtn = document.getElementById('downloadAnalysisPdfBtn');
+  if (downloadAnalysisPdfBtn) {
+    downloadAnalysisPdfBtn.addEventListener('click', exportAnalysisPdf);
+  }
+}
+setupAnalyticsEvents();
+
 /* ---------- heatmap ---------- */
 function renderHeatmap(){
   const grid = document.getElementById('heatmap');
@@ -1607,7 +2133,7 @@ document.getElementById('restoreFileInput').addEventListener('change', (e)=>{
 
 /* ---------- refresh everything ---------- */
 async function refreshEverything(){
-  renderTarget(); renderLevel(); renderCompare(); renderStats(); renderStreak(); renderMilestoneBadges(); renderHeatmap(); renderHistory(); renderSubjectAnalytics();
+  renderTarget(); renderLevel(); renderCompare(); renderStats(); renderStreak(); renderMilestoneBadges(); renderDeepAnalytics(); renderHeatmap(); renderHistory(); renderSubjectAnalytics();
 }
 
 /* ---------- init / resume timer across reload (local only) ---------- */

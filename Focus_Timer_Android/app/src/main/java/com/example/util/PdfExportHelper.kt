@@ -224,4 +224,226 @@ object PdfExportHelper {
 
         context.startActivity(Intent.createChooser(shareIntent, "Save or Share PDF Report"))
     }
+
+    fun generateAndShareAnalysisPdf(
+        context: Context,
+        report: AnalyticsReport
+    ) {
+        val pdfDocument = PdfDocument()
+        val pageInfo = PdfDocument.PageInfo.Builder(595, 842, 1).create() // Standard A4
+        var pageNumber = 1
+        var page = pdfDocument.startPage(pageInfo)
+        var canvas = page.canvas
+
+        val titlePaint = Paint().apply {
+            color = Color.rgb(20, 20, 20)
+            textSize = 17f
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+            isAntiAlias = true
+        }
+
+        val sectionPaint = Paint().apply {
+            color = Color.rgb(16, 185, 129) // Emerald
+            textSize = 10.5f
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+            isAntiAlias = true
+        }
+
+        val subtitlePaint = Paint().apply {
+            color = Color.rgb(100, 100, 100)
+            textSize = 9.5f
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
+            isAntiAlias = true
+        }
+
+        val statKeyPaint = Paint().apply {
+            color = Color.rgb(70, 70, 70)
+            textSize = 9f
+            isAntiAlias = true
+        }
+
+        val statValPaint = Paint().apply {
+            color = Color.rgb(20, 20, 20)
+            textSize = 9f
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+            isAntiAlias = true
+        }
+
+        val headerBgPaint = Paint().apply {
+            color = Color.rgb(16, 185, 129)
+            style = Paint.Style.FILL
+        }
+
+        val goldHeaderBgPaint = Paint().apply {
+            color = Color.rgb(201, 150, 47)
+            style = Paint.Style.FILL
+        }
+
+        val headerTextPaint = Paint().apply {
+            color = Color.WHITE
+            textSize = 8.5f
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+            isAntiAlias = true
+        }
+
+        val rowBgPaint = Paint().apply {
+            color = Color.WHITE
+            style = Paint.Style.FILL
+        }
+
+        val altRowBgPaint = Paint().apply {
+            color = Color.rgb(248, 250, 252)
+            style = Paint.Style.FILL
+        }
+
+        val cellTextPaint = Paint().apply {
+            color = Color.rgb(40, 40, 40)
+            textSize = 8f
+            isAntiAlias = true
+        }
+
+        val gridPaint = Paint().apply {
+            color = Color.rgb(226, 232, 240)
+            style = Paint.Style.STROKE
+            strokeWidth = 0.5f
+        }
+
+        val footerPaint = Paint().apply {
+            color = Color.rgb(150, 150, 150)
+            textSize = 8f
+            isAntiAlias = true
+        }
+
+        // Draw Top Header
+        canvas.drawText("FOCUS STUDY TIMER", 36f, 44f, titlePaint)
+        canvas.drawText("Cognitive Deep Analysis & Performance Report", 36f, 58f, subtitlePaint)
+        val todayStr = SimpleDateFormat("dd-MM-yyyy hh:mm a", Locale.getDefault()).format(Date())
+        canvas.drawText("Timeframe: ${report.timeframe.label}  •  Generated: $todayStr", 36f, 72f, subtitlePaint)
+
+        var y = 92f
+
+        // Section 1: Executive KPI Box
+        canvas.drawText("1. EXECUTIVE PERFORMANCE & STAMINA", 36f, y, sectionPaint)
+        y += 8f
+
+        canvas.drawRect(36f, y, 559f, y + 50f, rowBgPaint)
+        canvas.drawRect(36f, y, 559f, y + 50f, gridPaint)
+
+        val sign = if (report.velocityPercentage >= 0) "+" else ""
+        canvas.drawText("Total Focus: ${String.format(Locale.US, "%.1f", report.totalHours)} hrs (${report.totalMinutes}m)", 46f, y + 15f, statValPaint)
+        canvas.drawText("Deep Work Ratio: ${report.deepWorkRatio}% (≥45m blocks)", 230f, y + 15f, statValPaint)
+        canvas.drawText("Study Velocity: $sign${report.velocityPercentage}%", 420f, y + 15f, statValPaint)
+
+        canvas.drawText("Total Sessions: ${report.sessionCount}", 46f, y + 30f, statKeyPaint)
+        canvas.drawText("Avg Session Length: ${report.avgSessionMinutes} mins", 230f, y + 30f, statKeyPaint)
+        canvas.drawText("Active Study Days: ${report.activeDaysCount}", 420f, y + 30f, statKeyPaint)
+
+        canvas.drawText("Circadian Peak Window: ${report.peakFocusWindow}", 46f, y + 44f, statValPaint)
+        y += 64f
+
+        // Section 2: Circadian Rhythm
+        canvas.drawText("2. CIRCADIAN TIME-OF-DAY BREAKDOWN", 36f, y, sectionPaint)
+        y += 8f
+
+        canvas.drawRect(36f, y, 559f, y + 16f, headerBgPaint)
+        canvas.drawText("TIME WINDOW", 46f, y + 11f, headerTextPaint)
+        canvas.drawText("MINUTES", 260f, y + 11f, headerTextPaint)
+        canvas.drawText("HOURS", 370f, y + 11f, headerTextPaint)
+        canvas.drawText("SHARE (%)", 470f, y + 11f, headerTextPaint)
+        y += 16f
+
+        report.circadianBuckets.forEachIndexed { i, b ->
+            val bg = if (i % 2 == 0) rowBgPaint else altRowBgPaint
+            canvas.drawRect(36f, y, 559f, y + 15f, bg)
+            canvas.drawRect(36f, y, 559f, y + 15f, gridPaint)
+
+            canvas.drawText(b.label, 46f, y + 11f, cellTextPaint)
+            canvas.drawText("${b.minutes} mins", 260f, y + 11f, cellTextPaint)
+            canvas.drawText("${String.format(Locale.US, "%.1f", b.minutes / 60.0)} hrs", 370f, y + 11f, cellTextPaint)
+            canvas.drawText("${b.percentageOfTotal}%", 470f, y + 11f, cellTextPaint)
+            y += 15f
+        }
+        y += 14f
+
+        // Section 3: Subject Equilibrium & Neglect Matrix
+        canvas.drawText("3. SUBJECT EQUILIBRIUM & RECALL MATRIX", 36f, y, sectionPaint)
+        y += 8f
+
+        canvas.drawRect(36f, y, 559f, y + 16f, goldHeaderBgPaint)
+        canvas.drawText("SUBJECT", 46f, y + 11f, headerTextPaint)
+        canvas.drawText("HOURS", 210f, y + 11f, headerTextPaint)
+        canvas.drawText("MINS", 290f, y + 11f, headerTextPaint)
+        canvas.drawText("SHARE", 360f, y + 11f, headerTextPaint)
+        canvas.drawText("LAST ACTIVE", 420f, y + 11f, headerTextPaint)
+        canvas.drawText("STATUS", 490f, y + 11f, headerTextPaint)
+        y += 16f
+
+        val eqRows = report.subjectEquilibrium.take(8)
+        if (eqRows.isEmpty()) {
+            canvas.drawRect(36f, y, 559f, y + 15f, rowBgPaint)
+            canvas.drawText("No subject activity in this timeframe.", 46f, y + 11f, cellTextPaint)
+            y += 15f
+        } else {
+            eqRows.forEachIndexed { i, s ->
+                val bg = if (i % 2 == 0) rowBgPaint else altRowBgPaint
+                canvas.drawRect(36f, y, 559f, y + 15f, bg)
+                canvas.drawRect(36f, y, 559f, y + 15f, gridPaint)
+
+                val lastStr = if (s.daysAgo == 0) "Today" else if (s.daysAgo == 1) "Yesterday" else "${s.daysAgo}d ago"
+                val statusStr = if (s.isNeglected) "Neglected (≥3d)" else "Balanced"
+
+                canvas.drawText(s.subjectName, 46f, y + 11f, cellTextPaint)
+                canvas.drawText("${String.format(Locale.US, "%.1f", s.hours)}h", 210f, y + 11f, cellTextPaint)
+                canvas.drawText("${s.minutes}m", 290f, y + 11f, cellTextPaint)
+                canvas.drawText("${s.percentage}%", 360f, y + 11f, cellTextPaint)
+                canvas.drawText(lastStr, 420f, y + 11f, cellTextPaint)
+                canvas.drawText(statusStr, 490f, y + 11f, cellTextPaint)
+                y += 15f
+            }
+        }
+        y += 14f
+
+        // Section 4: AI Diagnostic Insights & Actionable Feedback
+        canvas.drawText("4. AI DIAGNOSTIC OBSERVATIONS & ACTIONABLE FEEDBACK", 36f, y, sectionPaint)
+        y += 8f
+
+        report.smartInsights.take(4).forEach { item ->
+            canvas.drawRect(36f, y, 559f, y + 20f, altRowBgPaint)
+            canvas.drawRect(36f, y, 559f, y + 20f, gridPaint)
+            val fullText = "${item.icon} ${item.title}: ${item.description}"
+            val clippedText = if (fullText.length > 95) fullText.take(92) + "..." else fullText
+            canvas.drawText(clippedText, 44f, y + 13f, cellTextPaint)
+            y += 21f
+        }
+
+        // Footer
+        canvas.drawText("Focus Study Timer • Cognitive Analysis Report • Page $pageNumber", 36f, 822f, footerPaint)
+        pdfDocument.finishPage(page)
+
+        // Write to Cache
+        val cacheDir = File(context.cacheDir, "reports").apply { mkdirs() }
+        val dateSlug = SimpleDateFormat("yyyyMMdd_HHmm", Locale.getDefault()).format(Date())
+        val pdfFile = File(cacheDir, "focus-timer-analysis-${report.timeframe.label.replace(" ", "_")}-${dateSlug}.pdf")
+
+        FileOutputStream(pdfFile).use { out ->
+            pdfDocument.writeTo(out)
+        }
+        pdfDocument.close()
+
+        val uri = FileProvider.getUriForFile(
+            context,
+            "${context.packageName}.fileprovider",
+            pdfFile
+        )
+
+        val shareIntent = Intent(Intent.ACTION_SEND).apply {
+            type = "application/pdf"
+            putExtra(Intent.EXTRA_STREAM, uri)
+            putExtra(Intent.EXTRA_SUBJECT, "Focus Study Analysis Report (${report.timeframe.label})")
+            putExtra(Intent.EXTRA_TEXT, "Comprehensive Focus Study Timer Cognitive Analysis Report (${report.timeframe.label}) - ${String.format(Locale.US, "%.1f", report.totalHours)} hours total focus.")
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+
+        context.startActivity(Intent.createChooser(shareIntent, "Save or Share Analysis PDF"))
+    }
 }
