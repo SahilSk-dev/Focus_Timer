@@ -3341,7 +3341,15 @@ document.getElementById('exportPdfBtn').addEventListener('click', async ()=>{
 
 /* ---------- JSON Backup & Restore ---------- */
 document.getElementById('backupJsonBtn').addEventListener('click', ()=>{
-  const backupData = { timestamp: Date.now(), sessions, nonStudySessions };
+  const backupData = {
+    timestamp: Date.now(),
+    sessions,
+    nonStudySessions,
+    settings: {
+      dailyTargetMinutes: (typeof prefs !== 'undefined' && prefs.dailyTarget) ? prefs.dailyTarget : 120
+    },
+    examGoal: (typeof getExamGoal === 'function') ? getExamGoal() : null
+  };
   const jsonStr = JSON.stringify(backupData, null, 2);
   const blob = new Blob([jsonStr], { type:'application/json' });
   const a = document.createElement('a');
@@ -3366,6 +3374,20 @@ document.getElementById('restoreFileInput').addEventListener('change', (e)=>{
         showToast('Invalid backup file');
         return;
       }
+
+      // Restore settings & examGoal if present in backup
+      if (data.settings && (data.settings.dailyTargetMinutes || data.settings.dailyTarget)) {
+        const tVal = Number(data.settings.dailyTargetMinutes || data.settings.dailyTarget);
+        if (tVal > 0) {
+          prefs.dailyTarget = tVal;
+          const targetInput = document.getElementById('targetInput');
+          if (targetInput) targetInput.value = tVal;
+          await savePrefs();
+        }
+      }
+      if (data.examGoal && typeof data.examGoal === 'object' && typeof saveExamGoal === 'function') {
+        saveExamGoal(data.examGoal);
+      }
       
       let newSessCount = 0;
       let newNonStudyCount = 0;
@@ -3373,7 +3395,7 @@ document.getElementById('restoreFileInput').addEventListener('change', (e)=>{
       const rawNonStudy = Array.isArray(data.nonStudySessions) ? data.nonStudySessions : [];
       for (const nsRaw of rawNonStudy) {
         if (!nsRaw || !nsRaw.date || !nsRaw.subject) continue;
-        const ts = Number(nsRaw.ts) || Date.now();
+        const ts = Number(nsRaw.ts || nsRaw.timestamp) || Date.now();
         const nsId = String(nsRaw.id || ('ns_' + ts));
         const ns = {
           ...nsRaw,
@@ -3386,7 +3408,8 @@ document.getElementById('restoreFileInput').addEventListener('change', (e)=>{
           isNonStudy: true
         };
         if (ns.minutes <= 0) continue;
-        if (!nonStudySessions.find(s => s.id === ns.id || (s.ts === ns.ts && s.date === ns.date && s.subject === ns.subject))) {
+        const isDuplicate = nonStudySessions.some(s => (s.ts && ns.ts && s.ts === ns.ts) || (s.id && ns.id && s.id === ns.id && (s.id.startsWith('ns_') || s.id.startsWith('s_'))));
+        if (!isDuplicate) {
           nonStudySessions.push(ns);
           newNonStudyCount++;
           if (currentUser) {
@@ -3399,7 +3422,7 @@ document.getElementById('restoreFileInput').addEventListener('change', (e)=>{
       const rawSessions = Array.isArray(data.sessions) ? data.sessions : [];
       for (const sRaw of rawSessions) {
         if (!sRaw || !sRaw.date || !sRaw.subject) continue;
-        const ts = Number(sRaw.ts) || Date.now();
+        const ts = Number(sRaw.ts || sRaw.timestamp) || Date.now();
         const sId = String(sRaw.id || ('s_' + ts));
         const s = {
           ...sRaw,
@@ -3411,7 +3434,8 @@ document.getElementById('restoreFileInput').addEventListener('change', (e)=>{
           minutes: Math.max(0, Math.round(Number(sRaw.minutes)) || 0)
         };
         if (s.minutes <= 0) continue;
-        if (!sessions.find(curr => curr.id === s.id || (curr.ts === s.ts && curr.date === s.date && curr.subject === s.subject))) {
+        const isDuplicate = sessions.some(curr => (curr.ts && s.ts && curr.ts === s.ts) || (curr.id && s.id && curr.id === s.id && (curr.id.startsWith('s_') || curr.id.startsWith('ns_'))));
+        if (!isDuplicate) {
           sessions.push(s);
           newSessCount++;
           if (currentUser) {

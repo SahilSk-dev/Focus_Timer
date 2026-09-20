@@ -175,8 +175,9 @@ fun HistorySettingsScreen(
                 try {
                     context.contentResolver.openInputStream(it)?.use { stream ->
                         val content = stream.bufferedReader().use { r -> r.readText() }
-                        val count = viewModel.repository.importFromJson(content)
-                        viewModel.showToast("Restore successful: $count sessions added!")
+                        val result = viewModel.repository.importFromJson(content)
+                        viewModel.reloadSettingsAndExamGoal()
+                        viewModel.showToast("Restore successful: ${result.studyCount} study, ${result.nonStudyCount} non-study added!")
                     }
                 } catch (e: Exception) {
                     viewModel.showToast("Import error: Invalid JSON file")
@@ -459,7 +460,7 @@ fun HistorySettingsScreen(
                             Spacer(modifier = Modifier.height(14.dp))
 
                             // Range dropdown selector
-                            val ranges = listOf("Last 30 Days", "Last 7 Days", "Last 48 Hours", "Last 24 Hours", "Today", "All Time")
+                            val ranges = listOf("Last 30 Days", "Last 7 Days", "Last 48h", "Last 24h", "Today", "All Time")
                             Box(modifier = Modifier.fillMaxWidth()) {
                                 Surface(
                                     modifier = Modifier
@@ -508,7 +509,7 @@ fun HistorySettingsScreen(
 
                             Spacer(modifier = Modifier.height(10.dp))
 
-                            // PDF Button (matches Image 2)
+                            // PDF Button (matches Web PDF Export)
                             OutlinedButton(
                                 onClick = {
                                     val filtered = filterSessionsByRange(allSessions, exportRange)
@@ -529,7 +530,7 @@ fun HistorySettingsScreen(
                                     .height(44.dp)
                             ) {
                                 Text(
-                                    text = "PDF",
+                                    text = "PDF Export",
                                     color = GoldBright,
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 14.sp
@@ -545,13 +546,34 @@ fun HistorySettingsScreen(
                             ) {
                                 OutlinedButton(
                                     onClick = {
-                                        val jsonStr = viewModel.repository.exportToJson(allSessions)
-                                        val sendIntent = Intent().apply {
-                                            action = Intent.ACTION_SEND
-                                            putExtra(Intent.EXTRA_TEXT, jsonStr)
-                                            type = "application/json"
+                                        coroutineScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                                            try {
+                                                val jsonStr = viewModel.repository.exportToJson(allSessions)
+                                                val cacheDir = java.io.File(context.cacheDir, "backups").apply { mkdirs() }
+                                                val backupFile = java.io.File(cacheDir, "focus-timer-backup-${FocusRepository.getTodayString()}.json")
+                                                backupFile.writeText(jsonStr)
+
+                                                val uri = androidx.core.content.FileProvider.getUriForFile(
+                                                    context,
+                                                    "${context.packageName}.fileprovider",
+                                                    backupFile
+                                                )
+
+                                                val sendIntent = Intent(Intent.ACTION_SEND).apply {
+                                                    type = "application/json"
+                                                    putExtra(Intent.EXTRA_STREAM, uri)
+                                                    putExtra(Intent.EXTRA_SUBJECT, "Focus Timer Backup (${FocusRepository.getTodayString()})")
+                                                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                                }
+                                                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                                                    context.startActivity(Intent.createChooser(sendIntent, "Download JSON (Backup)"))
+                                                }
+                                            } catch (e: Exception) {
+                                                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                                                    viewModel.showToast("Failed to create backup: ${e.localizedMessage}")
+                                                }
+                                            }
                                         }
-                                        context.startActivity(Intent.createChooser(sendIntent, "Download JSON (Backup)"))
                                     },
                                     border = BorderStroke(1.dp, LineBorder),
                                     shape = RoundedCornerShape(8.dp),
@@ -863,11 +885,10 @@ fun HistorySettingsScreen(
                     ) {
                         Column(modifier = Modifier.padding(16.dp)) {
                             Text(
-                                text = "Bulk Delete by Date Range",
+                                text = "Bulk Delete (Date Range)",
                                 color = DangerRed,
                                 fontSize = 16.sp,
-                                fontWeight = FontWeight.Bold,
-                                
+                                fontWeight = FontWeight.Bold
                             )
                             Spacer(modifier = Modifier.height(6.dp))
                             Text(
@@ -910,14 +931,24 @@ fun HistorySettingsScreen(
                             Spacer(modifier = Modifier.height(12.dp))
 
                             Button(
-                                onClick = { showBulkDeleteDialog = true },
+                                onClick = {
+                                    if (fromDateStr.isBlank() || toDateStr.isBlank()) {
+                                        viewModel.showToast("Please select From and To dates!")
+                                        return@Button
+                                    }
+                                    if (fromDateStr > toDateStr) {
+                                        viewModel.showToast("From Date cannot be greater than To Date!")
+                                        return@Button
+                                    }
+                                    showBulkDeleteDialog = true
+                                },
                                 colors = ButtonDefaults.buttonColors(containerColor = DangerRed, contentColor = TextPrimary),
                                 shape = RoundedCornerShape(8.dp),
                                 modifier = Modifier.fillMaxWidth()
                             ) {
                                 Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(16.dp))
                                 Spacer(modifier = Modifier.width(8.dp))
-                                Text("Delete Sessions in Range")
+                                Text("Delete Sessions")
                             }
                         }
                     }
@@ -1607,8 +1638,9 @@ fun HistorySettingsScreen(
                     onClick = {
                         coroutineScope.launch {
                             try {
-                                val count = viewModel.repository.importFromJson(jsonImportText)
-                                viewModel.showToast("Restore successful: $count sessions added!")
+                                val result = viewModel.repository.importFromJson(jsonImportText)
+                                viewModel.reloadSettingsAndExamGoal()
+                                viewModel.showToast("Restore successful: ${result.studyCount} study, ${result.nonStudyCount} non-study added!")
                                 showImportDialog = false
                                 jsonImportText = ""
                             } catch (e: Exception) {
@@ -1739,8 +1771,8 @@ private fun filterSessionsByRange(sessions: List<StudySessionEntity>, range: Str
     val today = FocusRepository.getTodayString()
     return when (range.lowercase(Locale.US)) {
         "today" -> sessions.filter { it.date == today }
-        "last 24 hours", "24h" -> sessions.filter { now - it.timestamp <= 24L * 3600 * 1000 }
-        "last 48 hours", "48h" -> sessions.filter { now - it.timestamp <= 48L * 3600 * 1000 }
+        "last 24 hours", "last 24h", "24h" -> sessions.filter { now - it.timestamp <= 24L * 3600 * 1000 }
+        "last 48 hours", "last 48h", "48h" -> sessions.filter { now - it.timestamp <= 48L * 3600 * 1000 }
         "last 7 days", "7 days" -> sessions.filter { now - it.timestamp <= 7L * 86400 * 1000 }
         "last 30 days", "30 days" -> sessions.filter { now - it.timestamp <= 30L * 86400 * 1000 }
         else -> sessions

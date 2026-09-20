@@ -68,6 +68,11 @@ class FocusViewModel(application: Application) : AndroidViewModel(application) {
             .apply()
     }
 
+    fun reloadSettingsAndExamGoal() {
+        _dailyTargetMinutes.value = repository.dailyTargetMinutes
+        _examGoal.value = repository.getExamGoal()
+    }
+
     fun toggleTheme() {
         val nextTheme = if (_currentAppTheme.value.isLight) AppTheme.OLED_DARK else AppTheme.PURE_WHITE
         setAppTheme(nextTheme)

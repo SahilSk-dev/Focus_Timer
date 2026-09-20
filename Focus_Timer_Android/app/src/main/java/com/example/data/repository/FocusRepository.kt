@@ -16,6 +16,13 @@ import java.util.Locale
 
 import com.example.data.sync.FirebaseSyncManager
 
+data class ImportResult(
+    val studyCount: Int,
+    val nonStudyCount: Int
+) {
+    val totalCount: Int get() = studyCount + nonStudyCount
+}
+
 class FocusRepository(
     private val studyDao: StudyDao,
     context: Context
@@ -182,6 +189,24 @@ class FocusRepository(
     }
 
 
+    fun getExamGoal(): com.example.util.ExamGoal {
+        return com.example.util.ExamGoal(
+            examName = prefs.getString("exam_goal_name", "Target Exam / Syllabus") ?: "Target Exam / Syllabus",
+            targetDate = prefs.getString("exam_goal_date", "") ?: "",
+            targetHours = prefs.getFloat("exam_goal_hours", 150f).toDouble(),
+            subjectScope = prefs.getStringSet("exam_goal_scope", emptySet()) ?: emptySet()
+        )
+    }
+
+    fun saveExamGoal(goal: com.example.util.ExamGoal) {
+        prefs.edit()
+            .putString("exam_goal_name", goal.examName)
+            .putString("exam_goal_date", goal.targetDate)
+            .putFloat("exam_goal_hours", goal.targetHours.toFloat())
+            .putStringSet("exam_goal_scope", goal.subjectScope)
+            .apply()
+    }
+
     fun exportToJson(sessions: List<StudySessionEntity>): String {
         val root = JSONObject()
         root.put("timestamp", System.currentTimeMillis())
@@ -215,37 +240,93 @@ class FocusRepository(
 
         root.put("sessions", studyArray)
         root.put("nonStudySessions", nonStudyArray)
+
+        // Settings & Exam Goal for cross-platform backup parity
+        val settingsObj = JSONObject()
+        settingsObj.put("dailyTargetMinutes", dailyTargetMinutes)
+        root.put("settings", settingsObj)
+
+        val goal = getExamGoal()
+        val goalObj = JSONObject()
+        goalObj.put("examName", goal.examName)
+        goalObj.put("targetDate", goal.targetDate)
+        goalObj.put("targetHours", goal.targetHours)
+        val scopeArray = JSONArray()
+        goal.subjectScope.forEach { scopeArray.put(it) }
+        goalObj.put("subjectScope", scopeArray)
+        root.put("examGoal", goalObj)
+
         return root.toString(2)
     }
 
-    suspend fun importFromJson(jsonString: String): Int {
+    suspend fun importFromJson(jsonString: String): ImportResult {
         val root = JSONObject(jsonString)
         val studyArray = root.optJSONArray("sessions")
         val nonStudyArray = root.optJSONArray("nonStudySessions")
 
-        if (studyArray == null && nonStudyArray == null) return 0
+        if (studyArray == null && nonStudyArray == null) return ImportResult(0, 0)
+
+        // Restore settings if present
+        if (root.has("settings")) {
+            val sObj = root.optJSONObject("settings")
+            if (sObj != null) {
+                if (sObj.has("dailyTargetMinutes")) {
+                    dailyTargetMinutes = sObj.optInt("dailyTargetMinutes", dailyTargetMinutes)
+                } else if (sObj.has("dailyTarget")) {
+                    dailyTargetMinutes = sObj.optInt("dailyTarget", dailyTargetMinutes)
+                }
+            }
+        }
+
+        // Restore examGoal if present
+        if (root.has("examGoal")) {
+            val gObj = root.optJSONObject("examGoal")
+            if (gObj != null) {
+                val name = gObj.optString("examName", "Target Exam / Syllabus")
+                val date = gObj.optString("targetDate", "")
+                val hours = gObj.optDouble("targetHours", 150.0)
+                val scopeSet = mutableSetOf<String>()
+                val arr = gObj.optJSONArray("subjectScope")
+                if (arr != null) {
+                    for (i in 0 until arr.length()) {
+                        val s = arr.optString(i)
+                        if (s.isNotBlank()) scopeSet.add(s)
+                    }
+                }
+                saveExamGoal(com.example.util.ExamGoal(name, date, hours, scopeSet))
+            }
+        }
 
         val existingSessions = studyDao.getAllSessions().first()
         val existingTsSet = existingSessions.map { it.timestamp }.toSet()
         val list = mutableListOf<StudySessionEntity>()
+        var studyCount = 0
+        var nonStudyCount = 0
 
         fun parseSession(obj: JSONObject, defaultIsNonStudy: Boolean) {
-            val ts = obj.optLong("ts", System.currentTimeMillis())
+            val ts = if (obj.has("ts")) obj.optLong("ts")
+                     else if (obj.has("timestamp")) obj.optLong("timestamp")
+                     else System.currentTimeMillis()
+
             // Check for deduplication
             if (existingTsSet.contains(ts) || list.any { it.timestamp == ts }) {
                 return
             }
 
-            val subject = obj.optString("subject", "General")
-            val sub = obj.optString("subSubject", "")
-            val workType = obj.optString("workType", "N/A")
+            val subject = obj.optString("subject", "").trim()
+            if (subject.isBlank()) return
+
             val minutes = obj.optInt("minutes", 0)
-            val date = obj.optString("date", getTodayString())
+            if (minutes <= 0) return
+
+            val sub = obj.optString("subSubject", "").trim()
+            val workType = obj.optString("workType", "N/A").trim()
+            val date = obj.optString("date", getTodayString()).trim()
             val isNonStudy = if (obj.has("isNonStudy")) obj.optBoolean("isNonStudy", defaultIsNonStudy) else defaultIsNonStudy
 
             list.add(
                 StudySessionEntity(
-                    date = date,
+                    date = if (date.isBlank()) getTodayString() else date,
                     subject = subject,
                     subSubject = if (sub.isNotBlank()) sub else null,
                     workType = if (workType.isBlank()) "N/A" else workType,
@@ -254,6 +335,12 @@ class FocusRepository(
                     isNonStudy = isNonStudy
                 )
             )
+
+            if (isNonStudy) {
+                nonStudyCount++
+            } else {
+                studyCount++
+            }
         }
 
         if (studyArray != null) {
@@ -272,8 +359,10 @@ class FocusRepository(
 
         if (list.isNotEmpty()) {
             studyDao.insertSessions(list)
+            // Sync restored sessions to Firestore if user is authenticated
+            syncManager.uploadRestoredSessionsToCloud(list)
         }
-        return list.size
+        return ImportResult(studyCount, nonStudyCount)
     }
 
     companion object {
