@@ -391,21 +391,28 @@ class FirebaseSyncManager(
     private suspend fun uploadLocalSessionsToCloud(uid: String) {
         try {
             val localSessions = studyDao.getAllSessions().first()
+            if (localSessions.isEmpty()) return
+
             val sessionsCol = firestore.collection("users").document(uid).collection("sessions")
             val nonStudyCol = firestore.collection("users").document(uid).collection("nonStudySessions")
 
-            for (s in localSessions) {
-                val targetCol = if (s.isNonStudy) nonStudyCol else sessionsCol
-                val data = hashMapOf(
-                    "date" to s.date,
-                    "subject" to s.subject,
-                    "subSubject" to (s.subSubject ?: ""),
-                    "workType" to s.workType,
-                    "minutes" to s.minutes,
-                    "ts" to s.timestamp,
-                    "isNonStudy" to s.isNonStudy
-                )
-                targetCol.document(s.timestamp.toString()).set(data, SetOptions.merge())
+            // Process in atomic batches of 400 (well within Firestore 500-op limit)
+            localSessions.chunked(400).forEach { chunk ->
+                val batch = firestore.batch()
+                for (s in chunk) {
+                    val targetCol = if (s.isNonStudy) nonStudyCol else sessionsCol
+                    val data = hashMapOf(
+                        "date" to s.date,
+                        "subject" to s.subject,
+                        "subSubject" to (s.subSubject ?: ""),
+                        "workType" to s.workType,
+                        "minutes" to s.minutes,
+                        "ts" to s.timestamp,
+                        "isNonStudy" to s.isNonStudy
+                    )
+                    batch.set(targetCol.document(s.timestamp.toString()), data, SetOptions.merge())
+                }
+                batch.commit().await()
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error in bulk upload: ${e.message}")

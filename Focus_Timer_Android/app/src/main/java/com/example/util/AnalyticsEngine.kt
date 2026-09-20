@@ -56,7 +56,27 @@ data class AnalyticsReport(
     val cognitiveWorkTypes: List<CognitiveWorkTypeItem>,
     val smartInsights: List<SmartInsight>,
     val filteredSessions: List<StudySessionEntity>
-)
+) {
+    companion object {
+        fun empty(timeframe: AnalyticsTimeframe = AnalyticsTimeframe.LAST_7_DAYS) = AnalyticsReport(
+            timeframe = timeframe,
+            totalMinutes = 0,
+            totalHours = 0.0,
+            sessionCount = 0,
+            activeDaysCount = 0,
+            avgSessionMinutes = 0,
+            deepWorkMinutes = 0,
+            deepWorkRatio = 0,
+            velocityPercentage = 0,
+            peakFocusWindow = "Morning (06:00 - 12:00)",
+            circadianBuckets = emptyList(),
+            subjectEquilibrium = emptyList(),
+            cognitiveWorkTypes = emptyList(),
+            smartInsights = emptyList(),
+            filteredSessions = emptyList()
+        )
+    }
+}
 
 object AnalyticsEngine {
 

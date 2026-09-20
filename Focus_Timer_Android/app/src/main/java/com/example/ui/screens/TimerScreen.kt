@@ -110,7 +110,6 @@ fun TimerScreen(
     val stopwatchMode by viewModel.stopwatchMode.collectAsState()
     val pomodoroMode by viewModel.pomodoroMode.collectAsState()
     val pomoPhase by viewModel.pomoPhase.collectAsState()
-    val remainingSeconds by viewModel.remainingSeconds.collectAsState()
     val inputHours by viewModel.inputHours.collectAsState()
     val inputMinutes by viewModel.inputMinutes.collectAsState()
     val selectedSubject by viewModel.selectedSubject.collectAsState()
@@ -124,21 +123,9 @@ fun TimerScreen(
     val subjects by viewModel.allSubjects.collectAsState()
     val workTypes by viewModel.allWorkTypes.collectAsState()
 
-    val displayDigits = remember(isTimerActive, isRunning, remainingSeconds, inputHours, inputMinutes, pomodoroMode, pomoPhase, stopwatchMode) {
-        val totalSec = when {
-            isTimerActive || isRunning -> remainingSeconds
-            pomodoroMode -> if (pomoPhase == "work") 25 * 60L else 5 * 60L
-            else -> (inputHours * 3600 + inputMinutes * 60).toLong()
-        }
-        val h = totalSec / 3600
-        val m = (totalSec % 3600) / 60
-        val s = totalSec % 60
-        String.format(Locale.getDefault(), "%02d:%02d:%02d", h, m, s)
-    }
-
     if (isFullscreen) {
         FullscreenFocusLayout(
-            displayDigits = displayDigits,
+            viewModel = viewModel,
             selectedSubject = selectedSubject,
             selectedSubSubject = selectedSubSubject,
             selectedWorkType = selectedWorkType,
@@ -499,20 +486,8 @@ fun TimerScreen(
                     modifier = Modifier.padding(vertical = 4.dp)
                 )
 
-                // Big Golden Display
-                Text(
-                    text = displayDigits,
-                    style = TextStyle(
-                        brush = GoldGradientBrush,
-                        fontSize = 44.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                        
-                        textAlign = TextAlign.Center
-                    ),
-                    modifier = Modifier
-                        .padding(vertical = 8.dp)
-                        .testTag("timer_display")
-                )
+                // Big Golden Display (Isolated recomposition)
+                IsolatedTimerDisplay(viewModel = viewModel)
 
                 // Pomodoro Phase Badge
                 if (pomodoroMode && isTimerActive) {
@@ -731,7 +706,7 @@ private fun AddChip(
 
 @Composable
 private fun FullscreenFocusLayout(
-    displayDigits: String,
+    viewModel: FocusViewModel,
     selectedSubject: String,
     selectedSubSubject: String?,
     selectedWorkType: String,
@@ -779,8 +754,7 @@ private fun FullscreenFocusLayout(
                     text = title,
                     color = GoldBright,
                     fontSize = 22.sp,
-                    fontWeight = FontWeight.Bold,
-                    
+                    fontWeight = FontWeight.Bold
                 )
                 Box(
                     modifier = Modifier
@@ -806,16 +780,7 @@ private fun FullscreenFocusLayout(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            Text(
-                text = displayDigits,
-                style = TextStyle(
-                    brush = GoldGradientBrush,
-                    fontSize = 84.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    
-                    textAlign = TextAlign.Center
-                )
-            )
+            FullscreenTimerDisplay(viewModel = viewModel)
 
             Spacer(modifier = Modifier.height(16.dp))
 
@@ -866,3 +831,80 @@ private fun FullscreenFocusLayout(
         }
     }
 }
+
+@Composable
+fun IsolatedTimerDisplay(
+    viewModel: FocusViewModel,
+    modifier: Modifier = Modifier
+) {
+    val isTimerActive by viewModel.isTimerActive.collectAsState()
+    val isRunning by viewModel.isRunning.collectAsState()
+    val pomodoroMode by viewModel.pomodoroMode.collectAsState()
+    val pomoPhase by viewModel.pomoPhase.collectAsState()
+    val remainingSeconds by viewModel.remainingSeconds.collectAsState()
+    val inputHours by viewModel.inputHours.collectAsState()
+    val inputMinutes by viewModel.inputMinutes.collectAsState()
+
+    val displayDigits = remember(isTimerActive, isRunning, remainingSeconds, inputHours, inputMinutes, pomodoroMode, pomoPhase) {
+        val totalSec = when {
+            isTimerActive || isRunning -> remainingSeconds
+            pomodoroMode -> if (pomoPhase == "work") 25 * 60L else 5 * 60L
+            else -> (inputHours * 3600 + inputMinutes * 60).toLong()
+        }
+        val h = totalSec / 3600
+        val m = (totalSec % 3600) / 60
+        val s = totalSec % 60
+        String.format(Locale.getDefault(), "%02d:%02d:%02d", h, m, s)
+    }
+
+    Text(
+        text = displayDigits,
+        style = TextStyle(
+            brush = GoldGradientBrush,
+            fontSize = 44.sp,
+            fontWeight = FontWeight.ExtraBold,
+            textAlign = TextAlign.Center
+        ),
+        modifier = modifier
+            .padding(vertical = 8.dp)
+            .testTag("timer_display")
+    )
+}
+
+@Composable
+fun FullscreenTimerDisplay(
+    viewModel: FocusViewModel,
+    modifier: Modifier = Modifier
+) {
+    val isTimerActive by viewModel.isTimerActive.collectAsState()
+    val isRunning by viewModel.isRunning.collectAsState()
+    val pomodoroMode by viewModel.pomodoroMode.collectAsState()
+    val pomoPhase by viewModel.pomoPhase.collectAsState()
+    val remainingSeconds by viewModel.remainingSeconds.collectAsState()
+    val inputHours by viewModel.inputHours.collectAsState()
+    val inputMinutes by viewModel.inputMinutes.collectAsState()
+
+    val displayDigits = remember(isTimerActive, isRunning, remainingSeconds, inputHours, inputMinutes, pomodoroMode, pomoPhase) {
+        val totalSec = when {
+            isTimerActive || isRunning -> remainingSeconds
+            pomodoroMode -> if (pomoPhase == "work") 25 * 60L else 5 * 60L
+            else -> (inputHours * 3600 + inputMinutes * 60).toLong()
+        }
+        val h = totalSec / 3600
+        val m = (totalSec % 3600) / 60
+        val s = totalSec % 60
+        String.format(Locale.getDefault(), "%02d:%02d:%02d", h, m, s)
+    }
+
+    Text(
+        text = displayDigits,
+        style = TextStyle(
+            brush = GoldGradientBrush,
+            fontSize = 84.sp,
+            fontWeight = FontWeight.ExtraBold,
+            textAlign = TextAlign.Center
+        ),
+        modifier = modifier
+    )
+}
+

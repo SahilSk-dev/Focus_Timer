@@ -428,9 +428,8 @@ class FocusViewModel(application: Application) : AndroidViewModel(application) {
                     }
                 }
 
-                // Update notification text and sync persistence every 5 seconds or when needed
-                if (counter % 5 == 0) {
-                    persistCurrentTimerState()
+                // Update notification text every 30 seconds to minimize Binder IPC and CPU churn
+                if (counter % 30 == 0) {
                     val sec = _remainingSeconds.value
                     val h = sec / 3600
                     val m = (sec % 3600) / 60
@@ -441,7 +440,9 @@ class FocusViewModel(application: Application) : AndroidViewModel(application) {
                         putExtra(AlarmService.EXTRA_TITLE, _selectedSubject.value)
                         putExtra(AlarmService.EXTRA_TIME_TEXT, timeText)
                     }
-                    getApplication<Application>().startService(updateIntent)
+                    try {
+                        getApplication<Application>().startService(updateIntent)
+                    } catch (_: Exception) {}
                 }
             }
         }

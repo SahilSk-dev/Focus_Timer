@@ -126,7 +126,7 @@ fun StatsScreen(
 
     // Day Streak calculation (Computed asynchronously on Dispatchers.Default)
     val streakPair by produceState(
-        initialValue = calculateStreaks(studySessions),
+        initialValue = 0 to 0,
         studySessions
     ) {
         value = withContext(Dispatchers.Default) {
@@ -154,7 +154,7 @@ fun StatsScreen(
 
     // Week comparison (Computed asynchronously on Dispatchers.Default)
     val weekComparison by produceState(
-        initialValue = calculateWeekComparison(studySessions),
+        initialValue = "",
         studySessions
     ) {
         value = withContext(Dispatchers.Default) {
@@ -164,7 +164,7 @@ fun StatsScreen(
 
     // Last 7 days ranking (Computed asynchronously on Dispatchers.Default)
     val rankingList by produceState(
-        initialValue = calculate7DaysRanking(studySessions),
+        initialValue = emptyList(),
         studySessions
     ) {
         value = withContext(Dispatchers.Default) {
@@ -174,7 +174,7 @@ fun StatsScreen(
 
     // Milestone Badges calculation (Computed asynchronously on Dispatchers.Default)
     val allBadges by produceState(
-        initialValue = calculateMilestoneBadges(studySessions, currentStreak, bestStreak, totalStudyMinutes),
+        initialValue = emptyList(),
         studySessions, currentStreak, bestStreak, totalStudyMinutes
     ) {
         value = withContext(Dispatchers.Default) {
@@ -193,7 +193,7 @@ fun StatsScreen(
     // Cognitive Deep Analysis Engine computation (Computed asynchronously on Dispatchers.Default)
     var analyticsTimeframe by remember { mutableStateOf(AnalyticsTimeframe.LAST_7_DAYS) }
     val analyticsReport by produceState(
-        initialValue = AnalyticsEngine.computeReport(studySessions, analyticsTimeframe),
+        initialValue = AnalyticsReport.empty(analyticsTimeframe),
         studySessions, analyticsTimeframe
     ) {
         value = withContext(Dispatchers.Default) {

@@ -19,3 +19,17 @@
 # If you keep the line number information, uncomment this to
 # hide the original source file name.
 #-renamesourcefileattribute SourceFile
+
+# Room Database & TypeConverters
+-keepclassmembers class * extends androidx.room.RoomDatabase { *; }
+-keep class * extends androidx.room.RoomDatabase
+-keep @androidx.room.Entity class * { *; }
+-keep @androidx.room.Dao interface * { *; }
+-keep class com.example.data.local.Converters { *; }
+-keep class com.example.data.model.** { *; }
+
+# Firebase & Coroutines
+-keepattributes Signature
+-keepattributes InnerClasses
+-dontwarn javax.annotation.**
+
