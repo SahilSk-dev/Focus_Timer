@@ -18,12 +18,14 @@ import com.example.data.model.StudySessionEntity
 import com.example.data.model.SubjectEntity
 import com.example.data.model.WorkTypeEntity
 import com.example.data.repository.FocusRepository
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import com.example.ui.theme.AppTheme
@@ -61,12 +63,15 @@ class FocusViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     val allSessions: StateFlow<List<StudySessionEntity>> = repository.getAllSessions()
+        .flowOn(Dispatchers.IO)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val allSubjects: StateFlow<List<SubjectEntity>> = repository.getAllSubjects()
+        .flowOn(Dispatchers.IO)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val allWorkTypes: StateFlow<List<WorkTypeEntity>> = repository.getAllWorkTypes()
+        .flowOn(Dispatchers.IO)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     // Alarm & Sync States
@@ -160,6 +165,18 @@ class FocusViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _toastMessage = MutableStateFlow<String?>(null)
     val toastMessage: StateFlow<String?> = _toastMessage.asStateFlow()
+
+    private val _alarmToneId = MutableStateFlow(repository.alarmToneId)
+    val alarmToneId: StateFlow<String> = _alarmToneId.asStateFlow()
+
+    private val _alarmCustomUri = MutableStateFlow(repository.alarmCustomUri)
+    val alarmCustomUri: StateFlow<String?> = _alarmCustomUri.asStateFlow()
+
+    private val _alarmVolumeBoost = MutableStateFlow(repository.alarmVolumeBoost)
+    val alarmVolumeBoost: StateFlow<Boolean> = _alarmVolumeBoost.asStateFlow()
+
+    private val _isPreviewingSound = MutableStateFlow(false)
+    val isPreviewingSound: StateFlow<Boolean> = _isPreviewingSound.asStateFlow()
 
     private var timerJob: Job? = null
     private var startAtTimestamp: Long = 0L
@@ -516,7 +533,7 @@ class FocusViewModel(application: Application) : AndroidViewModel(application) {
     private fun saveSession(minutes: Int) {
         if (minutes <= 0) return
         viewModelScope.launch {
-            val subj = allSubjects.value.find { it.name == _selectedSubject.value }
+            val subj = allSubjects.value.find { it.name.equals(_selectedSubject.value, ignoreCase = true) }
             val isNS = subj?.isNonStudy ?: false
             val sessionName = if (!_selectedSubSubject.value.isNullOrBlank()) {
                 "${_selectedSubject.value} - ${_selectedSubSubject.value}"
@@ -578,10 +595,10 @@ class FocusViewModel(application: Application) : AndroidViewModel(application) {
         } catch (_: Exception) {}
     }
 
-    fun updateSession(session: StudySessionEntity) {
+    fun updateSession(session: StudySessionEntity, previousIsNonStudy: Boolean? = null) {
         viewModelScope.launch {
-            repository.updateSession(session)
-            showToast("Session updated")
+            repository.updateSession(session, previousIsNonStudy)
+            showToast("Session updated & synced")
         }
     }
 
@@ -614,9 +631,19 @@ class FocusViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun updateSubject(subject: SubjectEntity) {
+        viewModelScope.launch {
+            repository.updateSubject(subject)
+            if (_selectedSubject.value.equals(subject.name, ignoreCase = true)) {
+                _selectedSubject.value = subject.name
+            }
+            showToast("Subject '${subject.name}' updated & synced")
+        }
+    }
+
     fun addSubSubject(subjectName: String, subName: String) {
         viewModelScope.launch {
-            val subj = allSubjects.value.find { it.name == subjectName } ?: return@launch
+            val subj = allSubjects.value.find { it.name.equals(subjectName, ignoreCase = true) } ?: return@launch
             val updatedSubs = subj.subSubjects + subName
             repository.updateSubject(subj.copy(subSubjects = updatedSubs))
             _selectedSubSubject.value = subName
@@ -642,15 +669,64 @@ class FocusViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun updateWorkType(id: Long, name: String) {
+        viewModelScope.launch {
+            repository.updateWorkType(id, name)
+            if (_selectedWorkType.value.equals(name, ignoreCase = true)) {
+                _selectedWorkType.value = name
+            }
+            showToast("Work type updated & synced")
+        }
+    }
+
     fun deleteWorkType(id: Long) {
         viewModelScope.launch {
             repository.deleteWorkType(id)
         }
     }
 
+    fun setAlarmTone(toneId: String) {
+        _alarmToneId.value = toneId
+        repository.alarmToneId = toneId
+        showToast("Alarm sound set to ${com.example.alarm.AlarmToneOption.fromId(toneId).displayName}")
+    }
+
+    fun setAlarmCustomUri(uriStr: String?) {
+        _alarmCustomUri.value = uriStr
+        repository.alarmCustomUri = uriStr
+        _alarmToneId.value = com.example.alarm.AlarmToneOption.CUSTOM_PICKER.id
+        repository.alarmToneId = com.example.alarm.AlarmToneOption.CUSTOM_PICKER.id
+        showToast("Custom alarm tone selected")
+    }
+
+    fun toggleAlarmVolumeBoost() {
+        val newVal = !_alarmVolumeBoost.value
+        _alarmVolumeBoost.value = newVal
+        repository.alarmVolumeBoost = newVal
+        showToast(if (newVal) "Maximum Alarm Volume Boost: ON 🔊" else "Maximum Volume Boost: OFF")
+    }
+
+    fun previewAlarmTone(toneOption: com.example.alarm.AlarmToneOption) {
+        _isPreviewingSound.value = true
+        com.example.alarm.AlarmSoundManager.playPreview(
+            context = getApplication(),
+            toneOption = toneOption,
+            customUriStr = _alarmCustomUri.value,
+            onFinished = {
+                _isPreviewingSound.value = false
+            }
+        )
+    }
+
+    fun stopAlarmTonePreview() {
+        com.example.alarm.AlarmSoundManager.stopPreview()
+        _isPreviewingSound.value = false
+    }
+
     override fun onCleared() {
         super.onCleared()
         timerJob?.cancel()
         toneGenerator?.release()
+        com.example.alarm.AlarmSoundManager.stopPreview()
     }
 }

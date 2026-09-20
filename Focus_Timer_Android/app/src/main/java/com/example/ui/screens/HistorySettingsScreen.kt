@@ -1,6 +1,8 @@
 package com.example.ui.screens
 
+import android.app.Activity
 import android.content.Intent
+import android.media.RingtoneManager
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -13,11 +15,13 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -34,14 +38,21 @@ import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.MusicNote
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.Upload
+import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
@@ -51,6 +62,8 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
 import androidx.compose.material3.TabRowDefaults
@@ -76,7 +89,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.alarm.AlarmToneOption
 import com.example.data.model.StudySessionEntity
+import com.example.data.model.SubjectEntity
+import com.example.data.model.WorkTypeEntity
 import com.example.data.repository.FocusRepository
 import com.example.util.PdfExportHelper
 import com.example.ui.theme.ActiveTheme
@@ -118,14 +134,38 @@ fun HistorySettingsScreen(
     var selectedTab by remember { mutableStateOf(0) } // 0: History, 1: Backup & Export, 2: Subjects & Work
     var sessionToDelete by remember { mutableStateOf<StudySessionEntity?>(null) }
     var sessionToEdit by remember { mutableStateOf<StudySessionEntity?>(null) }
+    var subjectToEdit by remember { mutableStateOf<SubjectEntity?>(null) }
+    var workTypeToEdit by remember { mutableStateOf<WorkTypeEntity?>(null) }
     var recentlyDeletedSession by remember { mutableStateOf<StudySessionEntity?>(null) }
     var showBulkDeleteDialog by remember { mutableStateOf(false) }
 
-    // Backup & Export state
+    // Backup & Export & Alarm state
     var exportRange by remember { mutableStateOf("Last 30 Days") }
     var rangeDropdownExpanded by remember { mutableStateOf(false) }
+    var ringtoneDropdownExpanded by remember { mutableStateOf(false) }
     var jsonImportText by remember { mutableStateOf("") }
     var showImportDialog by remember { mutableStateOf(false) }
+
+    val alarmToneId by viewModel.alarmToneId.collectAsState()
+    val alarmVolumeBoost by viewModel.alarmVolumeBoost.collectAsState()
+    val isPreviewingSound by viewModel.isPreviewingSound.collectAsState()
+    val alarmCustomUri by viewModel.alarmCustomUri.collectAsState()
+
+    val ringtonePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            val uri: Uri? = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+                result.data?.getParcelableExtra(RingtoneManager.EXTRA_RINGTONE_PICKED_URI, Uri::class.java)
+            } else {
+                @Suppress("DEPRECATION")
+                result.data?.getParcelableExtra(RingtoneManager.EXTRA_RINGTONE_PICKED_URI)
+            }
+            if (uri != null) {
+                viewModel.setAlarmCustomUri(uri.toString())
+            }
+        }
+    }
 
     val jsonFilePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
@@ -263,7 +303,11 @@ fun HistorySettingsScreen(
                         modifier = Modifier.fillMaxSize(),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        items(allSessions, key = { it.id }) { session ->
+                        items(
+                            items = allSessions,
+                            key = { it.id },
+                            contentType = { "session_item" }
+                        ) { session ->
                             SessionHistoryItem(
                                 session = session,
                                 onEdit = { sessionToEdit = session },
@@ -511,13 +555,15 @@ fun HistorySettingsScreen(
                                     },
                                     border = BorderStroke(1.dp, LineBorder),
                                     shape = RoundedCornerShape(8.dp),
+                                    contentPadding = PaddingValues(horizontal = 6.dp, vertical = 6.dp),
                                     modifier = Modifier
                                         .weight(1f)
-                                        .height(52.dp)
+                                        .heightIn(min = 52.dp)
                                 ) {
                                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                         Text("Download JSON", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
-                                        Text("(Backup)", fontSize = 11.sp, color = TextDim)
+                                        Spacer(modifier = Modifier.height(2.dp))
+                                        Text("(Backup)", fontSize = 10.sp, color = TextDim)
                                     }
                                 }
 
@@ -525,14 +571,284 @@ fun HistorySettingsScreen(
                                     onClick = { showImportDialog = true },
                                     border = BorderStroke(1.dp, LineBorder),
                                     shape = RoundedCornerShape(8.dp),
+                                    contentPadding = PaddingValues(horizontal = 6.dp, vertical = 6.dp),
                                     modifier = Modifier
                                         .weight(1f)
-                                        .height(52.dp)
+                                        .heightIn(min = 52.dp)
                                 ) {
                                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                         Text("Restore JSON", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
-                                        Text("(Upload)", fontSize = 11.sp, color = TextDim)
+                                        Spacer(modifier = Modifier.height(2.dp))
+                                        Text("(Upload)", fontSize = 10.sp, color = TextDim)
                                     }
+                                }
+                            }
+                        }
+                    }
+
+                    // ALARM SOUND & VOLUME SETTINGS
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        color = PanelDark,
+                        shape = RoundedCornerShape(12.dp),
+                        border = BorderStroke(1.dp, GoldAccent.copy(alpha = 0.5f))
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column {
+                                    Text(
+                                        text = "Alarm Sound & Ringtone",
+                                        style = TextStyle(
+                                            brush = GoldGradientBrush,
+                                            fontSize = 16.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    )
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Text(
+                                        text = "High volume alerts & customizable tones",
+                                        color = TextDim,
+                                        fontSize = 11.sp
+                                    )
+                                }
+
+                                Icon(
+                                    imageVector = Icons.Default.Notifications,
+                                    contentDescription = null,
+                                    tint = GoldBright,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+
+                            Spacer(modifier = Modifier.height(14.dp))
+
+                            // Current Selected Tone Selector Dropdown
+                            val currentOption = AlarmToneOption.fromId(alarmToneId)
+                            Text(
+                                text = "Select Alarm Ringtone",
+                                color = TextDim,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                            Spacer(modifier = Modifier.height(6.dp))
+
+                            Box(modifier = Modifier.fillMaxWidth()) {
+                                Surface(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable { ringtoneDropdownExpanded = true },
+                                    color = PanelElevated,
+                                    shape = RoundedCornerShape(8.dp),
+                                    border = BorderStroke(1.dp, LineBorder)
+                                ) {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(horizontal = 12.dp, vertical = 10.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                        ) {
+                                            Text(text = currentOption.icon, fontSize = 16.sp)
+                                            Column {
+                                                Text(
+                                                    text = currentOption.displayName,
+                                                    color = TextPrimary,
+                                                    fontWeight = FontWeight.Bold,
+                                                    fontSize = 13.sp
+                                                )
+                                                Text(
+                                                    text = currentOption.description,
+                                                    color = TextDim,
+                                                    fontSize = 10.sp
+                                                )
+                                            }
+                                        }
+
+                                        Icon(
+                                            imageVector = Icons.Default.ArrowDropDown,
+                                            contentDescription = null,
+                                            tint = GoldAccent
+                                        )
+                                    }
+                                }
+
+                                DropdownMenu(
+                                    expanded = ringtoneDropdownExpanded,
+                                    onDismissRequest = { ringtoneDropdownExpanded = false },
+                                    modifier = Modifier
+                                        .fillMaxWidth(0.9f)
+                                        .background(PanelDark)
+                                ) {
+                                    AlarmToneOption.entries.forEach { opt ->
+                                        DropdownMenuItem(
+                                            text = {
+                                                Row(
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                                ) {
+                                                    Text(opt.icon, fontSize = 16.sp)
+                                                    Column {
+                                                        Text(
+                                                            opt.displayName,
+                                                            color = if (alarmToneId == opt.id) GoldBright else TextPrimary,
+                                                            fontWeight = if (alarmToneId == opt.id) FontWeight.Bold else FontWeight.Normal,
+                                                            fontSize = 13.sp
+                                                        )
+                                                        Text(
+                                                            opt.description,
+                                                            color = TextDim,
+                                                            fontSize = 10.sp
+                                                        )
+                                                    }
+                                                }
+                                            },
+                                            onClick = {
+                                                ringtoneDropdownExpanded = false
+                                                if (opt == AlarmToneOption.CUSTOM_PICKER) {
+                                                    val intent = Intent(RingtoneManager.ACTION_RINGTONE_PICKER).apply {
+                                                        putExtra(RingtoneManager.EXTRA_RINGTONE_TYPE, RingtoneManager.TYPE_ALARM)
+                                                        putExtra(RingtoneManager.EXTRA_RINGTONE_TITLE, "Select Alarm Ringtone")
+                                                        putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_DEFAULT, true)
+                                                        putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_SILENT, false)
+                                                        if (!alarmCustomUri.isNullOrBlank()) {
+                                                            putExtra(RingtoneManager.EXTRA_RINGTONE_EXISTING_URI, Uri.parse(alarmCustomUri))
+                                                        }
+                                                    }
+                                                    ringtonePickerLauncher.launch(intent)
+                                                } else {
+                                                    viewModel.setAlarmTone(opt.id)
+                                                }
+                                            }
+                                        )
+                                    }
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(12.dp))
+
+                            // Test Sound Button & Custom Picker Button
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                Button(
+                                    onClick = {
+                                        if (isPreviewingSound) {
+                                            viewModel.stopAlarmTonePreview()
+                                        } else {
+                                            viewModel.previewAlarmTone(currentOption)
+                                        }
+                                    },
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = if (isPreviewingSound) DangerRed else GoldAccent,
+                                        contentColor = if (isPreviewingSound) Color.White else BgDark
+                                    ),
+                                    shape = RoundedCornerShape(8.dp),
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .height(44.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = if (isPreviewingSound) Icons.Default.Stop else Icons.Default.PlayArrow,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = if (isPreviewingSound) "Stop Test" else "Test Alarm Sound",
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 12.sp
+                                    )
+                                }
+
+                                OutlinedButton(
+                                    onClick = {
+                                        val intent = Intent(RingtoneManager.ACTION_RINGTONE_PICKER).apply {
+                                            putExtra(RingtoneManager.EXTRA_RINGTONE_TYPE, RingtoneManager.TYPE_ALARM or RingtoneManager.TYPE_RINGTONE)
+                                            putExtra(RingtoneManager.EXTRA_RINGTONE_TITLE, "Choose Phone Ringtone")
+                                            putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_DEFAULT, true)
+                                            putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_SILENT, false)
+                                            if (!alarmCustomUri.isNullOrBlank()) {
+                                                putExtra(RingtoneManager.EXTRA_RINGTONE_EXISTING_URI, Uri.parse(alarmCustomUri))
+                                            }
+                                        }
+                                        ringtonePickerLauncher.launch(intent)
+                                    },
+                                    border = BorderStroke(1.dp, LineBorder),
+                                    shape = RoundedCornerShape(8.dp),
+                                    modifier = Modifier.height(44.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.MusicNote,
+                                        contentDescription = "Pick Ringtone",
+                                        tint = GoldBright,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("Pick File", color = TextPrimary, fontSize = 12.sp)
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(12.dp))
+
+                            // Volume Boost Option Row
+                            Surface(
+                                color = PanelElevated,
+                                shape = RoundedCornerShape(8.dp),
+                                border = BorderStroke(1.dp, LineBorder),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                        modifier = Modifier.weight(1f)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.VolumeUp,
+                                            contentDescription = null,
+                                            tint = GoldAccent,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                        Column {
+                                            Text(
+                                                text = "Maximum Volume Boost",
+                                                color = TextPrimary,
+                                                fontWeight = FontWeight.Bold,
+                                                fontSize = 12.sp
+                                            )
+                                            Text(
+                                                text = "Forces alarm to play at 100% device volume",
+                                                color = TextDim,
+                                                fontSize = 10.sp
+                                            )
+                                        }
+                                    }
+
+                                    Switch(
+                                        checked = alarmVolumeBoost,
+                                        onCheckedChange = { viewModel.toggleAlarmVolumeBoost() },
+                                        colors = SwitchDefaults.colors(
+                                            checkedThumbColor = BgDark,
+                                            checkedTrackColor = GoldAccent,
+                                            uncheckedThumbColor = TextDim,
+                                            uncheckedTrackColor = PanelDark
+                                        )
+                                    )
                                 }
                             }
                         }
@@ -602,59 +918,6 @@ fun HistorySettingsScreen(
                                 Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(16.dp))
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text("Delete Sessions in Range")
-                            }
-                        }
-                    }
-
-                    // Theme & Appearance Settings Card (Dark Mode vs White Mode)
-                    val currentTheme by viewModel.currentAppTheme.collectAsState()
-                    Surface(
-                        modifier = Modifier.fillMaxWidth(),
-                        color = PanelDark,
-                        shape = RoundedCornerShape(12.dp),
-                        border = BorderStroke(1.dp, LineBorder)
-                    ) {
-                        Column(modifier = Modifier.padding(16.dp)) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                ) {
-                                    Text(if (currentTheme.isLight) "☀️" else "🌙", fontSize = 20.sp)
-                                    Column {
-                                        Text(
-                                            text = if (currentTheme.isLight) "White Mode" else "Dark Mode",
-                                            color = TextPrimary,
-                                            fontSize = 16.sp,
-                                            fontWeight = FontWeight.Bold
-                                        )
-                                        Text(
-                                            text = if (currentTheme.isLight) "Minimalist light theme active" else "OLED pitch black theme active",
-                                            color = TextDim,
-                                            fontSize = 12.sp
-                                        )
-                                    }
-                                }
-
-                                // Quick switch button
-                                Surface(
-                                    onClick = { viewModel.toggleTheme() },
-                                    shape = RoundedCornerShape(10.dp),
-                                    color = PanelElevated,
-                                    border = BorderStroke(1.dp, LineBorder)
-                                ) {
-                                    Text(
-                                        text = if (currentTheme.isLight) "Switch to Dark" else "Switch to White",
-                                        color = TextPrimary,
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
-                                    )
-                                }
                             }
                         }
                     }
@@ -733,17 +996,30 @@ fun HistorySettingsScreen(
                                         }
                                     }
 
-                                    if (!subj.isCore) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
                                         IconButton(
-                                            onClick = { viewModel.deleteSubject(subj.id) },
+                                            onClick = { subjectToEdit = subj },
                                             modifier = Modifier.size(32.dp)
                                         ) {
                                             Icon(
-                                                Icons.Default.Delete,
-                                                contentDescription = "Delete Subject",
-                                                tint = DangerRed,
+                                                Icons.Default.Edit,
+                                                contentDescription = "Edit Subject",
+                                                tint = GoldAccent,
                                                 modifier = Modifier.size(16.dp)
                                             )
+                                        }
+                                        if (!subj.isCore) {
+                                            IconButton(
+                                                onClick = { viewModel.deleteSubject(subj.id) },
+                                                modifier = Modifier.size(32.dp)
+                                            ) {
+                                                Icon(
+                                                    Icons.Default.Delete,
+                                                    contentDescription = "Delete Subject",
+                                                    tint = DangerRed,
+                                                    modifier = Modifier.size(16.dp)
+                                                )
+                                            }
                                         }
                                     }
                                 }
@@ -780,16 +1056,29 @@ fun HistorySettingsScreen(
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Text(text = wt.name, color = TextPrimary, fontSize = 14.sp)
-                                    IconButton(
-                                        onClick = { viewModel.deleteWorkType(wt.id) },
-                                        modifier = Modifier.size(32.dp)
-                                    ) {
-                                        Icon(
-                                            Icons.Default.Delete,
-                                            contentDescription = "Delete Work Type",
-                                            tint = DangerRed,
-                                            modifier = Modifier.size(16.dp)
-                                        )
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        IconButton(
+                                            onClick = { workTypeToEdit = wt },
+                                            modifier = Modifier.size(32.dp)
+                                        ) {
+                                            Icon(
+                                                Icons.Default.Edit,
+                                                contentDescription = "Edit Work Type",
+                                                tint = GoldAccent,
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                        }
+                                        IconButton(
+                                            onClick = { viewModel.deleteWorkType(wt.id) },
+                                            modifier = Modifier.size(32.dp)
+                                        ) {
+                                            Icon(
+                                                Icons.Default.Delete,
+                                                contentDescription = "Delete Work Type",
+                                                tint = DangerRed,
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                        }
                                     }
                                 }
                                 HorizontalDivider(color = LineBorder, modifier = Modifier.padding(vertical = 4.dp))
@@ -839,10 +1128,11 @@ fun HistorySettingsScreen(
         var editWorkType by remember(s) { mutableStateOf(s.workType) }
         var editMinutes by remember(s) { mutableStateOf(s.minutes.toString()) }
         var editDate by remember(s) { mutableStateOf(s.date) }
+        var editIsNonStudy by remember(s) { mutableStateOf(s.isNonStudy) }
 
         AlertDialog(
             onDismissRequest = { sessionToEdit = null },
-            title = { Text("Edit Study Session", color = GoldBright, ) },
+            title = { Text("Edit Session", color = GoldBright) },
             text = {
                 Column(
                     modifier = Modifier.verticalScroll(rememberScrollState()),
@@ -851,7 +1141,7 @@ fun HistorySettingsScreen(
                     OutlinedTextField(
                         value = editSubject,
                         onValueChange = { editSubject = it },
-                        label = { Text("Subject (e.g. Bengali, Math)", color = TextDim) },
+                        label = { Text("Subject (e.g. Bengali, Math, SLEEP)", color = TextDim) },
                         modifier = Modifier.fillMaxWidth(),
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = GoldAccent,
@@ -860,6 +1150,32 @@ fun HistorySettingsScreen(
                             unfocusedTextColor = TextPrimary
                         )
                     )
+
+                    // Quick subject chips
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        subjects.forEach { subj ->
+                            val isSel = editSubject.equals(subj.name, ignoreCase = true)
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = if (isSel) GoldAccent.copy(alpha = 0.2f) else PanelElevated,
+                                border = BorderStroke(1.dp, if (isSel) GoldAccent else LineBorder),
+                                modifier = Modifier.clickable {
+                                    editSubject = subj.name
+                                    editIsNonStudy = subj.isNonStudy
+                                }
+                            ) {
+                                Text(
+                                    text = subj.name + if (subj.isNonStudy) " (NS)" else "",
+                                    color = if (isSel) GoldBright else TextDim,
+                                    fontSize = 11.sp,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                )
+                            }
+                        }
+                    }
 
                     OutlinedTextField(
                         value = editSubSubject,
@@ -877,7 +1193,7 @@ fun HistorySettingsScreen(
                     OutlinedTextField(
                         value = editWorkType,
                         onValueChange = { editWorkType = it },
-                        label = { Text("Work Type (e.g. Revision, Memorize)", color = TextDim) },
+                        label = { Text("Work Type (e.g. Revision, Memorize, N/A)", color = TextDim) },
                         modifier = Modifier.fillMaxWidth(),
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = GoldAccent,
@@ -886,6 +1202,29 @@ fun HistorySettingsScreen(
                             unfocusedTextColor = TextPrimary
                         )
                     )
+
+                    // Quick work type chips
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        workTypes.forEach { wt ->
+                            val isSel = editWorkType.equals(wt.name, ignoreCase = true)
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = if (isSel) GoldAccent.copy(alpha = 0.2f) else PanelElevated,
+                                border = BorderStroke(1.dp, if (isSel) GoldAccent else LineBorder),
+                                modifier = Modifier.clickable { editWorkType = wt.name }
+                            ) {
+                                Text(
+                                    text = wt.name,
+                                    color = if (isSel) GoldBright else TextDim,
+                                    fontSize = 11.sp,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                )
+                            }
+                        }
+                    }
 
                     OutlinedTextField(
                         value = editMinutes,
@@ -913,6 +1252,41 @@ fun HistorySettingsScreen(
                             unfocusedTextColor = TextPrimary
                         )
                     )
+
+                    // Non-Study Category Checkbox
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = PanelElevated,
+                        border = BorderStroke(1.dp, if (editIsNonStudy) GoldAccent else LineBorder),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { editIsNonStudy = !editIsNonStudy }
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "Non-Study Session",
+                                    color = if (editIsNonStudy) GoldBright else TextPrimary,
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                                Text(
+                                    text = "Excluded from daily study goal & deep focus stats",
+                                    color = TextDim,
+                                    fontSize = 11.sp
+                                )
+                            }
+                            Checkbox(
+                                checked = editIsNonStudy,
+                                onCheckedChange = { editIsNonStudy = it },
+                                colors = CheckboxDefaults.colors(checkedColor = GoldAccent)
+                            )
+                        }
+                    }
                 }
             },
             confirmButton = {
@@ -925,19 +1299,235 @@ fun HistorySettingsScreen(
                                 subSubject = if (editSubSubject.isNotBlank()) editSubSubject.trim() else null,
                                 workType = editWorkType.trim(),
                                 minutes = mins,
-                                date = editDate.trim()
+                                date = editDate.trim(),
+                                isNonStudy = editIsNonStudy
                             )
-                            viewModel.updateSession(updated)
+                            viewModel.updateSession(updated, previousIsNonStudy = s.isNonStudy)
                             sessionToEdit = null
                         }
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = GoldAccent, contentColor = BgDark)
                 ) {
-                    Text("Save Changes")
+                    Text("Save & Sync")
                 }
             },
             dismissButton = {
                 TextButton(onClick = { sessionToEdit = null }) {
+                    Text("Cancel", color = TextDim)
+                }
+            },
+            containerColor = PanelDark
+        )
+    }
+
+    // Edit Subject Dialog
+    if (subjectToEdit != null) {
+        val subj = subjectToEdit!!
+        var editName by remember(subj) { mutableStateOf(subj.name) }
+        var editIsCore by remember(subj) { mutableStateOf(subj.isCore) }
+        var editIsNonStudy by remember(subj) { mutableStateOf(subj.isNonStudy) }
+        var subList by remember(subj) { mutableStateOf(subj.subSubjects) }
+        var newSubInput by remember(subj) { mutableStateOf("") }
+
+        AlertDialog(
+            onDismissRequest = { subjectToEdit = null },
+            title = { Text("Edit Subject", color = GoldBright) },
+            text = {
+                Column(
+                    modifier = Modifier.verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    OutlinedTextField(
+                        value = editName,
+                        onValueChange = { editName = it },
+                        label = { Text("Subject Name", color = TextDim) },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = GoldAccent,
+                            unfocusedBorderColor = LineBorder,
+                            focusedTextColor = TextPrimary,
+                            unfocusedTextColor = TextPrimary
+                        )
+                    )
+
+                    // Core Subject toggle
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = PanelElevated,
+                        border = BorderStroke(1.dp, LineBorder),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { editIsCore = !editIsCore }
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("Core Subject", color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                                Text("Pinned permanently to the main subject bar", color = TextDim, fontSize = 11.sp)
+                            }
+                            Checkbox(
+                                checked = editIsCore,
+                                onCheckedChange = { editIsCore = it },
+                                colors = CheckboxDefaults.colors(checkedColor = GoldAccent)
+                            )
+                        }
+                    }
+
+                    // Non-Study toggle
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = PanelElevated,
+                        border = BorderStroke(1.dp, LineBorder),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { editIsNonStudy = !editIsNonStudy }
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("Non-Study Subject", color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                                Text("Tags all new sessions as non-study/personal", color = TextDim, fontSize = 11.sp)
+                            }
+                            Checkbox(
+                                checked = editIsNonStudy,
+                                onCheckedChange = { editIsNonStudy = it },
+                                colors = CheckboxDefaults.colors(checkedColor = GoldAccent)
+                            )
+                        }
+                    }
+
+                    Text("Sub-Subjects", color = GoldLight, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+
+                    if (subList.isNotEmpty()) {
+                        FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            subList.forEach { sub ->
+                                Surface(
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = PanelElevated,
+                                    border = BorderStroke(1.dp, LineBorder)
+                                ) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        modifier = Modifier.padding(start = 8.dp, end = 4.dp, top = 2.dp, bottom = 2.dp)
+                                    ) {
+                                        Text(sub, color = TextPrimary, fontSize = 12.sp)
+                                        IconButton(
+                                            onClick = { subList = subList.filter { it != sub } },
+                                            modifier = Modifier.size(20.dp)
+                                        ) {
+                                            Text("✕", color = DangerRed, fontSize = 10.sp)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        OutlinedTextField(
+                            value = newSubInput,
+                            onValueChange = { newSubInput = it },
+                            label = { Text("Add Sub-Subject", color = TextDim) },
+                            modifier = Modifier.weight(1f),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = GoldAccent,
+                                unfocusedBorderColor = LineBorder,
+                                focusedTextColor = TextPrimary,
+                                unfocusedTextColor = TextPrimary
+                            )
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Button(
+                            onClick = {
+                                if (newSubInput.isNotBlank() && !subList.contains(newSubInput.trim())) {
+                                    subList = subList + newSubInput.trim()
+                                    newSubInput = ""
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = GoldAccent, contentColor = BgDark)
+                        ) {
+                            Text("+")
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        if (editName.isNotBlank()) {
+                            val updatedSubj = subj.copy(
+                                name = editName.trim(),
+                                isCore = editIsCore,
+                                isNonStudy = editIsNonStudy,
+                                subSubjects = subList
+                            )
+                            viewModel.updateSubject(updatedSubj)
+                            subjectToEdit = null
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = GoldAccent, contentColor = BgDark)
+                ) {
+                    Text("Save & Sync")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { subjectToEdit = null }) {
+                    Text("Cancel", color = TextDim)
+                }
+            },
+            containerColor = PanelDark
+        )
+    }
+
+    // Edit Work Type Dialog
+    if (workTypeToEdit != null) {
+        val wt = workTypeToEdit!!
+        var editName by remember(wt) { mutableStateOf(wt.name) }
+
+        AlertDialog(
+            onDismissRequest = { workTypeToEdit = null },
+            title = { Text("Edit Work Type", color = GoldBright) },
+            text = {
+                OutlinedTextField(
+                    value = editName,
+                    onValueChange = { editName = it },
+                    label = { Text("Work Type Name", color = TextDim) },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = GoldAccent,
+                        unfocusedBorderColor = LineBorder,
+                        focusedTextColor = TextPrimary,
+                        unfocusedTextColor = TextPrimary
+                    )
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        if (editName.isNotBlank()) {
+                            viewModel.updateWorkType(wt.id, editName.trim())
+                            workTypeToEdit = null
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = GoldAccent, contentColor = BgDark)
+                ) {
+                    Text("Save & Sync")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { workTypeToEdit = null }) {
                     Text("Cancel", color = TextDim)
                 }
             },
@@ -1049,14 +1639,14 @@ private fun SessionHistoryItem(
 ) {
     val endTs = session.timestamp
     val startTs = endTs - (session.minutes.toLong() * 60L * 1000L)
-    val timeFormat = remember { SimpleDateFormat("h:mm a", Locale.US) }
-    val dateFormat = remember { SimpleDateFormat("dd-MM-yyyy", Locale.US) }
 
     val timeRangeStr = remember(endTs, session.minutes) {
-        "${timeFormat.format(Date(startTs))} - ${timeFormat.format(Date(endTs))}"
+        val startStr = com.example.util.DateFormatterCache.formatTime(startTs)
+        val endStr = com.example.util.DateFormatterCache.formatTime(endTs)
+        "$startStr - $endStr"
     }
     val dateStr = remember(endTs) {
-        dateFormat.format(Date(endTs))
+        com.example.util.DateFormatterCache.formatReadableDate(session.date)
     }
     val workTypeStr = if (session.workType.isBlank()) "N/A" else session.workType
     val subtitleText = "[$workTypeStr] $timeRangeStr, $dateStr"

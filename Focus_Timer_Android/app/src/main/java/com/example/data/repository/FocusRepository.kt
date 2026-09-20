@@ -44,6 +44,18 @@ class FocusRepository(
         get() = prefs.getBoolean("is_sound_muted", false)
         set(value) = prefs.edit().putBoolean("is_sound_muted", value).apply()
 
+    var alarmToneId: String
+        get() = prefs.getString("alarm_tone_id", "ultra_siren") ?: "ultra_siren"
+        set(value) = prefs.edit().putString("alarm_tone_id", value).apply()
+
+    var alarmCustomUri: String?
+        get() = prefs.getString("alarm_custom_uri", null)
+        set(value) = prefs.edit().putString("alarm_custom_uri", value).apply()
+
+    var alarmVolumeBoost: Boolean
+        get() = prefs.getBoolean("alarm_volume_boost", true)
+        set(value) = prefs.edit().putBoolean("alarm_volume_boost", value).apply()
+
     // Persistent Active Timer State (survives app kill / close)
     fun saveRunningTimerState(
         isActive: Boolean,
@@ -108,9 +120,9 @@ class FocusRepository(
         return id
     }
 
-    suspend fun updateSession(session: StudySessionEntity) {
+    suspend fun updateSession(session: StudySessionEntity, previousIsNonStudy: Boolean? = null) {
         studyDao.updateSession(session)
-        syncManager.uploadSession(session)
+        syncManager.uploadSession(session, previousIsNonStudy)
     }
 
     suspend fun deleteSession(id: Long) {
@@ -149,6 +161,11 @@ class FocusRepository(
         val id = studyDao.insertWorkType(WorkTypeEntity(name = name))
         syncPrefsToCloud()
         return id
+    }
+
+    suspend fun updateWorkType(id: Long, name: String) {
+        studyDao.updateWorkType(WorkTypeEntity(id = id, name = name))
+        syncPrefsToCloud()
     }
 
     suspend fun deleteWorkType(id: Long) {
@@ -261,7 +278,7 @@ class FocusRepository(
 
     companion object {
         fun getTodayString(): String {
-            return SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
+            return com.example.util.DateFormatterCache.getTodayString()
         }
     }
 }

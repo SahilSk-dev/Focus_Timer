@@ -91,6 +91,9 @@ interface StudyDao {
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertWorkTypes(workTypes: List<WorkTypeEntity>)
 
+    @Update
+    suspend fun updateWorkType(workType: WorkTypeEntity)
+
     @Query("DELETE FROM work_types WHERE id = :id")
     suspend fun deleteWorkTypeById(id: Long)
 

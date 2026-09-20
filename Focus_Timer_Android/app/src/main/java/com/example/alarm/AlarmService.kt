@@ -8,6 +8,7 @@ import android.content.Context
 import android.content.Intent
 import android.media.AudioAttributes
 import android.media.AudioManager
+import android.media.AudioTrack
 import android.media.MediaPlayer
 import android.media.RingtoneManager
 import android.os.Build
@@ -60,6 +61,7 @@ class AlarmService : Service() {
     }
 
     private var mediaPlayer: MediaPlayer? = null
+    private var audioTrack: AudioTrack? = null
     private var wakeLock: PowerManager.WakeLock? = null
     private var vibrator: Vibrator? = null
 
@@ -226,26 +228,62 @@ class AlarmService : Service() {
 
     private fun playRingtone() {
         try {
-            var alarmUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
-            if (alarmUri == null) {
-                alarmUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
-            }
+            // Maximize volume
+            AlarmSoundManager.ensureMaxAlarmVolume(applicationContext)
+
+            val prefs = getSharedPreferences("focus_timer_prefs", Context.MODE_PRIVATE)
+            val toneId = prefs.getString("alarm_tone_id", "ultra_siren") ?: "ultra_siren"
+            val toneOption = AlarmToneOption.fromId(toneId)
+            val customUriStr = prefs.getString("alarm_custom_uri", null)
 
             mediaPlayer?.release()
-            mediaPlayer = MediaPlayer().apply {
-                setDataSource(applicationContext, alarmUri)
-                setAudioAttributes(
-                    AudioAttributes.Builder()
-                        .setUsage(AudioAttributes.USAGE_ALARM)
-                        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                        .build()
-                )
-                isLooping = true
-                prepare()
-                start()
+            mediaPlayer = null
+            try {
+                audioTrack?.stop()
+                audioTrack?.release()
+            } catch (_: Exception) {}
+            audioTrack = null
+
+            if (toneOption == AlarmToneOption.SYSTEM_DEFAULT || (toneOption == AlarmToneOption.CUSTOM_PICKER && !customUriStr.isNullOrBlank())) {
+                val alarmUri = if (toneOption == AlarmToneOption.CUSTOM_PICKER && !customUriStr.isNullOrBlank()) {
+                    android.net.Uri.parse(customUriStr)
+                } else {
+                    RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
+                        ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+                        ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE)
+                }
+
+                mediaPlayer = MediaPlayer().apply {
+                    setDataSource(applicationContext, alarmUri)
+                    setAudioAttributes(
+                        AudioAttributes.Builder()
+                            .setUsage(AudioAttributes.USAGE_ALARM)
+                            .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                            .setFlags(AudioAttributes.FLAG_AUDIBILITY_ENFORCED)
+                            .build()
+                    )
+                    setVolume(1.0f, 1.0f)
+                    isLooping = true
+                    prepare()
+                    start()
+                }
+            } else {
+                // Play ultra loud synthesized tone
+                AlarmSoundManager.playSynthesizedTone(toneOption) { track ->
+                    audioTrack = track
+                }
             }
-        } catch (_: Exception) {
-            // Fallback tone if needed
+        } catch (e: Exception) {
+            android.util.Log.e("AlarmService", "Failed to play custom alarm, falling back: ${e.message}")
+            try {
+                val fallbackUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
+                    ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+                mediaPlayer = MediaPlayer.create(applicationContext, fallbackUri)?.apply {
+                    isLooping = true
+                    setVolume(1.0f, 1.0f)
+                    start()
+                }
+            } catch (_: Exception) {}
         }
     }
 
@@ -268,6 +306,12 @@ class AlarmService : Service() {
             mediaPlayer?.stop()
             mediaPlayer?.release()
             mediaPlayer = null
+        } catch (_: Exception) {}
+
+        try {
+            audioTrack?.stop()
+            audioTrack?.release()
+            audioTrack = null
         } catch (_: Exception) {}
 
         try {

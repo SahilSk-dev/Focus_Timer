@@ -65,14 +65,12 @@ object AnalyticsEngine {
         timeframe: AnalyticsTimeframe
     ): AnalyticsReport {
         val studySessions = allSessions.filter { !it.isNonStudy }
-        val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
-
         val now = Calendar.getInstance()
         val daysLimit = timeframe.days
 
         val filteredSessions = if (daysLimit != null) {
             val limitCal = Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, -daysLimit + 1) }
-            val limitStr = sdf.format(limitCal.time)
+            val limitStr = DateFormatterCache.formatIsoDate(limitCal.timeInMillis)
             studySessions.filter { it.date >= limitStr }
         } else {
             studySessions
@@ -82,8 +80,8 @@ object AnalyticsEngine {
         val priorSessions = if (daysLimit != null) {
             val startPrior = Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, -2 * daysLimit + 1) }
             val endPrior = Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, -daysLimit) }
-            val startStr = sdf.format(startPrior.time)
-            val endStr = sdf.format(endPrior.time)
+            val startStr = DateFormatterCache.formatIsoDate(startPrior.timeInMillis)
+            val endStr = DateFormatterCache.formatIsoDate(endPrior.timeInMillis)
             studySessions.filter { it.date in startStr..endStr }
         } else {
             emptyList()
@@ -109,17 +107,17 @@ object AnalyticsEngine {
             0
         }
 
-
-        // Circadian Time-of-Day Distribution
+        // Circadian Time-of-Day Distribution (Single reusable Calendar)
         var morningMins = 0
         var afternoonMins = 0
         var eveningMins = 0
         var nightMins = 0
         val hourlyMins = IntArray(24)
+        val reusableCal = Calendar.getInstance()
 
         filteredSessions.forEach { s ->
-            val cal = Calendar.getInstance().apply { timeInMillis = s.timestamp }
-            val hour = cal.get(Calendar.HOUR_OF_DAY)
+            reusableCal.timeInMillis = s.timestamp
+            val hour = reusableCal.get(Calendar.HOUR_OF_DAY)
             hourlyMins[hour] += s.minutes
 
             when (hour) {
@@ -185,7 +183,7 @@ object AnalyticsEngine {
             val lastDateStr = lastDatePerSubject[name]
             var daysAgo = 0
             if (lastDateStr != null) {
-                val d = sdf.parse(lastDateStr)
+                val d = DateFormatterCache.parseIsoDate(lastDateStr)
                 if (d != null) {
                     daysAgo = max(0, ((todayTime - d.time) / (24 * 3600 * 1000)).toInt())
                 }

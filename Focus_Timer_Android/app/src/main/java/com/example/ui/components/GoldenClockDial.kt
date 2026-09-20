@@ -39,7 +39,7 @@ fun GoldenClockDial(
     LaunchedEffect(Unit) {
         while (true) {
             currentMillis = System.currentTimeMillis()
-            delay(50L) // smooth 20 FPS updates for sweeping second hand
+            delay(100L) // 10 FPS is buttery smooth and saves battery/CPU
         }
     }
 
@@ -55,6 +55,38 @@ fun GoldenClockDial(
     val sweepMinute = minute + sweepSecond / 60f
     val sweepHour = hour + sweepMinute / 60f
 
+    // Cached paints
+    val textPaint = remember {
+        Paint().apply {
+            color = android.graphics.Color.parseColor("#E6C875")
+            textAlign = Paint.Align.CENTER
+            typeface = Typeface.create(Typeface.SERIF, Typeface.BOLD)
+            isAntiAlias = true
+        }
+    }
+
+    val brandPaint = remember {
+        Paint().apply {
+            color = android.graphics.Color.parseColor("#C9962F")
+            textAlign = Paint.Align.CENTER
+            letterSpacing = 0.2f
+            typeface = Typeface.create(Typeface.SERIF, Typeface.BOLD)
+            isAntiAlias = true
+        }
+    }
+
+    val subBrandPaint = remember {
+        Paint().apply {
+            color = android.graphics.Color.parseColor("#A89F8B")
+            textAlign = Paint.Align.CENTER
+            letterSpacing = 0.3f
+            typeface = Typeface.create(Typeface.SANS_SERIF, Typeface.NORMAL)
+            isAntiAlias = true
+        }
+    }
+
+    val numbers = remember { listOf(12, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11) }
+
     Box(
         modifier = modifier.size(dialSize),
         contentAlignment = Alignment.Center
@@ -62,6 +94,11 @@ fun GoldenClockDial(
         Canvas(modifier = Modifier.fillMaxSize()) {
             val center = Offset(size.width / 2f, size.height / 2f)
             val radius = size.minDimension / 2f - 8.dp.toPx()
+
+            // Update text sizes based on density
+            textPaint.textSize = 12.dp.toPx()
+            brandPaint.textSize = 10.dp.toPx()
+            subBrandPaint.textSize = 6.5.dp.toPx()
 
             // 1. Dial Base Gradient Ring (Outer Rim)
             val outerBezelBrush = Brush.sweepGradient(
@@ -142,15 +179,6 @@ fun GoldenClockDial(
 
             // Draw Numerals (12, 1, 2... 11)
             val textRadius = radius - 26.dp.toPx()
-            val textPaint = Paint().apply {
-                color = android.graphics.Color.parseColor("#E6C875")
-                textSize = 12.dp.toPx()
-                textAlign = Paint.Align.CENTER
-                typeface = Typeface.create(Typeface.SERIF, Typeface.BOLD)
-                isAntiAlias = true
-            }
-
-            val numbers = listOf(12, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11)
             drawIntoCanvas { canvas ->
                 numbers.forEachIndexed { index, num ->
                     val angleRad = Math.toRadians((index * 30 - 90).toDouble())
@@ -160,24 +188,7 @@ fun GoldenClockDial(
                 }
 
                 // Brand text inside dial
-                val brandPaint = Paint().apply {
-                    color = android.graphics.Color.parseColor("#C9962F")
-                    textSize = 10.dp.toPx()
-                    textAlign = Paint.Align.CENTER
-                    letterSpacing = 0.2f
-                    typeface = Typeface.create(Typeface.SERIF, Typeface.BOLD)
-                    isAntiAlias = true
-                }
                 canvas.nativeCanvas.drawText("FOCUS", center.x, center.y - 28.dp.toPx(), brandPaint)
-
-                val subBrandPaint = Paint().apply {
-                    color = android.graphics.Color.parseColor("#A89F8B")
-                    textSize = 6.5.dp.toPx()
-                    textAlign = Paint.Align.CENTER
-                    letterSpacing = 0.3f
-                    typeface = Typeface.create(Typeface.SANS_SERIF, Typeface.NORMAL)
-                    isAntiAlias = true
-                }
                 canvas.nativeCanvas.drawText("LEGENDARY", center.x, center.y - 18.dp.toPx(), subBrandPaint)
             }
 

@@ -199,19 +199,44 @@ class FirebaseSyncManager(
             } else {
                 Result.failure(Exception("Unsupported credential type"))
             }
-        } catch (e: GetCredentialException) {
+        } catch (e: androidx.credentials.exceptions.NoCredentialException) {
+            val msg = "No Google account found on device. Please add a Google account in Android Settings or configure SHA-1 in Firebase Console."
+            Log.e(TAG, "NoCredentialException: ${e.message}")
+            _syncStatus.value = "No Google account found"
+            Result.failure(Exception(msg, e))
+        } catch (e: androidx.credentials.exceptions.GetCredentialCancellationException) {
             _syncStatus.value = "Sign-in cancelled"
             Result.failure(e)
+        } catch (e: GetCredentialException) {
+            val msg = "Credential error (${e::class.simpleName}): ${e.message}"
+            Log.e(TAG, msg, e)
+            _syncStatus.value = "Sign-in failed"
+            Result.failure(Exception(msg, e))
         } catch (e: Exception) {
-            Log.e(TAG, "Google Sign-In failed: ${e.message}")
-            _syncStatus.value = "Sign-in error"
+            Log.e(TAG, "Google Sign-In failed: ${e.message}", e)
+            _syncStatus.value = "Sign-in error: ${e.message}"
             Result.failure(e)
         }
     }
 
-    suspend fun uploadSession(session: StudySessionEntity) {
+    suspend fun uploadSession(session: StudySessionEntity, previousIsNonStudy: Boolean? = null) {
         val user = auth.currentUser ?: return
         try {
+            // If category flipped (Study <-> NonStudy), remove from previous collection first
+            if (previousIsNonStudy != null && previousIsNonStudy != session.isNonStudy) {
+                val oldCol = if (previousIsNonStudy) "nonStudySessions" else "sessions"
+                try {
+                    val oldDocRef = firestore.collection("users").document(user.uid).collection(oldCol).document(session.timestamp.toString())
+                    oldDocRef.delete().await()
+                    val querySnap = firestore.collection("users").document(user.uid).collection(oldCol).whereEqualTo("ts", session.timestamp).get().await()
+                    for (doc in querySnap.documents) {
+                        doc.reference.delete().await()
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "Failed to clean old collection doc: ${e.message}")
+                }
+            }
+
             val collectionName = if (session.isNonStudy) "nonStudySessions" else "sessions"
             val data = hashMapOf(
                 "date" to session.date,
@@ -391,9 +416,13 @@ class FirebaseSyncManager(
         changes: List<DocumentChange>,
         isNonStudy: Boolean
     ) {
+        if (changes.isEmpty()) return
         try {
             val localSessions = studyDao.getAllSessions().first()
-            val localTsSet = localSessions.map { it.timestamp }.toSet()
+            val localTsMap = localSessions.associateBy { it.timestamp }
+
+            val sessionsToInsert = mutableListOf<StudySessionEntity>()
+            val timestampsToDelete = mutableListOf<Long>()
 
             for (change in changes) {
                 val doc = change.document
@@ -401,19 +430,20 @@ class FirebaseSyncManager(
 
                 when (change.type) {
                     DocumentChange.Type.REMOVED -> {
-                        studyDao.deleteSessionByTimestamp(ts)
-                        Log.d(TAG, "Removed session $ts locally per cloud sync")
+                        timestampsToDelete.add(ts)
                     }
                     DocumentChange.Type.ADDED, DocumentChange.Type.MODIFIED -> {
-                        if (!localTsSet.contains(ts)) {
-                            val date = doc.getString("date") ?: ""
-                            val subject = doc.getString("subject") ?: "General"
-                            val subSubject = doc.getString("subSubject").takeIf { !it.isNullOrBlank() }
-                            val workType = doc.getString("workType") ?: "Other"
-                            val minutes = doc.getLong("minutes")?.toInt() ?: 0
+                        val existing = localTsMap[ts]
+                        val date = doc.getString("date") ?: ""
+                        val subject = doc.getString("subject") ?: "General"
+                        val subSubject = doc.getString("subSubject").takeIf { !it.isNullOrBlank() }
+                        val workType = doc.getString("workType") ?: "Other"
+                        val minutes = doc.getLong("minutes")?.toInt() ?: 0
 
-                            studyDao.insertSession(
+                        if (existing == null || existing.minutes != minutes || existing.subject != subject || existing.workType != workType || existing.isNonStudy != isNonStudy) {
+                            sessionsToInsert.add(
                                 StudySessionEntity(
+                                    id = existing?.id ?: 0L,
                                     date = date,
                                     subject = subject,
                                     subSubject = subSubject,
@@ -426,6 +456,17 @@ class FirebaseSyncManager(
                         }
                     }
                 }
+            }
+
+            // Batch deletions
+            for (ts in timestampsToDelete) {
+                studyDao.deleteSessionByTimestamp(ts)
+            }
+
+            // Single batch insert to prevent multiple UI flow invalidations
+            if (sessionsToInsert.isNotEmpty()) {
+                studyDao.insertSessions(sessionsToInsert)
+                Log.d(TAG, "Batch synced ${sessionsToInsert.size} sessions from Cloud")
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error processing session changes: ${e.message}")

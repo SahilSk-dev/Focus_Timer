@@ -2140,24 +2140,56 @@ function getExportSessions(){
 // Note: b2eSubject, b2eWorkType, and toBanglish are defined in the Translation & PDF section above.
 
 
+const translationCache = new Map();
+
 async function translateBatch(strings) {
   if (!strings || strings.length === 0) return {};
-  const query = strings.join(' ||| ');
+  
+  const needingTranslation = [];
+  const resultMap = {};
+
+  strings.forEach(s => {
+    if (!s) return;
+    if (translationCache.has(s)) {
+      resultMap[s] = translationCache.get(s);
+    } else if (/[\u0980-\u09FF]/.test(s)) {
+      needingTranslation.push(s);
+    } else {
+      // String contains no Bengali characters - return identity immediately (0 ms)
+      resultMap[s] = s;
+      translationCache.set(s, s);
+    }
+  });
+
+  if (needingTranslation.length === 0) {
+    return resultMap;
+  }
+
+  const query = needingTranslation.join(' ||| ');
   const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=bn&tl=en&dt=t&q=${encodeURIComponent(query)}`;
   try {
-    const res = await fetch(url);
+    const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    const timeoutId = controller ? setTimeout(() => controller.abort(), 1500) : null;
+    const res = await fetch(url, controller ? { signal: controller.signal } : {});
+    if (timeoutId) clearTimeout(timeoutId);
     const json = await res.json();
     let translated = '';
     json[0].forEach(part => translated += part[0]);
     const translatedParts = translated.split('|||').map(s => s.trim());
-    const resultMap = {};
-    strings.forEach((s, i) => { resultMap[s] = translatedParts[i] || s; });
+    needingTranslation.forEach((s, i) => {
+      const val = translatedParts[i] || toBanglish(s);
+      resultMap[s] = val;
+      translationCache.set(s, val);
+    });
     return resultMap;
   } catch(e) {
-    console.error('Translation API failed:', e);
-    const fallbackMap = {};
-    strings.forEach(s => fallbackMap[s] = toBanglish(s));
-    return fallbackMap;
+    console.warn('Translation API skipped/timed out, using Banglish fallback:', e);
+    needingTranslation.forEach(s => {
+      const val = toBanglish(s);
+      resultMap[s] = val;
+      translationCache.set(s, val);
+    });
+    return resultMap;
   }
 }
 
@@ -2166,7 +2198,6 @@ document.getElementById('exportPdfBtn').addEventListener('click', async ()=>{
   if(data.length===0){ showToast('No data to export'); return; }
   
   const btn = document.getElementById('exportPdfBtn');
-  btn.textContent = 'Translating...';
   btn.disabled = true;
 
   try {
@@ -2176,6 +2207,10 @@ document.getElementById('exportPdfBtn').addEventListener('click', async ()=>{
       if (s.workType && !b2eWorkType[s.workType]) uniqueStrings.add(s.workType);
     });
     
+    // Only show "Translating..." if there are actually uncached Bengali characters
+    const hasUncachedBengali = Array.from(uniqueStrings).some(s => /[\u0980-\u09FF]/.test(s) && !translationCache.has(s));
+    btn.textContent = hasUncachedBengali ? 'Translating...' : 'Preparing...';
+
     const translationMap = await translateBatch(Array.from(uniqueStrings));
     
     function getEn(str, isSubject) {
@@ -2223,8 +2258,12 @@ document.getElementById('exportPdfBtn').addEventListener('click', async ()=>{
       const isNS = s.isNonStudy || (s.id && String(s.id).startsWith('ns')) ? 'Non-Study' : 'Study';
       const timeRange = s.ts ? formatTimeRangeOnlyTime(s.ts, s.minutes) : '-';
       return [
-        s.date, timeRange, getEn(s.subject, true), 
-        getEn(s.workType || 'N/A', false), `${s.minutes} min`, isNS
+        cleanPdfText(s.date),
+        cleanPdfText(timeRange),
+        cleanPdfText(getEn(s.subject, true)), 
+        cleanPdfText(getEn(s.workType || 'N/A', false)),
+        `${s.minutes} min`,
+        isNS
       ];
     });
 
@@ -2343,9 +2382,26 @@ document.getElementById('restoreFileInput').addEventListener('change', (e)=>{
   e.target.value = ''; 
 });
 
-/* ---------- refresh everything ---------- */
-async function refreshEverything(){
-  renderTarget(); renderLevel(); renderCompare(); renderStats(); renderStreak(); renderMilestoneBadges(); renderDeepAnalytics(); renderHeatmap(); renderHistory(); renderSubjectAnalytics();
+/* ---------- refresh everything (debounced via requestAnimationFrame for 60fps performance) ---------- */
+let refreshRafId = null;
+function refreshEverything(){
+  if (refreshRafId) cancelAnimationFrame(refreshRafId);
+  return new Promise(resolve => {
+    refreshRafId = requestAnimationFrame(() => {
+      refreshRafId = null;
+      renderTarget();
+      renderLevel();
+      renderCompare();
+      renderStats();
+      renderStreak();
+      renderMilestoneBadges();
+      renderDeepAnalytics();
+      renderHeatmap();
+      renderHistory();
+      renderSubjectAnalytics();
+      resolve();
+    });
+  });
 }
 
 /* ---------- init / resume timer across reload (local only) ---------- */

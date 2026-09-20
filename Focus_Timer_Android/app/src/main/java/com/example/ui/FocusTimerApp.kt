@@ -393,19 +393,77 @@ fun FocusTimerApp(
     // Edit/Delete Subject Dialog
     if (editSubjectTarget != null) {
         val (name, id) = editSubjectTarget!!
+        val allSubjs by viewModel.allSubjects.collectAsState()
+        val currentSubj = allSubjs.find { it.id == id }
+        var editName by remember(editSubjectTarget) { mutableStateOf(currentSubj?.name ?: name) }
+        var editIsCore by remember(editSubjectTarget) { mutableStateOf(currentSubj?.isCore ?: false) }
+        var editIsNonStudy by remember(editSubjectTarget) { mutableStateOf(currentSubj?.isNonStudy ?: false) }
+
         AlertDialog(
             onDismissRequest = { editSubjectTarget = null },
-            title = { Text("Edit Subject: $name", color = GoldBright) },
-            text = { Text("Do you want to delete this custom subject?", color = TextPrimary) },
+            title = { Text("Edit Subject", color = GoldBright) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    OutlinedTextField(
+                        value = editName,
+                        onValueChange = { editName = it },
+                        label = { Text("Subject Name", color = TextDim) },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = GoldAccent,
+                            unfocusedBorderColor = LineBorder,
+                            focusedTextColor = TextPrimary,
+                            unfocusedTextColor = TextPrimary
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(
+                            checked = editIsCore,
+                            onCheckedChange = { editIsCore = it },
+                            colors = CheckboxDefaults.colors(checkedColor = GoldAccent)
+                        )
+                        Text("Core Subject", color = TextPrimary, fontSize = 13.sp)
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(
+                            checked = editIsNonStudy,
+                            onCheckedChange = { editIsNonStudy = it },
+                            colors = CheckboxDefaults.colors(checkedColor = GoldAccent)
+                        )
+                        Text("Non-Study (Personal/Excluded from Goals)", color = TextPrimary, fontSize = 13.sp)
+                    }
+                }
+            },
             confirmButton = {
-                Button(
-                    onClick = {
-                        viewModel.deleteSubject(id)
-                        editSubjectTarget = null
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = DangerRed)
-                ) {
-                    Text("Delete")
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (currentSubj?.isCore == false) {
+                        Button(
+                            onClick = {
+                                viewModel.deleteSubject(id)
+                                editSubjectTarget = null
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = DangerRed)
+                        ) {
+                            Text("Delete")
+                        }
+                    }
+                    Button(
+                        onClick = {
+                            if (editName.isNotBlank() && currentSubj != null) {
+                                viewModel.updateSubject(
+                                    currentSubj.copy(
+                                        name = editName.trim(),
+                                        isCore = editIsCore,
+                                        isNonStudy = editIsNonStudy
+                                    )
+                                )
+                            }
+                            editSubjectTarget = null
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = GoldAccent, contentColor = BgDark)
+                    ) {
+                        Text("Save")
+                    }
                 }
             },
             dismissButton = {

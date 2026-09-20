@@ -11,7 +11,7 @@ import com.example.data.model.WorkTypeEntity
 
 @Database(
     entities = [StudySessionEntity::class, SubjectEntity::class, WorkTypeEntity::class],
-    version = 2,
+    version = 3,
     exportSchema = false
 )
 @TypeConverters(Converters::class)

@@ -48,12 +48,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.TextStyle
@@ -81,6 +83,8 @@ import com.example.util.AnalyticsReport
 import com.example.util.AnalyticsTimeframe
 import com.example.util.PdfExportHelper
 import com.example.viewmodel.FocusViewModel
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
@@ -120,10 +124,17 @@ fun StatsScreen(
     val todayStr = remember { FocusRepository.getTodayString() }
     val studySessions = remember(allSessions) { allSessions.filter { !it.isNonStudy } }
 
-    // Day Streak calculation
-    val (currentStreak, bestStreak) = remember(studySessions) {
-        calculateStreaks(studySessions)
+    // Day Streak calculation (Computed asynchronously on Dispatchers.Default)
+    val streakPair by produceState(
+        initialValue = calculateStreaks(studySessions),
+        studySessions
+    ) {
+        value = withContext(Dispatchers.Default) {
+            calculateStreaks(studySessions)
+        }
     }
+    val currentStreak = streakPair.first
+    val bestStreak = streakPair.second
 
     // Daily Target progress
     val todayDoneMinutes = remember(studySessions, todayStr) {
@@ -141,19 +152,34 @@ fun StatsScreen(
     val currentXp = remember(totalStudyMinutes) { totalStudyMinutes % xpPerLevel }
     val xpPct = remember(currentXp) { ((currentXp.toFloat() / xpPerLevel) * 100).toInt().coerceIn(0, 100) }
 
-    // Week comparison
-    val weekComparison = remember(studySessions) {
-        calculateWeekComparison(studySessions)
+    // Week comparison (Computed asynchronously on Dispatchers.Default)
+    val weekComparison by produceState(
+        initialValue = calculateWeekComparison(studySessions),
+        studySessions
+    ) {
+        value = withContext(Dispatchers.Default) {
+            calculateWeekComparison(studySessions)
+        }
     }
 
-    // Last 7 days ranking
-    val rankingList = remember(studySessions) {
-        calculate7DaysRanking(studySessions)
+    // Last 7 days ranking (Computed asynchronously on Dispatchers.Default)
+    val rankingList by produceState(
+        initialValue = calculate7DaysRanking(studySessions),
+        studySessions
+    ) {
+        value = withContext(Dispatchers.Default) {
+            calculate7DaysRanking(studySessions)
+        }
     }
 
-    // Milestone Badges calculation
-    val allBadges = remember(studySessions, currentStreak, bestStreak, totalStudyMinutes) {
-        calculateMilestoneBadges(studySessions, currentStreak, bestStreak, totalStudyMinutes)
+    // Milestone Badges calculation (Computed asynchronously on Dispatchers.Default)
+    val allBadges by produceState(
+        initialValue = calculateMilestoneBadges(studySessions, currentStreak, bestStreak, totalStudyMinutes),
+        studySessions, currentStreak, bestStreak, totalStudyMinutes
+    ) {
+        value = withContext(Dispatchers.Default) {
+            calculateMilestoneBadges(studySessions, currentStreak, bestStreak, totalStudyMinutes)
+        }
     }
     val unlockedBadgeCount = remember(allBadges) { allBadges.count { it.isUnlocked } }
     val displayedBadges = remember(allBadges, badgeFilter) {
@@ -164,10 +190,15 @@ fun StatsScreen(
         }
     }
 
-    // Cognitive Deep Analysis Engine computation
+    // Cognitive Deep Analysis Engine computation (Computed asynchronously on Dispatchers.Default)
     var analyticsTimeframe by remember { mutableStateOf(AnalyticsTimeframe.LAST_7_DAYS) }
-    val analyticsReport = remember(studySessions, analyticsTimeframe) {
-        AnalyticsEngine.computeReport(studySessions, analyticsTimeframe)
+    val analyticsReport by produceState(
+        initialValue = AnalyticsEngine.computeReport(studySessions, analyticsTimeframe),
+        studySessions, analyticsTimeframe
+    ) {
+        value = withContext(Dispatchers.Default) {
+            AnalyticsEngine.computeReport(studySessions, analyticsTimeframe)
+        }
     }
 
     Column(
@@ -470,7 +501,12 @@ fun StatsScreen(
             onTimeframeSelected = { analyticsTimeframe = it },
             onExportPdf = {
                 try {
-                    PdfExportHelper.generateAndShareAnalysisPdf(context, analyticsReport)
+                    PdfExportHelper.generateAndShareAnalysisPdf(
+                        context = context,
+                        report = analyticsReport,
+                        currentStreak = currentStreak,
+                        bestStreak = bestStreak
+                    )
                 } catch (e: Exception) {
                     viewModel.showToast("Analysis PDF failed: ${e.localizedMessage}")
                 }
@@ -791,7 +827,7 @@ fun StatsScreen(
                                 .fillMaxWidth(pct / 100f)
                                 .height(8.dp)
                                 .clip(RoundedCornerShape(4.dp))
-                                .background(if (badge.isUnlocked) GoldGradientBrush else SuccessGreen)
+                                .background(if (badge.isUnlocked) GoldGradientBrush else SolidColor(SuccessGreen))
                         )
                     }
 
@@ -1055,7 +1091,7 @@ private fun BadgeCard(
                         .fillMaxWidth(pct / 100f)
                         .height(4.dp)
                         .clip(RoundedCornerShape(2.dp))
-                        .background(if (badge.isUnlocked) GoldGradientBrush else SuccessGreen)
+                        .background(if (badge.isUnlocked) GoldGradientBrush else SolidColor(SuccessGreen))
                 )
             }
 
@@ -1301,12 +1337,12 @@ private fun calculateMilestoneBadges(
 
 private fun getLast7Days(): List<DayInfo> {
     val list = mutableListOf<DayInfo>()
-    val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
     val dayNames = listOf("Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat")
+    val cal = Calendar.getInstance()
     for (i in 6 downTo 0) {
-        val cal = Calendar.getInstance()
+        cal.timeInMillis = System.currentTimeMillis()
         cal.add(Calendar.DAY_OF_YEAR, -i)
-        val dStr = sdf.format(cal.time)
+        val dStr = com.example.util.DateFormatterCache.formatIsoDate(cal.timeInMillis)
         val dayIndex = cal.get(Calendar.DAY_OF_WEEK) - 1
         list.add(DayInfo(dStr, dayNames.getOrElse(dayIndex) { "" }))
     }
@@ -1318,15 +1354,14 @@ private fun calculateStreaks(sessions: List<StudySessionEntity>): Pair<Int, Int>
     if (uniqueDates.isEmpty()) return 0 to 0
 
     val dateSet = uniqueDates.toSet()
-    val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+    val cal = Calendar.getInstance()
 
     // Current streak
     var current = 0
-    val cal = Calendar.getInstance()
-    if (!dateSet.contains(sdf.format(cal.time))) {
+    if (!dateSet.contains(com.example.util.DateFormatterCache.formatIsoDate(cal.timeInMillis))) {
         cal.add(Calendar.DAY_OF_YEAR, -1)
     }
-    while (dateSet.contains(sdf.format(cal.time))) {
+    while (dateSet.contains(com.example.util.DateFormatterCache.formatIsoDate(cal.timeInMillis))) {
         current++
         cal.add(Calendar.DAY_OF_YEAR, -1)
     }
@@ -1335,8 +1370,8 @@ private fun calculateStreaks(sessions: List<StudySessionEntity>): Pair<Int, Int>
     var best = 1
     var run = 1
     for (i in 1 until uniqueDates.size) {
-        val d1 = sdf.parse(uniqueDates[i - 1]) ?: continue
-        val d2 = sdf.parse(uniqueDates[i]) ?: continue
+        val d1 = com.example.util.DateFormatterCache.parseIsoDate(uniqueDates[i - 1]) ?: continue
+        val d2 = com.example.util.DateFormatterCache.parseIsoDate(uniqueDates[i]) ?: continue
         val diffDays = (d2.time - d1.time) / (24 * 3600 * 1000)
         if (diffDays == 1L) {
             run++
@@ -1350,16 +1385,17 @@ private fun calculateStreaks(sessions: List<StudySessionEntity>): Pair<Int, Int>
 }
 
 private fun calculateWeekComparison(sessions: List<StudySessionEntity>): String {
-    val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+    val cal = Calendar.getInstance()
+    val now = System.currentTimeMillis()
     val thisWeekDays = (0..6).map {
-        val c = Calendar.getInstance()
-        c.add(Calendar.DAY_OF_YEAR, -it)
-        sdf.format(c.time)
+        cal.timeInMillis = now
+        cal.add(Calendar.DAY_OF_YEAR, -it)
+        com.example.util.DateFormatterCache.formatIsoDate(cal.timeInMillis)
     }.toSet()
     val lastWeekDays = (7..13).map {
-        val c = Calendar.getInstance()
-        c.add(Calendar.DAY_OF_YEAR, -it)
-        sdf.format(c.time)
+        cal.timeInMillis = now
+        cal.add(Calendar.DAY_OF_YEAR, -it)
+        com.example.util.DateFormatterCache.formatIsoDate(cal.timeInMillis)
     }.toSet()
 
     val thisWeek = sessions.filter { it.date in thisWeekDays }.sumOf { it.minutes }
@@ -1377,8 +1413,7 @@ private fun calculateWeekComparison(sessions: List<StudySessionEntity>): String 
 private fun calculate7DaysRanking(sessions: List<StudySessionEntity>): List<RankItem> {
     val cal = Calendar.getInstance()
     cal.add(Calendar.DAY_OF_YEAR, -7)
-    val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
-    val sevenDaysAgoStr = sdf.format(cal.time)
+    val sevenDaysAgoStr = com.example.util.DateFormatterCache.formatIsoDate(cal.timeInMillis)
 
     val recent = sessions.filter { it.date >= sevenDaysAgoStr }
     val map = mutableMapOf<String, Int>()
@@ -1409,7 +1444,7 @@ private fun DeepAnalysisEngineSection(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Column {
+                Column(modifier = Modifier.weight(1f).padding(end = 10.dp)) {
                     Text(
                         text = "🧠 Deep Analysis Engine",
                         style = TextStyle(
@@ -1418,32 +1453,34 @@ private fun DeepAnalysisEngineSection(
                             fontWeight = FontWeight.Bold
                         )
                     )
+                    Spacer(modifier = Modifier.height(2.dp))
                     Text(
-                        text = "Cognitive habits, biological rhythm & stamina",
+                        text = "Cognitive habits, rhythm & stamina",
                         color = TextDim,
-                        fontSize = 11.sp
+                        fontSize = 11.sp,
+                        lineHeight = 14.sp
                     )
                 }
 
                 Surface(
-                    modifier = Modifier.clickable { onExportPdf() },
+                    onClick = { onExportPdf() },
                     shape = RoundedCornerShape(8.dp),
                     color = PanelElevated,
                     border = BorderStroke(1.dp, LineBorder)
                 ) {
                     Row(
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        horizontalArrangement = Arrangement.spacedBy(5.dp)
                     ) {
                         Icon(
                             imageVector = Icons.Default.PictureAsPdf,
-                            contentDescription = "Analysis PDF",
+                            contentDescription = "Analysis PDF Report",
                             tint = GoldLight,
-                            modifier = Modifier.size(13.dp)
+                            modifier = Modifier.size(14.dp)
                         )
                         Text(
-                            text = "Analysis PDF",
+                            text = "PDF Report",
                             color = GoldLight,
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold
@@ -1452,42 +1489,44 @@ private fun DeepAnalysisEngineSection(
                 }
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(14.dp))
 
             // Timeframe Selector Chips
             Row(
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 AnalyticsTimeframe.values().forEach { tf ->
                     val isSelected = tf == currentTimeframe
                     Box(
                         modifier = Modifier
-                            .clip(RoundedCornerShape(12.dp))
+                            .clip(RoundedCornerShape(20.dp))
                             .background(if (isSelected) GoldAccent else PanelElevated)
-                            .border(1.dp, if (isSelected) GoldAccent else LineBorder, RoundedCornerShape(12.dp))
+                            .border(1.dp, if (isSelected) GoldAccent else LineBorder, RoundedCornerShape(20.dp))
                             .clickable { onTimeframeSelected(tf) }
-                            .padding(horizontal = 10.dp, vertical = 4.dp)
+                            .padding(horizontal = 14.dp, vertical = 6.dp)
                     ) {
                         Text(
                             text = tf.label,
                             color = if (isSelected) BgDark else TextDim,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.SemiBold
+                            fontSize = 12.sp,
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
                         )
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(14.dp))
 
             // 1. Circadian Peak Focus Card
             Surface(
                 modifier = Modifier.fillMaxWidth(),
                 color = PanelElevated,
-                shape = RoundedCornerShape(10.dp),
+                shape = RoundedCornerShape(12.dp),
                 border = BorderStroke(1.dp, LineBorder)
             ) {
-                Column(modifier = Modifier.padding(12.dp)) {
+                Column(modifier = Modifier.padding(14.dp)) {
+                    val isNoStudy = report.peakFocusWindow.contains("No study", ignoreCase = true) || report.peakFocusWindow.contains("N/A", ignoreCase = true)
+                    
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -1497,19 +1536,25 @@ private fun DeepAnalysisEngineSection(
                             text = "🌅 Circadian Peak Focus",
                             color = TextPrimary,
                             fontSize = 13.sp,
-                            fontWeight = FontWeight.Bold
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.weight(1f, fill = false)
                         )
-                        Box(
-                            modifier = Modifier
-                                .background(GoldAccent.copy(alpha = 0.15f), RoundedCornerShape(4.dp))
-                                .border(1.dp, GoldAccent, RoundedCornerShape(4.dp))
-                                .padding(horizontal = 6.dp, vertical = 2.dp)
+
+                        Spacer(modifier = Modifier.width(8.dp))
+
+                        Surface(
+                            shape = RoundedCornerShape(6.dp),
+                            color = if (isNoStudy) PanelDark else Color(0xFF2E2718),
+                            border = BorderStroke(1.dp, if (isNoStudy) LineBorder else GoldAccent.copy(alpha = 0.5f))
                         ) {
                             Text(
-                                text = "Peak: ${report.peakFocusWindow}",
-                                color = GoldBright,
+                                text = if (isNoStudy) "No Study Data" else "Peak: ${report.peakFocusWindow}",
+                                color = if (isNoStudy) TextDim else GoldBright,
                                 fontSize = 10.sp,
-                                fontWeight = FontWeight.Bold
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
                             )
                         }
                     }
@@ -1685,51 +1730,6 @@ private fun DeepAnalysisEngineSection(
                                         fontWeight = FontWeight.Medium
                                     )
                                 }
-                            }
-                        }
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(10.dp))
-
-            // 4. Smart Diagnostic Insights Card
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                color = PanelElevated,
-                shape = RoundedCornerShape(10.dp),
-                border = BorderStroke(1.dp, LineBorder)
-            ) {
-                Column(modifier = Modifier.padding(12.dp)) {
-                    Text(
-                        text = "💡 Diagnostic Observations",
-                        color = TextPrimary,
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    report.smartInsights.forEach { insight ->
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 4.dp),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Text(text = insight.icon, fontSize = 14.sp)
-                            Column {
-                                Text(
-                                    text = insight.title,
-                                    color = GoldBright,
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
-                                Text(
-                                    text = insight.description,
-                                    color = TextDim,
-                                    fontSize = 11.sp,
-                                    lineHeight = 15.sp
-                                )
                             }
                         }
                     }
