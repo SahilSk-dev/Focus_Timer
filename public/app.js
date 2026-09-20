@@ -98,7 +98,40 @@ let prefs = { dailyTarget: 120, subjects: [], workTypes: [] };
 let unsubSessions = null;
 let unsubNonStudySessions = null;
 
-/* ---------- data layer ---------- */
+/* ---------- data layer & deduplication ---------- */
+function deduplicateSessions(rawList) {
+  if (!Array.isArray(rawList)) return [];
+  const map = new Map();
+  rawList.forEach(s => {
+    if (!s) return;
+    const date = s.date || '';
+    const subj = (s.subject || '').trim().toLowerCase();
+    const mins = Math.max(0, Math.round(Number(s.minutes)) || 0);
+    const numTs = Number(s.ts || s.timestamp || 0);
+
+    let key;
+    if (numTs > 0) {
+      // 2-minute bucket (120,000ms) to cleanly collapse any sync duplicates or skews of the same session
+      const bucket = Math.round(numTs / 120000);
+      key = `${date}|${subj}|${mins}|${bucket}`;
+    } else {
+      const work = (s.workType || '').trim().toLowerCase();
+      key = `${date}|${subj}|${mins}|${work}|${s.id || ''}`;
+    }
+
+    if (!map.has(key)) {
+      map.set(key, s);
+    } else {
+      const prev = map.get(key);
+      // Prefer record with valid numeric timestamp ID or explicit ts field
+      if ((!prev.ts && s.ts) || (s.id && !isNaN(Number(s.id)))) {
+        map.set(key, s);
+      }
+    }
+  });
+  return Array.from(map.values());
+}
+
 async function loadAll(){
   if(currentUser){
     const q = collection(db, 'users', currentUser.uid, 'sessions');
@@ -106,12 +139,7 @@ async function loadAll(){
     if (unsubSessions) unsubSessions();
     unsubSessions = onSnapshot(q, (snap) => {
       const raw = snap.docs.map(d => ({ id:d.id, ...d.data() }));
-      const byTs = new Map();
-      raw.forEach(s => {
-        const key = s.ts || s.timestamp || s.id;
-        if (!byTs.has(key)) byTs.set(key, s);
-      });
-      sessions = Array.from(byTs.values());
+      sessions = deduplicateSessions(raw);
       refreshEverything();
     });
 
@@ -119,20 +147,15 @@ async function loadAll(){
     if (unsubNonStudySessions) unsubNonStudySessions();
     unsubNonStudySessions = onSnapshot(qNS, (snap) => {
       const raw = snap.docs.map(d => ({ id:d.id, ...d.data(), isNonStudy: true }));
-      const byTs = new Map();
-      raw.forEach(s => {
-        const key = s.ts || s.timestamp || s.id;
-        if (!byTs.has(key)) byTs.set(key, s);
-      });
-      nonStudySessions = Array.from(byTs.values());
+      nonStudySessions = deduplicateSessions(raw);
       refreshEverything();
     });
 
     const prefSnap = await getDoc(doc(db,'users',currentUser.uid,'meta','prefs'));
     prefs = prefSnap.exists() ? prefSnap.data() : { dailyTarget:120, subjects: [...DEFAULT_SUBJECTS], workTypes: [...DEFAULT_WORK_TYPES] };
   } else {
-    sessions = localGet(LS_SESSIONS, []);
-    nonStudySessions = localGet('st_nonstudy_sessions', []).map(s => ({ ...s, isNonStudy: true }));
+    sessions = deduplicateSessions(localGet(LS_SESSIONS, []));
+    nonStudySessions = deduplicateSessions(localGet('st_nonstudy_sessions', []).map(s => ({ ...s, isNonStudy: true })));
     prefs = localGet(LS_PREFS, { dailyTarget:120, subjects: [...DEFAULT_SUBJECTS], workTypes: [...DEFAULT_WORK_TYPES] });
   }
 
@@ -1453,6 +1476,8 @@ function cleanPdfText(str) {
   s = s.replace(/⚖️?/g, '[Equilibrium]');
   s = s.replace(/📈/g, '[Velocity]');
   s = s.replace(/💡/g, '[Insight]');
+  s = s.replace(/🎯/g, '[Goal]');
+  s = s.replace(/🔋/g, '[Recovery]');
   s = s.replace(/🏆/g, '[Badge]');
   s = s.replace(/🔥/g, '[Streak]');
   s = s.replace(/⚡/g, '[Focus]');
@@ -2169,7 +2194,7 @@ function drawPdfRadarChart(doc, cx, cy, radius, subjectEquilibrium) {
 }
 
 function computeAnalyticsReport(period) {
-  const allStudy = sessions.filter(s => !s.isNonStudy);
+  const allStudy = deduplicateSessions(sessions.filter(s => !s.isNonStudy));
   let filtered = allStudy;
   let priorSessions = [];
 
@@ -2373,8 +2398,16 @@ function computeAnalyticsReport(period) {
   if (totalMinutes > 0) {
     let peakBucket = Object.values(circadianBuckets).sort((a, b) => b.mins - a.mins)[0];
     const bucketPct = Math.round((peakBucket.mins / totalMinutes) * 100);
+
+    // Select accurate circadian icon matching the actual peak window time of day
+    let peakIcon = '☀️';
+    if (peakStartHour >= 5 && peakStartHour < 12) peakIcon = '🌅';
+    else if (peakStartHour >= 12 && peakStartHour < 17) peakIcon = '☀️';
+    else if (peakStartHour >= 17 && peakStartHour < 22) peakIcon = '🌆';
+    else peakIcon = '🌙';
+
     smartInsights.push({
-      icon: '🌅',
+      icon: peakIcon,
       text: `<strong>Circadian Prime:</strong> Your peak focus window is <strong>${peakFocusWindow}</strong> (${bucketPct}% of study). Prioritize challenging analytical concepts during this period.`
     });
 
@@ -3004,7 +3037,15 @@ async function exportAnalysisPdf() {
 
     // 7. Cognitive Work Modality Breakdown Table
     const workRows = effectiveReport.cognitiveWorkTypes.map(w => {
-      const activeType = ['Revision', 'Practice', 'Mock Test'].includes(w.name) ? 'Active Recall / Test' : 'Content Acquisition / Notes';
+      const nameLower = (w.name || '').toLowerCase();
+      const isActiveRecall = nameLower.includes('revision') ||
+                             nameLower.includes('practice') ||
+                             nameLower.includes('mock') ||
+                             nameLower.includes('test') ||
+                             nameLower.includes('quiz') ||
+                             nameLower.includes('memoriz') ||
+                             nameLower.includes('recall');
+      const activeType = isActiveRecall ? 'Active Recall / Test' : 'Content Acquisition / Notes';
       return [cleanPdfText(w.name), `${w.mins} mins`, `${w.pct}%`, activeType];
     });
 
@@ -3040,14 +3081,22 @@ async function exportAnalysisPdf() {
     doc.addPage();
     currentY = 18;
 
-    const sessionRows = effectiveReport.filteredSessions.slice(0, 75).map(s => {
+    // Deduplicate and sort chronologically (newest sessions first)
+    const sortedAuditSessions = deduplicateSessions(effectiveReport.filteredSessions).sort((a, b) => {
+      const tsA = Number(a.ts || a.timestamp) || (new Date(a.date).getTime() || 0);
+      const tsB = Number(b.ts || b.timestamp) || (new Date(b.date).getTime() || 0);
+      if (tsB !== tsA) return tsB - tsA;
+      return (b.date || '').localeCompare(a.date || '');
+    });
+
+    const sessionRows = sortedAuditSessions.map(s => {
       const timeStr = s.ts ? formatTimeRange(s.ts, s.minutes) : s.date;
       return [s.date, cleanPdfText(timeStr), cleanPdfText(s.subject), cleanPdfText(s.workType || 'Other'), `${s.minutes}m`];
     });
 
     const auditHeader = hasHistory 
-      ? `SESSION AUDIT LOG (ALL TIME HISTORICAL SESSIONS: ${effectiveReport.sessionCount})`
-      : `SESSION AUDIT LOG (${cleanPdfText(periodLabel).toUpperCase()})`;
+      ? `SESSION AUDIT LOG (ALL TIME HISTORICAL SESSIONS: ${sortedAuditSessions.length})`
+      : `SESSION AUDIT LOG (${cleanPdfText(periodLabel).toUpperCase()}: ${sortedAuditSessions.length} SESSIONS)`;
 
     doc.autoTable({
       startY: currentY,
@@ -3194,7 +3243,7 @@ function renderHeatmap(){
 /* ---------- history ---------- */
 function renderHistory(){
   const list = document.getElementById('historyList');
-  const allSess = [...sessions, ...nonStudySessions];
+  const allSess = deduplicateSessions([...sessions, ...nonStudySessions]);
   const sorted = allSess.sort((a,b)=> (b.ts||0)-(a.ts||0)).slice(0,30);
   if(sorted.length===0){ list.innerHTML='<div class="empty-note">No sessions yet</div>'; return; }
   list.innerHTML = sorted.map(s=>{
@@ -3210,7 +3259,7 @@ function renderHistory(){
         ${safeSubject} ${badge}
         <span class="hist-meta">[${safeWorkType}] &nbsp; ${timeStr}</span>
       </div>
-      <div class="hist-right"><span class="hist-min">${Number(s.minutes) || 0} min</span><button class="del-btn" data-id="${safeId}">×</button></div>
+      <div class="hist-right"><span class="hist-min">${Number(s.minutes) || 0} min</span><button class="del-btn" data-id="${safeId}">&times;</button></div>
     </div>`;
   }).join('');
   list.querySelectorAll('.del-btn').forEach(b=>{
@@ -3225,7 +3274,7 @@ function renderHistory(){
 /* ---------- report export ---------- */
 function getExportSessions(){
   const range = document.getElementById('exportRange').value;
-  const allSess = [...sessions, ...nonStudySessions];
+  const allSess = deduplicateSessions([...sessions, ...nonStudySessions]);
   if(range === 'all') return allSess;
   if(range === 'today') {
     const today = todayStr();
