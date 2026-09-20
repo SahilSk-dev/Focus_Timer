@@ -3655,6 +3655,21 @@ document.querySelectorAll('.sidebar-nav .nav-item, .nav-item').forEach(item => {
   });
 });
 
+/* ---------- Hash Routing for Deep-linking (e.g. from Android App) ---------- */
+function handleHashRoute() {
+  const hash = (window.location.hash || '').toLowerCase().replace(/^#\/?/, '');
+  if (hash === 'stats' || hash === 'analytics' || hash === 'report') {
+    switchView('view-stats');
+  } else if (hash === 'history' || hash === 'data' || hash === 'pdf') {
+    switchView('view-history');
+  } else if (hash === 'timer') {
+    switchView('view-timer');
+  }
+}
+window.addEventListener('hashchange', handleHashRoute);
+window.addEventListener('DOMContentLoaded', handleHashRoute);
+handleHashRoute();
+
 /* ---------- Bulk Delete ---------- */
 document.getElementById('bulkDeleteBtn').addEventListener('click', async () => {
   const fromDate = document.getElementById('bulkDelFrom').value;

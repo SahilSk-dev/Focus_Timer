@@ -95,6 +95,7 @@ import com.example.data.model.SubjectEntity
 import com.example.data.model.WorkTypeEntity
 import com.example.data.repository.FocusRepository
 import com.example.util.PdfExportHelper
+import com.example.util.WebPortalHelper
 import com.example.ui.theme.ActiveTheme
 import com.example.ui.theme.AppTheme
 import com.example.ui.theme.BgDark
@@ -509,33 +510,45 @@ fun HistorySettingsScreen(
 
                             Spacer(modifier = Modifier.height(10.dp))
 
-                            // PDF Button (matches Web PDF Export)
-                            OutlinedButton(
+                            // PDF Button (Opens Web Dashboard with jsPDF-AutoTable)
+                            Button(
                                 onClick = {
-                                    val filtered = filterSessionsByRange(allSessions, exportRange)
-                                    if (filtered.isEmpty()) {
-                                        viewModel.showToast("No study sessions found in selected range")
-                                    } else {
-                                        try {
-                                            PdfExportHelper.generateAndSharePdf(context, filtered, exportRange)
-                                        } catch (e: Exception) {
-                                            viewModel.showToast("Failed to generate PDF: ${e.localizedMessage}")
-                                        }
-                                    }
+                                    WebPortalHelper.openWebHistoryReport(context)
                                 },
-                                border = BorderStroke(1.dp, LineBorder),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = GoldAccent,
+                                    contentColor = BgDark
+                                ),
                                 shape = RoundedCornerShape(8.dp),
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .height(44.dp)
                             ) {
-                                Text(
-                                    text = "PDF Export",
-                                    color = GoldBright,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 14.sp
-                                )
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.PictureAsPdf,
+                                        contentDescription = null,
+                                        tint = BgDark,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Text(
+                                        text = "Generate PDF Report (Web) ↗",
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 13.sp
+                                    )
+                                }
                             }
+
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = "💡 Generates high-resolution multi-page PDF tables with auto-pagination on Web",
+                                color = TextDim,
+                                fontSize = 11.sp,
+                                modifier = Modifier.padding(horizontal = 2.dp)
+                            )
 
                             Spacer(modifier = Modifier.height(10.dp))
 
