@@ -2106,7 +2106,7 @@ private fun ExamGoalEditDialog(
     onDismiss: () -> Unit,
     onSave: (name: String, targetDate: String, targetHours: Double, subjectScope: Set<String>) -> Unit
 ) {
-    var name by remember { mutableStateOf(currentGoal.name) }
+    var name by remember { mutableStateOf(currentGoal.examName) }
     var targetDate by remember { mutableStateOf(currentGoal.targetDate) }
     var targetHoursText by remember { mutableStateOf(currentGoal.targetHours.toString()) }
     var selectedScope by remember { mutableStateOf(currentGoal.subjectScope) }
@@ -2234,7 +2234,7 @@ private fun ExamGoalEditDialog(
                 onClick = {
                     val parsedHours = targetHoursText.toDoubleOrNull() ?: currentGoal.targetHours
                     val cleanDate = targetDate.trim().ifBlank { currentGoal.targetDate }
-                    val cleanName = name.trim().ifBlank { currentGoal.name }
+                    val cleanName = name.trim().ifBlank { currentGoal.examName }
                     onSave(cleanName, cleanDate, parsedHours, selectedScope)
                 },
                 colors = ButtonDefaults.buttonColors(containerColor = GoldAccent)
@@ -2276,7 +2276,7 @@ private fun ExamProjectionCard(
             ) {
                 Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
                     Text(
-                        text = "🎯 ${goal.name}",
+                        text = "🎯 ${goal.examName}",
                         color = TextPrimary,
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Bold,
@@ -2458,7 +2458,7 @@ private fun CognitiveFatigueCard(
                     fontWeight = FontWeight.Bold
                 )
 
-                val (tierBg, tierBorder, tierFg) = when (fatigue.classificationTier) {
+                val (tierBg, tierBorder, tierFg) = when (fatigue.fatigueTier) {
                     "OPTIMAL_RECOVERY" -> Triple(Color(0xFF064E3B), SuccessGreen, SuccessGreen)
                     "SUSTAINED_HIGH_LOAD" -> Triple(Color(0xFF78350F), Color(0xFFF59E0B), Color(0xFFFBBF24))
                     else -> Triple(Color(0xFF450A0A), Color(0xFFEF4444), Color(0xFFF87171))
