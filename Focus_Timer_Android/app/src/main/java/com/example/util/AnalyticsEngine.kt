@@ -44,6 +44,41 @@ data class SmartInsight(
     val description: String
 )
 
+data class ExamGoal(
+    val examName: String = "Target Exam / Syllabus",
+    val targetDate: String = "", // "YYYY-MM-DD"
+    val targetHours: Double = 150.0,
+    val subjectScope: Set<String> = emptySet()
+)
+
+data class ExamProjection(
+    val examName: String,
+    val targetDate: String,
+    val targetHours: Double,
+    val completedHours: Double,
+    val remainingHours: Double,
+    val daysRemaining: Int,
+    val requiredDailyHours: Double,
+    val currentDailyHours: Double,
+    val paceDeltaHours: Double,
+    val paceRatio: Double,
+    val projectedDate: String,
+    val status: String,
+    val statusBadgeText: String,
+    val statusDescription: String,
+    val subjectScope: Set<String>
+)
+
+data class FatigueReport(
+    val fatigueScore: Int = 0,
+    val fatigueTier: String = "OPTIMAL_RECOVERY",
+    val tierLabel: String = "Optimal Recovery 🔋",
+    val adviceText: String = "Optimal Cognitive Recovery: High endurance reserve, ready for intensive focus blocks.",
+    val avgDailyHours7d: Double = 0.0,
+    val consecutiveHighDays: Int = 0,
+    val recoveryDaysCount: Int = 7
+)
+
 data class AnalyticsReport(
     val timeframe: AnalyticsTimeframe,
     val totalMinutes: Int,
@@ -64,7 +99,10 @@ data class AnalyticsReport(
     val focusQualityTier: String = "Fragmented Focus",
     val consistencyPct: Int = 0,
     val goalHitRate: Int = 0,
-    val pacingStability: Int = 0
+    val pacingStability: Int = 0,
+    val hourlyMins: IntArray = IntArray(24),
+    val examProjection: ExamProjection? = null,
+    val fatigueReport: FatigueReport = FatigueReport()
 ) {
     companion object {
         fun empty(timeframe: AnalyticsTimeframe = AnalyticsTimeframe.LAST_7_DAYS) = AnalyticsReport(
@@ -87,7 +125,10 @@ data class AnalyticsReport(
             focusQualityTier = "Fragmented Focus",
             consistencyPct = 0,
             goalHitRate = 0,
-            pacingStability = 0
+            pacingStability = 0,
+            hourlyMins = IntArray(24),
+            examProjection = null,
+            fatigueReport = FatigueReport()
         )
     }
 }
@@ -96,7 +137,8 @@ object AnalyticsEngine {
 
     fun computeReport(
         allSessions: List<StudySessionEntity>,
-        timeframe: AnalyticsTimeframe
+        timeframe: AnalyticsTimeframe,
+        examGoal: ExamGoal? = null
     ): AnalyticsReport {
         val studySessions = allSessions.filter { !it.isNonStudy }
         val now = Calendar.getInstance()
@@ -186,24 +228,48 @@ object AnalyticsEngine {
             0
         }
 
-        // Circadian Time-of-Day Distribution (Single reusable Calendar)
+        // Circadian Time-of-Day Distribution with exact hour-boundary splitting
+        val hourlyMins = IntArray(24)
+        val startCal = Calendar.getInstance()
+        val endCal = Calendar.getInstance()
+
+        filteredSessions.forEach { s ->
+            if (s.minutes <= 0) return@forEach
+            val endTs = s.timestamp
+            val startTs = endTs - (s.minutes.toLong() * 60000L)
+
+            startCal.timeInMillis = startTs
+            startCal.set(Calendar.MINUTE, 0)
+            startCal.set(Calendar.SECOND, 0)
+            startCal.set(Calendar.MILLISECOND, 0)
+
+            var curHourStart = startCal.timeInMillis
+            while (curHourStart < endTs) {
+                val nextHourStart = curHourStart + 3600000L
+                val overlapStart = maxOf(startTs, curHourStart)
+                val overlapEnd = minOf(endTs, nextHourStart)
+
+                if (overlapEnd > overlapStart) {
+                    endCal.timeInMillis = curHourStart
+                    val h = endCal.get(Calendar.HOUR_OF_DAY)
+                    val mins = ((overlapEnd - overlapStart) / 60000L).toInt()
+                    hourlyMins[h] += mins
+                }
+                curHourStart = nextHourStart
+            }
+        }
+
         var morningMins = 0
         var afternoonMins = 0
         var eveningMins = 0
         var nightMins = 0
-        val hourlyMins = IntArray(24)
-        val reusableCal = Calendar.getInstance()
-
-        filteredSessions.forEach { s ->
-            reusableCal.timeInMillis = s.timestamp
-            val hour = reusableCal.get(Calendar.HOUR_OF_DAY)
-            hourlyMins[hour] += s.minutes
-
-            when (hour) {
-                in 5..11 -> morningMins += s.minutes
-                in 12..16 -> afternoonMins += s.minutes
-                in 17..21 -> eveningMins += s.minutes
-                else -> nightMins += s.minutes
+        for (h in 0..23) {
+            val m = hourlyMins[h]
+            when (h) {
+                in 5..11 -> morningMins += m
+                in 12..16 -> afternoonMins += m
+                in 17..21 -> eveningMins += m
+                else -> nightMins += m
             }
         }
 
@@ -310,6 +376,170 @@ object AnalyticsEngine {
             CognitiveWorkTypeItem(type, mins, toPct(mins))
         }
 
+        // 🎯 Compute Exam / Syllabus Projection
+        val effectiveGoal = examGoal ?: ExamGoal()
+        val examName = effectiveGoal.examName.ifBlank { "Target Exam / Syllabus" }
+        val targetHours = effectiveGoal.targetHours.coerceAtLeast(1.0)
+        val targetDateStr = effectiveGoal.targetDate
+        val subjectScope = effectiveGoal.subjectScope
+
+        val scopedSessions = studySessions.filter { s ->
+            if (subjectScope.isEmpty()) true
+            else {
+                val mainSub = s.subject.split(" - ").firstOrNull() ?: s.subject
+                subjectScope.contains(mainSub) || subjectScope.contains(s.subject)
+            }
+        }
+
+        val completedMinutes = scopedSessions.sumOf { it.minutes }
+        val completedHours = completedMinutes / 60.0
+        val remainingHours = maxOf(0.0, targetHours - completedHours)
+
+        var daysRemaining = 0
+        val todayMidnight = Calendar.getInstance().apply {
+            set(Calendar.HOUR_OF_DAY, 0)
+            set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }
+        if (targetDateStr.isNotBlank()) {
+            val targetDateObj = DateFormatterCache.parseIsoDate(targetDateStr)
+            if (targetDateObj != null) {
+                val targetCal = Calendar.getInstance().apply {
+                    time = targetDateObj
+                    set(Calendar.HOUR_OF_DAY, 0)
+                    set(Calendar.MINUTE, 0)
+                    set(Calendar.SECOND, 0)
+                    set(Calendar.MILLISECOND, 0)
+                }
+                daysRemaining = Math.round((targetCal.timeInMillis - todayMidnight.timeInMillis).toDouble() / 86400000.0).toInt()
+            }
+        }
+
+        val requiredDailyHours = if (daysRemaining > 0) remainingHours / daysRemaining else 0.0
+
+        val sevenDaysAgoCal = Calendar.getInstance().apply {
+            timeInMillis = todayMidnight.timeInMillis
+            add(Calendar.DAY_OF_YEAR, -6)
+        }
+        val limit7dStr = DateFormatterCache.formatIsoDate(sevenDaysAgoCal.timeInMillis)
+        val todayIsoStr = DateFormatterCache.formatIsoDate(todayMidnight.timeInMillis)
+
+        val last7DaysScoped = scopedSessions.filter { it.date in limit7dStr..todayIsoStr }
+        val last7DaysMins = last7DaysScoped.sumOf { it.minutes }
+        val currentDailyHours = (last7DaysMins / 60.0) / 7.0 // Div by 7 calendar days
+
+        val paceDeltaHours = currentDailyHours - requiredDailyHours
+        val paceRatio = if (requiredDailyHours > 0.0) currentDailyHours / requiredDailyHours else 1.0
+
+        val (status, statusBadgeText, statusDescription) = when {
+            remainingHours <= 0.0 -> Triple("COMPLETE", "GOAL ACHIEVED 🏆", "Congratulations! You have completed 100% of your targeted syllabus hours.")
+            daysRemaining < 0 -> Triple("EXPIRED", "DEADLINE PASSED ⚠️", "The target exam date has passed. Edit the target date in settings to recalibrate.")
+            daysRemaining == 0 -> Triple("DEADLINE_TODAY", "EXAM TODAY ⏳", "Target deadline is today! Focus on high-yield formulas and active recall.")
+            paceRatio >= 1.0 -> Triple("ON_TRACK", "ON TRACK 🎯", "Velocity surplus of +${String.format(Locale.US, "%.1f", paceDeltaHours)}h/day. Syllabus will be completed on schedule.")
+            paceRatio >= 0.8 -> Triple("MINOR_DEFICIT", "MINOR DEFICIT ⚠️", "Velocity lag of ${String.format(Locale.US, "%.1f", kotlin.math.abs(paceDeltaHours))}h/day. Increase study blocks by ~${Math.round(kotlin.math.abs(paceDeltaHours) * 60)} mins/day to regain pace.")
+            else -> Triple("CRITICAL_LAG", "CRITICAL LAG 🚨", "Significant pace deficit of ${String.format(Locale.US, "%.1f", kotlin.math.abs(paceDeltaHours))}h/day. Urgent pace recalibration needed to cover remaining ${String.format(Locale.US, "%.1f", remainingHours)}h.")
+        }
+
+        val projectedDate = when {
+            remainingHours <= 0.0 -> "Completed"
+            currentDailyHours >= 0.05 -> {
+                val daysNeeded = kotlin.math.ceil(remainingHours / currentDailyHours).toInt()
+                val projCal = Calendar.getInstance().apply {
+                    timeInMillis = todayMidnight.timeInMillis
+                    add(Calendar.DAY_OF_YEAR, daysNeeded)
+                }
+                DateFormatterCache.formatIsoDate(projCal.timeInMillis)
+            }
+            else -> "Indeterminate (0h pace)"
+        }
+
+        val examProjection = ExamProjection(
+            examName = examName,
+            targetDate = targetDateStr,
+            targetHours = targetHours,
+            completedHours = completedHours,
+            remainingHours = remainingHours,
+            daysRemaining = daysRemaining,
+            requiredDailyHours = requiredDailyHours,
+            currentDailyHours = currentDailyHours,
+            paceDeltaHours = paceDeltaHours,
+            paceRatio = paceRatio,
+            projectedDate = projectedDate,
+            status = status,
+            statusBadgeText = statusBadgeText,
+            statusDescription = statusDescription,
+            subjectScope = subjectScope
+        )
+
+        // 🔋 Compute Cognitive Workload & Fatigue Index
+        val daily7dMins = IntArray(7)
+        val day7dStrings = Array(7) { "" }
+        for (i in 6 downTo 0) {
+            val dCal = Calendar.getInstance().apply {
+                timeInMillis = todayMidnight.timeInMillis
+                add(Calendar.DAY_OF_YEAR, -i)
+            }
+            day7dStrings[6 - i] = DateFormatterCache.formatIsoDate(dCal.timeInMillis)
+        }
+
+        studySessions.forEach { s ->
+            val idx = day7dStrings.indexOf(s.date)
+            if (idx != -1) {
+                daily7dMins[idx] += s.minutes
+            }
+        }
+
+        val daily7dHours = daily7dMins.map { it / 60.0 }
+        val total7dHours = daily7dHours.sum()
+        val avgDailyHours7d = total7dHours / 7.0
+
+        val loadFactor = minOf(1.0, avgDailyHours7d / 6.0)
+
+        var consecutiveHighDays = 0
+        for (i in 6 downTo 0) {
+            if (daily7dHours[i] >= 5.0) {
+                consecutiveHighDays++
+            } else {
+                break
+            }
+        }
+        val streakFactor = minOf(1.0, consecutiveHighDays / 4.0)
+
+        val recoveryDaysCount = daily7dHours.count { it < 2.0 }
+        val recoveryRatio = recoveryDaysCount / 7.0
+
+        val rawScore = 100.0 * (0.40 * loadFactor + 0.35 * streakFactor + 0.25 * (1.0 - recoveryRatio))
+        val fatigueScore = Math.round(rawScore).toInt().coerceIn(0, 100)
+
+        val (fatigueTier, tierLabel, adviceText) = when {
+            fatigueScore >= 70 -> Triple(
+                "HIGH_FATIGUE_LOAD",
+                "High Strain ⚠️",
+                "Elevated Cognitive Strain ($fatigueScore/100): Extended peak exertion detected ($consecutiveHighDays consecutive 5h+ days). Schedule structured active rest to prevent fatigue."
+            )
+            fatigueScore >= 40 -> Triple(
+                "SUSTAINED_HIGH_LOAD",
+                "Sustained Workload ⚡",
+                "Sustained High Workload ($fatigueScore/100): Consistent daily output (${String.format(Locale.US, "%.1f", avgDailyHours7d)}h/day). Maintain proper hydration and short recovery intervals."
+            )
+            else -> Triple(
+                "OPTIMAL_RECOVERY",
+                "Optimal Recovery 🔋",
+                "Optimal Cognitive Recovery ($fatigueScore/100): Well-paced focus routines with adequate recovery ($recoveryDaysCount light/rest days). High cognitive reserve."
+            )
+        }
+
+        val fatigueReport = FatigueReport(
+            fatigueScore = fatigueScore,
+            fatigueTier = fatigueTier,
+            tierLabel = tierLabel,
+            adviceText = adviceText,
+            avgDailyHours7d = avgDailyHours7d,
+            consecutiveHighDays = consecutiveHighDays,
+            recoveryDaysCount = recoveryDaysCount
+        )
+
         // Deterministic Cognitive Diagnostic Insights (100% Deterministic Algorithmic Logic)
         val smartInsights = mutableListOf<SmartInsight>()
         if (totalMinutes > 0) {
@@ -331,6 +561,32 @@ object AnalyticsEngine {
                     description = "Tier: $focusQualityTier. Consistency: $consistencyPct%, Goal Hit: $goalHitRate%, Deep Work: $deepWorkRatio%."
                 )
             )
+
+            smartInsights.add(
+                SmartInsight(
+                    icon = "🔋",
+                    title = "Cognitive Workload Index ($fatigueScore/100)",
+                    description = adviceText
+                )
+            )
+
+            if (examProjection.status == "ON_TRACK") {
+                smartInsights.add(
+                    SmartInsight(
+                        icon = "🎯",
+                        title = "Exam Horizon Projection",
+                        description = "On schedule for $examName (${String.format(Locale.US, "%.1f", completedHours)}h done, pace: ${String.format(Locale.US, "%.1f", currentDailyHours)}h/d). Projected completion: $projectedDate."
+                    )
+                )
+            } else if (examProjection.status == "MINOR_DEFICIT" || examProjection.status == "CRITICAL_LAG") {
+                smartInsights.add(
+                    SmartInsight(
+                        icon = "⚠️",
+                        title = "Exam Pace Deficit",
+                        description = "$examName requires ${String.format(Locale.US, "%.1f", requiredDailyHours)}h/day, current velocity is ${String.format(Locale.US, "%.1f", currentDailyHours)}h/d. $statusDescription"
+                    )
+                )
+            }
 
             if (deepWorkRatio >= 60) {
                 smartInsights.add(
@@ -438,7 +694,10 @@ object AnalyticsEngine {
             focusQualityTier = focusQualityTier,
             consistencyPct = consistencyPct,
             goalHitRate = goalHitRate,
-            pacingStability = pacingStability
+            pacingStability = pacingStability,
+            hourlyMins = hourlyMins,
+            examProjection = examProjection,
+            fatigueReport = fatigueReport
         )
     }
 }

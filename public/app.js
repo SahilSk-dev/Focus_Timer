@@ -1456,9 +1456,696 @@ function cleanPdfText(str) {
 }
 
 /* ============================================================
-   🧠 COGNITIVE DEEP ANALYSIS ENGINE
+   🧠 COGNITIVE DEEP ANALYSIS ENGINE (v2.0 PURE DETERMINISTIC MATH)
    ============================================================ */
 let currentAnalyticsPeriod = '7'; // '7', '30', or 'all'
+
+function getExamGoal() {
+  if (!prefs.examGoal || typeof prefs.examGoal !== 'object') {
+    const defaultTarget = new Date();
+    defaultTarget.setDate(defaultTarget.getDate() + 60);
+    const dStr = `${defaultTarget.getFullYear()}-${String(defaultTarget.getMonth() + 1).padStart(2, '0')}-${String(defaultTarget.getDate()).padStart(2, '0')}`;
+    prefs.examGoal = {
+      examName: 'Competitive / Academic Exam',
+      targetDate: dStr,
+      targetHours: 150,
+      subjectScope: []
+    };
+  }
+  return prefs.examGoal;
+}
+
+function saveExamGoal(newGoal) {
+  prefs.examGoal = {
+    examName: String(newGoal.examName || 'Target Exam').trim(),
+    targetDate: String(newGoal.targetDate || '').trim(),
+    targetHours: Math.max(1, Number(newGoal.targetHours) || 100),
+    subjectScope: Array.isArray(newGoal.subjectScope) ? newGoal.subjectScope : []
+  };
+  savePrefs();
+  renderDeepAnalytics();
+}
+
+function computeExamProjection(allStudy, goal, todayDate = new Date()) {
+  const examName = goal.examName || 'Target Exam / Syllabus';
+  const targetHours = Number(goal.targetHours) || 100;
+  const targetDateStr = goal.targetDate || '';
+  const subjectScope = Array.isArray(goal.subjectScope) ? goal.subjectScope : [];
+
+  // 1. Filter sessions matching subject scope
+  const scopedSessions = allStudy.filter(s => {
+    if (s.isNonStudy) return false;
+    if (subjectScope.length === 0) return true; // Empty scope = all study subjects count
+    let m = s.subject || '';
+    if (m.includes(' - ')) m = m.split(' - ')[0];
+    return subjectScope.includes(m) || subjectScope.includes(s.subject);
+  });
+
+  const completedMinutes = scopedSessions.reduce((acc, s) => acc + (s.minutes || 0), 0);
+  const completedHours = completedMinutes / 60;
+  const remainingHours = Math.max(0, targetHours - completedHours);
+
+  // 2. Calendar days remaining (midnight-to-midnight)
+  let daysRemaining = 0;
+  const todayMid = new Date(todayDate.getFullYear(), todayDate.getMonth(), todayDate.getDate(), 0, 0, 0);
+  if (targetDateStr) {
+    const parts = targetDateStr.split('-').map(Number);
+    if (parts.length === 3) {
+      const targetMid = new Date(parts[0], parts[1] - 1, parts[2], 0, 0, 0);
+      daysRemaining = Math.round((targetMid - todayMid) / 86400000);
+    }
+  }
+
+  // 3. Required daily pace
+  const requiredDailyHours = daysRemaining > 0 ? (remainingHours / daysRemaining) : 0;
+
+  // 4. Actual trailing 7 calendar days velocity
+  // Must divide sum by 7.0 calendar days (including 0-study days)
+  const sevenDaysAgo = new Date(todayMid);
+  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
+  const limitDateStr = `${sevenDaysAgo.getFullYear()}-${String(sevenDaysAgo.getMonth() + 1).padStart(2, '0')}-${String(sevenDaysAgo.getDate()).padStart(2, '0')}`;
+  const todayDateStr = `${todayMid.getFullYear()}-${String(todayMid.getMonth() + 1).padStart(2, '0')}-${String(todayMid.getDate()).padStart(2, '0')}`;
+
+  const last7DaysSessions = scopedSessions.filter(s => s.date >= limitDateStr && s.date <= todayDateStr);
+  const last7DaysMins = last7DaysSessions.reduce((acc, s) => acc + (s.minutes || 0), 0);
+  const currentDailyHours = (last7DaysMins / 60) / 7.0; // Div by 7 calendar days
+
+  const paceDeltaHours = currentDailyHours - requiredDailyHours;
+  const paceRatio = requiredDailyHours > 0 ? (currentDailyHours / requiredDailyHours) : 1.0;
+
+  // 5. Feasibility status
+  let status = 'ON_TRACK';
+  let statusBadgeText = 'ON TRACK 🎯';
+  let statusBadgeClass = 'on-track';
+  let statusDescription = 'Current 7-day velocity is on schedule to complete the syllabus before the target deadline.';
+
+  if (remainingHours <= 0) {
+    status = 'COMPLETE';
+    statusBadgeText = 'GOAL ACHIEVED 🏆';
+    statusBadgeClass = 'complete';
+    statusDescription = 'Congratulations! You have completed 100% of your targeted syllabus hours.';
+  } else if (daysRemaining < 0) {
+    status = 'EXPIRED';
+    statusBadgeText = 'DEADLINE PASSED ⚠️';
+    statusBadgeClass = 'critical-lag';
+    statusDescription = 'The target exam date has passed. Edit the target date in settings to recalibrate.';
+  } else if (daysRemaining === 0) {
+    status = 'DEADLINE_TODAY';
+    statusBadgeText = 'EXAM TODAY ⏳';
+    statusBadgeClass = 'minor-deficit';
+    statusDescription = 'Target deadline is today! Focus on high-yield formulas and active recall.';
+  } else if (paceRatio >= 1.0) {
+    status = 'ON_TRACK';
+    statusBadgeText = 'ON TRACK 🎯';
+    statusBadgeClass = 'on-track';
+    statusDescription = `Velocity surplus of +${paceDeltaHours.toFixed(1)}h/day. Syllabus will be completed on schedule.`;
+  } else if (paceRatio >= 0.8) {
+    status = 'MINOR_DEFICIT';
+    statusBadgeText = 'MINOR DEFICIT ⚠️';
+    statusBadgeClass = 'minor-deficit';
+    statusDescription = `Velocity lag of ${Math.abs(paceDeltaHours).toFixed(1)}h/day. Increase study blocks by ~${Math.round(Math.abs(paceDeltaHours) * 60)} mins/day to regain pace.`;
+  } else {
+    status = 'CRITICAL_LAG';
+    statusBadgeText = 'CRITICAL LAG 🚨';
+    statusBadgeClass = 'critical-lag';
+    statusDescription = `Significant pace deficit of ${Math.abs(paceDeltaHours).toFixed(1)}h/day. Urgent pace recalibration needed to cover remaining ${remainingHours.toFixed(1)}h.`;
+  }
+
+  // 6. Projected Completion Date
+  let projectedDate = 'Indeterminate (0h pace)';
+  if (remainingHours <= 0) {
+    projectedDate = 'Completed';
+  } else if (currentDailyHours >= 0.05) {
+    const daysNeeded = Math.ceil(remainingHours / currentDailyHours);
+    const projDateObj = new Date(todayMid);
+    projDateObj.setDate(projDateObj.getDate() + daysNeeded);
+    projectedDate = `${projDateObj.getFullYear()}-${String(projDateObj.getMonth() + 1).padStart(2, '0')}-${String(projDateObj.getDate()).padStart(2, '0')}`;
+  }
+
+  return {
+    examName,
+    targetDate: targetDateStr,
+    targetHours,
+    completedHours,
+    remainingHours,
+    daysRemaining,
+    requiredDailyHours,
+    currentDailyHours,
+    paceDeltaHours,
+    paceRatio,
+    projectedDate,
+    status,
+    statusBadgeText,
+    statusBadgeClass,
+    statusDescription,
+    subjectScope
+  };
+}
+
+function compute24hHourlyDensity(sessionsList) {
+  const hourlyMins = new Array(24).fill(0);
+
+  sessionsList.forEach(s => {
+    if (!s.minutes || s.minutes <= 0) return;
+    const endTs = s.ts ? Number(s.ts) : (s.date ? new Date(s.date + 'T14:00:00').getTime() : Date.now());
+    const durationMs = s.minutes * 60000;
+    const startTs = endTs - durationMs;
+
+    // Exact splitting across hour boundaries
+    let cur = new Date(startTs);
+    let curHourStart = new Date(cur.getFullYear(), cur.getMonth(), cur.getDate(), cur.getHours(), 0, 0, 0).getTime();
+
+    while (curHourStart < endTs) {
+      const nextHourStart = curHourStart + 3600000;
+      const overlapStart = Math.max(startTs, curHourStart);
+      const overlapEnd = Math.min(endTs, nextHourStart);
+
+      if (overlapEnd > overlapStart) {
+        const h = new Date(curHourStart).getHours();
+        const mins = (overlapEnd - overlapStart) / 60000;
+        hourlyMins[h] = (hourlyMins[h] || 0) + mins;
+      }
+      curHourStart = nextHourStart;
+    }
+  });
+
+  for (let i = 0; i < 24; i++) {
+    hourlyMins[i] = Math.round(hourlyMins[i]);
+  }
+  return hourlyMins;
+}
+
+function computeFatigueReport(allStudySessions, todayDate = new Date()) {
+  const todayMid = new Date(todayDate.getFullYear(), todayDate.getMonth(), todayDate.getDate(), 0, 0, 0);
+
+  const dailyMins = new Array(7).fill(0);
+  const dayStrings = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(todayMid);
+    d.setDate(d.getDate() - i);
+    dayStrings.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`);
+  }
+
+  allStudySessions.forEach(s => {
+    if (s.isNonStudy) return;
+    const idx = dayStrings.indexOf(s.date);
+    if (idx !== -1) {
+      dailyMins[idx] += (s.minutes || 0);
+    }
+  });
+
+  const dailyHours = dailyMins.map(m => m / 60);
+  const total7dHours = dailyHours.reduce((a, b) => a + b, 0);
+  const avgDailyHours7d = total7dHours / 7.0;
+
+  // 1. loadFactor: normalized against 6h daily baseline, capped at 1.0
+  const loadFactor = Math.min(1.0, avgDailyHours7d / 6.0);
+
+  // 2. consecutiveHighDays: consecutive days leading up to today (d0) with >= 5.0h
+  let consecutiveHighDays = 0;
+  for (let i = 6; i >= 0; i--) {
+    if (dailyHours[i] >= 5.0) {
+      consecutiveHighDays++;
+    } else {
+      break;
+    }
+  }
+  const streakFactor = Math.min(1.0, consecutiveHighDays / 4.0);
+
+  // 3. recoveryDays: days in 7d with < 2.0h
+  const recoveryDaysCount = dailyHours.filter(h => h < 2.0).length;
+  const recoveryRatio = recoveryDaysCount / 7.0;
+
+  // Combined Fatigue Score: 0.40 * load + 0.35 * streak + 0.25 * (1 - recovery)
+  const rawScore = 100 * (0.40 * loadFactor + 0.35 * streakFactor + 0.25 * (1.0 - recoveryRatio));
+  const fatigueScore = Math.min(100, Math.max(0, Math.round(rawScore)));
+
+  // Non-clinical Behavioral Tiers
+  let fatigueTier = 'OPTIMAL_RECOVERY';
+  let tierLabel = 'Optimal Recovery 🔋';
+  let tierClass = 'optimal';
+  let adviceText = 'Optimal Cognitive Recovery: High endurance reserve, ready for intensive focus blocks.';
+
+  if (fatigueScore >= 70) {
+    fatigueTier = 'HIGH_FATIGUE_LOAD';
+    tierLabel = 'High Strain ⚠️';
+    tierClass = 'fatigue';
+    adviceText = `Elevated Cognitive Strain (${fatigueScore}/100): Extended peak exertion detected (${consecutiveHighDays} consecutive 5h+ days). Schedule structured active rest to prevent fatigue.`;
+  } else if (fatigueScore >= 40) {
+    fatigueTier = 'SUSTAINED_HIGH_LOAD';
+    tierLabel = 'Sustained Workload ⚡';
+    tierClass = 'sustained';
+    adviceText = `Sustained High Workload (${fatigueScore}/100): Consistent daily output (${avgDailyHours7d.toFixed(1)}h/day). Maintain proper hydration and short recovery intervals.`;
+  } else {
+    fatigueTier = 'OPTIMAL_RECOVERY';
+    tierLabel = 'Optimal Recovery 🔋';
+    tierClass = 'optimal';
+    adviceText = `Optimal Cognitive Recovery (${fatigueScore}/100): Well-paced focus routines with adequate recovery (${recoveryDaysCount} light/rest days). High cognitive reserve.`;
+  }
+
+  return {
+    fatigueScore,
+    fatigueTier,
+    tierLabel,
+    tierClass,
+    adviceText,
+    avgDailyHours7d,
+    consecutiveHighDays,
+    recoveryDaysCount
+  };
+}
+
+function drawCircadianDensityCurve(canvas, hourlyMins) {
+  if (!canvas) return;
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.getBoundingClientRect();
+  const width = rect.width || canvas.parentElement?.clientWidth || 480;
+  const height = 140;
+  canvas.width = Math.round(width * dpr);
+  canvas.height = Math.round(height * dpr);
+  canvas.style.width = `${width}px`;
+  canvas.style.height = `${height}px`;
+
+  const ctx = canvas.getContext('2d');
+  ctx.save();
+  ctx.scale(dpr, dpr);
+  ctx.clearRect(0, 0, width, height);
+
+  const padLeft = 32;
+  const padRight = 20;
+  const padTop = 22;
+  const padBottom = 26;
+  const plotW = width - padLeft - padRight;
+  const plotH = height - padTop - padBottom;
+
+  const maxMins = Math.max(...hourlyMins, 10);
+
+  // Subtle horizontal grid lines (0%, 50%, 100%)
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.06)';
+  ctx.lineWidth = 1;
+  [0, 0.5, 1].forEach(ratio => {
+    const y = padTop + plotH * (1 - ratio);
+    ctx.beginPath();
+    ctx.moveTo(padLeft, y);
+    ctx.lineTo(width - padRight, y);
+    ctx.stroke();
+
+    ctx.fillStyle = 'rgba(148, 163, 184, 0.7)';
+    ctx.font = '9px Inter, sans-serif';
+    ctx.textAlign = 'right';
+    ctx.fillText(`${Math.round(maxMins * ratio)}m`, padLeft - 6, y + 3);
+  });
+
+  // Calculate 24 coordinate points
+  const points = [];
+  for (let h = 0; h < 24; h++) {
+    const x = padLeft + (h / 23) * plotW;
+    const y = padTop + plotH * (1 - (hourlyMins[h] / maxMins));
+    points.push({ x, y, val: hourlyMins[h], hour: h });
+  }
+
+  // Draw smooth monotonic Bézier curve with gradient fill
+  ctx.beginPath();
+  ctx.moveTo(points[0].x, padTop + plotH);
+  ctx.lineTo(points[0].x, points[0].y);
+
+  for (let i = 0; i < points.length - 1; i++) {
+    const p0 = points[Math.max(0, i - 1)];
+    const p1 = points[i];
+    const p2 = points[i + 1];
+    const p3 = points[Math.min(points.length - 1, i + 2)];
+
+    const cp1x = p1.x + (p2.x - p0.x) / 6;
+    let cp1y = p1.y + (p2.y - p0.y) / 6;
+    const cp2x = p2.x - (p3.x - p1.x) / 6;
+    let cp2y = p2.y - (p3.y - p1.y) / 6;
+
+    const baseY = padTop + plotH;
+    if (cp1y > baseY) cp1y = baseY;
+    if (cp2y > baseY) cp2y = baseY;
+
+    ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, p2.x, p2.y);
+  }
+
+  ctx.lineTo(points[23].x, padTop + plotH);
+  ctx.closePath();
+
+  const grad = ctx.createLinearGradient(0, padTop, 0, padTop + plotH);
+  grad.addColorStop(0, 'rgba(16, 185, 129, 0.42)');
+  grad.addColorStop(0.7, 'rgba(16, 185, 129, 0.12)');
+  grad.addColorStop(1, 'rgba(16, 185, 129, 0.01)');
+  ctx.fillStyle = grad;
+  ctx.fill();
+
+  // Draw stroke line
+  ctx.beginPath();
+  ctx.moveTo(points[0].x, points[0].y);
+  for (let i = 0; i < points.length - 1; i++) {
+    const p0 = points[Math.max(0, i - 1)];
+    const p1 = points[i];
+    const p2 = points[i + 1];
+    const p3 = points[Math.min(points.length - 1, i + 2)];
+
+    const cp1x = p1.x + (p2.x - p0.x) / 6;
+    let cp1y = p1.y + (p2.y - p0.y) / 6;
+    const cp2x = p2.x - (p3.x - p1.x) / 6;
+    let cp2y = p2.y - (p3.y - p1.y) / 6;
+
+    const baseY = padTop + plotH;
+    if (cp1y > baseY) cp1y = baseY;
+    if (cp2y > baseY) cp2y = baseY;
+
+    ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, p2.x, p2.y);
+  }
+  ctx.strokeStyle = '#34d399';
+  ctx.lineWidth = 2.2;
+  ctx.stroke();
+
+  // Peak Hour Marker
+  let peakIdx = 0;
+  let peakVal = 0;
+  points.forEach((p, idx) => {
+    if (p.val > peakVal) {
+      peakVal = p.val;
+      peakIdx = idx;
+    }
+  });
+
+  if (peakVal > 0) {
+    const peakP = points[peakIdx];
+    ctx.fillStyle = 'rgba(52, 211, 153, 0.25)';
+    ctx.beginPath();
+    ctx.arc(peakP.x, peakP.y, 7, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = '#10b981';
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(peakP.x, peakP.y, 3.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+
+    const ampm = peakIdx >= 12 ? 'PM' : 'AM';
+    const hr = peakIdx % 12 === 0 ? 12 : peakIdx % 12;
+    const peakText = `${hr}:00 ${ampm} (${peakVal}m)`;
+    ctx.fillStyle = '#34d399';
+    ctx.font = 'bold 9.5px Inter, sans-serif';
+    ctx.textAlign = peakIdx > 18 ? 'right' : (peakIdx < 5 ? 'left' : 'center');
+    ctx.fillText(peakText, peakP.x, Math.max(12, peakP.y - 10));
+  }
+
+  // X-axis time labels
+  const hourTicks = [0, 4, 8, 12, 16, 20, 23];
+  ctx.fillStyle = 'rgba(148, 163, 184, 0.8)';
+  ctx.font = '9px Inter, sans-serif';
+  ctx.textAlign = 'center';
+  hourTicks.forEach(h => {
+    const p = points[h];
+    const ampm = h >= 12 ? 'p' : 'a';
+    const hr = h % 12 === 0 ? 12 : h % 12;
+    ctx.fillText(`${hr}${ampm}`, p.x, height - 8);
+  });
+
+  ctx.restore();
+}
+
+function drawSubjectRadar(canvas, subjectEquilibrium) {
+  if (!canvas) return;
+  const fallbackNotice = document.getElementById('radarFallbackNotice');
+  const subjects = subjectEquilibrium || [];
+
+  if (subjects.length < 3) {
+    canvas.style.display = 'none';
+    if (fallbackNotice) {
+      fallbackNotice.style.display = 'block';
+      const count = subjects.length;
+      fallbackNotice.innerHTML = `
+        <div style="font-size:1.4rem; margin-bottom:6px;">⚖️</div>
+        <strong>Polygonal Radar Standby</strong>
+        <div style="margin-top:4px;">Radar web polygon requires 3+ subjects (currently ${count} recorded). Comparative balance bars are displayed on the right.</div>
+      `;
+    }
+    return;
+  }
+
+  canvas.style.display = 'block';
+  if (fallbackNotice) fallbackNotice.style.display = 'none';
+
+  const dpr = window.devicePixelRatio || 1;
+  const width = 340;
+  const height = 300;
+  canvas.width = Math.round(width * dpr);
+  canvas.height = Math.round(height * dpr);
+  canvas.style.width = `${width}px`;
+  canvas.style.height = `${height}px`;
+
+  const ctx = canvas.getContext('2d');
+  ctx.save();
+  ctx.scale(dpr, dpr);
+  ctx.clearRect(0, 0, width, height);
+
+  const topSubjects = subjects.slice(0, 8);
+  const N = topSubjects.length;
+  const cx = width / 2;
+  const cy = height / 2 + 6;
+  const R = Math.min(cx, cy) - 46;
+
+  // Concentric polygon web rings (25%, 50%, 75%, 100%)
+  const rings = [0.25, 0.50, 0.75, 1.0];
+  rings.forEach((ringPct, ringIdx) => {
+    const r = R * ringPct;
+    ctx.beginPath();
+    for (let i = 0; i < N; i++) {
+      const angle = -Math.PI / 2 + (2 * Math.PI * i) / N;
+      const x = cx + r * Math.cos(angle);
+      const y = cy + r * Math.sin(angle);
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.closePath();
+    ctx.strokeStyle = ringIdx === 3 ? 'rgba(255, 255, 255, 0.18)' : 'rgba(255, 255, 255, 0.07)';
+    ctx.lineWidth = ringIdx === 3 ? 1.2 : 0.8;
+    ctx.stroke();
+  });
+
+  // Radial spokes
+  for (let i = 0; i < N; i++) {
+    const angle = -Math.PI / 2 + (2 * Math.PI * i) / N;
+    const x = cx + R * Math.cos(angle);
+    const y = cy + R * Math.sin(angle);
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(x, y);
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+  }
+
+  // Data Polygon
+  const maxMins = Math.max(...topSubjects.map(s => s.mins), 1);
+  const dataPoints = topSubjects.map((s, i) => {
+    const angle = -Math.PI / 2 + (2 * Math.PI * i) / N;
+    const norm = Math.max(0.08, Math.min(1.0, s.mins / maxMins));
+    const r = R * norm;
+    return {
+      x: cx + r * Math.cos(angle),
+      y: cy + r * Math.sin(angle),
+      name: s.name,
+      hours: s.hours,
+      mins: s.mins,
+      angle
+    };
+  });
+
+  // Draw Data Fill
+  ctx.beginPath();
+  dataPoints.forEach((p, i) => {
+    if (i === 0) ctx.moveTo(p.x, p.y);
+    else ctx.lineTo(p.x, p.y);
+  });
+  ctx.closePath();
+  ctx.fillStyle = 'rgba(16, 185, 129, 0.28)';
+  ctx.fill();
+
+  // Draw Data Stroke
+  ctx.strokeStyle = '#34d399';
+  ctx.lineWidth = 2.2;
+  ctx.stroke();
+
+  // Draw Dots and Labels
+  dataPoints.forEach(p => {
+    ctx.fillStyle = '#10b981';
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 3.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+
+    const labelDist = R + 16;
+    const lx = cx + labelDist * Math.cos(p.angle);
+    const ly = cy + labelDist * Math.sin(p.angle);
+
+    ctx.fillStyle = '#f1f5f9';
+    ctx.font = 'bold 9.5px Inter, sans-serif';
+    ctx.textAlign = Math.cos(p.angle) > 0.3 ? 'left' : (Math.cos(p.angle) < -0.3 ? 'right' : 'center');
+    ctx.textBaseline = Math.sin(p.angle) > 0.3 ? 'top' : (Math.sin(p.angle) < -0.3 ? 'bottom' : 'middle');
+
+    const cleanName = p.name.length > 11 ? p.name.slice(0, 10) + '..' : p.name;
+    ctx.fillText(`${cleanName} (${p.hours}h)`, lx, ly);
+  });
+
+  ctx.restore();
+}
+
+function drawPdfCircadianWave(doc, startX, startY, width, height, hourlyMins) {
+  const maxMins = Math.max(...hourlyMins, 10);
+  const padBottom = 8;
+  const padTop = 6;
+  const plotH = height - padBottom - padTop;
+  const baseY = startY + height - padBottom;
+
+  doc.setFillColor(248, 250, 252);
+  doc.rect(startX, startY, width, height, 'F');
+  doc.setDrawColor(226, 232, 240);
+  doc.setLineWidth(0.4);
+  doc.rect(startX, startY, width, height, 'S');
+
+  // Baseline
+  doc.setDrawColor(203, 213, 225);
+  doc.line(startX + 10, baseY, startX + width - 6, baseY);
+
+  const points = [];
+  for (let h = 0; h < 24; h++) {
+    const x = startX + 10 + (h / 23) * (width - 16);
+    const y = baseY - (hourlyMins[h] / maxMins) * plotH;
+    points.push({ x, y, h, mins: hourlyMins[h] });
+  }
+
+  // Draw filled area under curve
+  doc.setFillColor(209, 250, 229);
+  for (let i = 0; i < points.length - 1; i++) {
+    const p1 = points[i];
+    const p2 = points[i + 1];
+    doc.triangle(p1.x, baseY, p1.x, p1.y, p2.x, p2.y, 'F');
+    doc.triangle(p1.x, baseY, p2.x, p2.y, p2.x, baseY, 'F');
+  }
+
+  // Draw stroke
+  doc.setDrawColor(16, 185, 129);
+  doc.setLineWidth(0.75);
+  for (let i = 0; i < points.length - 1; i++) {
+    doc.line(points[i].x, points[i].y, points[i + 1].x, points[i + 1].y);
+  }
+
+  // Peak Marker
+  let peakIdx = 0;
+  let peakVal = 0;
+  points.forEach((p, idx) => {
+    if (p.mins > peakVal) {
+      peakVal = p.mins;
+      peakIdx = idx;
+    }
+  });
+
+  if (peakVal > 0) {
+    const p = points[peakIdx];
+    doc.setFillColor(16, 185, 129);
+    doc.circle(p.x, p.y, 1.2, 'FD');
+    doc.setFontSize(6.5);
+    doc.setTextColor(6, 95, 70);
+    const ampm = peakIdx >= 12 ? 'PM' : 'AM';
+    const hr = peakIdx % 12 === 0 ? 12 : peakIdx % 12;
+    doc.text(`Peak: ${hr}:00 ${ampm} (${peakVal}m)`, p.x, Math.max(startY + 5, p.y - 2), { align: 'center' });
+  }
+
+  // Hour Labels
+  doc.setFontSize(6.5);
+  doc.setTextColor(100, 116, 139);
+  [0, 6, 12, 18, 23].forEach(h => {
+    const p = points[h];
+    const ampm = h >= 12 ? 'p' : 'a';
+    const hr = h % 12 === 0 ? 12 : h % 12;
+    doc.text(`${hr}${ampm}`, p.x, baseY + 5, { align: 'center' });
+  });
+}
+
+function drawPdfRadarChart(doc, cx, cy, radius, subjectEquilibrium) {
+  const topSubjects = (subjectEquilibrium || []).slice(0, 8);
+  const N = topSubjects.length;
+
+  if (N < 3) {
+    doc.setFontSize(7.5);
+    doc.setTextColor(100, 116, 139);
+    doc.text('Polygonal radar activates with 3+ subjects (see audit table for balance).', cx, cy, { align: 'center' });
+    return;
+  }
+
+  // Concentric Rings
+  [0.25, 0.50, 0.75, 1.0].forEach(pct => {
+    const r = radius * pct;
+    doc.setDrawColor(226, 232, 240);
+    doc.setLineWidth(0.3);
+    for (let i = 0; i < N; i++) {
+      const a1 = -Math.PI / 2 + (2 * Math.PI * i) / N;
+      const a2 = -Math.PI / 2 + (2 * Math.PI * (i + 1)) / N;
+      doc.line(cx + r * Math.cos(a1), cy + r * Math.sin(a1), cx + r * Math.cos(a2), cy + r * Math.sin(a2));
+    }
+  });
+
+  // Spokes
+  for (let i = 0; i < N; i++) {
+    const a = -Math.PI / 2 + (2 * Math.PI * i) / N;
+    doc.setDrawColor(226, 232, 240);
+    doc.line(cx, cy, cx + radius * Math.cos(a), cy + radius * Math.sin(a));
+  }
+
+  const maxMins = Math.max(...topSubjects.map(s => s.mins), 1);
+  const points = topSubjects.map((s, i) => {
+    const a = -Math.PI / 2 + (2 * Math.PI * i) / N;
+    const norm = Math.max(0.08, Math.min(1.0, s.mins / maxMins));
+    const r = radius * norm;
+    return {
+      x: cx + r * Math.cos(a),
+      y: cy + r * Math.sin(a),
+      a,
+      name: s.name,
+      hours: s.hours
+    };
+  });
+
+  // Fill polygon
+  doc.setFillColor(209, 250, 229);
+  for (let i = 0; i < N; i++) {
+    const p1 = points[i];
+    const p2 = points[(i + 1) % N];
+    doc.triangle(cx, cy, p1.x, p1.y, p2.x, p2.y, 'F');
+  }
+
+  // Stroke polygon
+  doc.setDrawColor(16, 185, 129);
+  doc.setLineWidth(0.75);
+  for (let i = 0; i < N; i++) {
+    const p1 = points[i];
+    const p2 = points[(i + 1) % N];
+    doc.line(p1.x, p1.y, p2.x, p2.y);
+  }
+
+  // Dots & Labels
+  doc.setFontSize(6.5);
+  doc.setTextColor(30, 41, 59);
+  points.forEach(p => {
+    doc.setFillColor(16, 185, 129);
+    doc.circle(p.x, p.y, 0.9, 'FD');
+
+    const lx = cx + (radius + 8) * Math.cos(p.a);
+    const ly = cy + (radius + 8) * Math.sin(p.a);
+    const clean = p.name.length > 9 ? p.name.slice(0, 8) + '..' : p.name;
+    const align = Math.cos(p.a) > 0.2 ? 'left' : (Math.cos(p.a) < -0.2 ? 'right' : 'center');
+    doc.text(`${clean} (${p.hours}h)`, lx, ly + 1.5, { align });
+  });
+}
 
 function computeAnalyticsReport(period) {
   const allStudy = sessions.filter(s => !s.isNonStudy);
@@ -1504,27 +2191,23 @@ function computeAnalyticsReport(period) {
     velocity = 100;
   }
 
-  // Circadian Time-of-Day Distribution (Morning 5-11, Afternoon 12-16, Evening 17-21, Night 22-4)
+  // 24-Hour Continuous Hourly Density with exact boundary splitting
+  const hourlyMins = compute24hHourlyDensity(filtered);
+
+  // Circadian Buckets calculated synchronously from hourlyMins
   const circadianBuckets = {
     morning: { label: '🌅 Morning (5am - 12pm)', cleanLabel: 'Morning (05:00 AM - 12:00 PM)', mins: 0, count: 0 },
     afternoon: { label: '☀️ Afternoon (12pm - 5pm)', cleanLabel: 'Afternoon (12:00 PM - 05:00 PM)', mins: 0, count: 0 },
     evening: { label: '🌆 Evening (5pm - 10pm)', cleanLabel: 'Evening (05:00 PM - 10:00 PM)', mins: 0, count: 0 },
     night: { label: '🌙 Night (10pm - 5am)', cleanLabel: 'Night (10:00 PM - 05:00 AM)', mins: 0, count: 0 }
   };
-  const hourlyMins = new Array(24).fill(0);
-
-  filtered.forEach(s => {
-    let hour = 14; // fallback mid-afternoon
-    if (s.ts) {
-      hour = new Date(s.ts).getHours();
-    }
-    hourlyMins[hour] += s.minutes;
-
-    if (hour >= 5 && hour < 12) circadianBuckets.morning.mins += s.minutes;
-    else if (hour >= 12 && hour < 17) circadianBuckets.afternoon.mins += s.minutes;
-    else if (hour >= 17 && hour < 22) circadianBuckets.evening.mins += s.minutes;
-    else circadianBuckets.night.mins += s.minutes;
-  });
+  for (let h = 0; h < 24; h++) {
+    const m = hourlyMins[h];
+    if (h >= 5 && h < 12) circadianBuckets.morning.mins += m;
+    else if (h >= 12 && h < 17) circadianBuckets.afternoon.mins += m;
+    else if (h >= 17 && h < 22) circadianBuckets.evening.mins += m;
+    else circadianBuckets.night.mins += m;
+  }
 
   // Find Peak 2-hour Window
   let max2Hour = 0;
@@ -1542,10 +2225,10 @@ function computeAnalyticsReport(period) {
     return `${hr}:00 ${ampm}`;
   };
   const peakFocusWindow = max2Hour > 0 
+    ? `${formatHour(peakStartHour)} - ${formatHour(peakStartHour + 2)}`
     : 'N/A (No study in period)';
 
   // Deterministic Algorithmic Pillars for Focus Quality Score (FQS / Cognitive Quality Index: 0-100)
-  // 1. Consistency Percentage (C)
   let daysInPeriod = 7;
   if (period === '7') {
     daysInPeriod = 7;
@@ -1565,7 +2248,7 @@ function computeAnalyticsReport(period) {
   }
   const consistencyPct = Math.min(100, Math.round((activeDaysCount / daysInPeriod) * 100));
 
-  // 2. Daily Goal Hit Rate (G)
+  // Daily Goal Hit Rate (G)
   const targetMins = (typeof prefs !== 'undefined' && prefs.dailyTarget) ? prefs.dailyTarget : 120;
   const dayTotals = {};
   filtered.forEach(s => {
@@ -1574,10 +2257,10 @@ function computeAnalyticsReport(period) {
   const daysMetTarget = Object.values(dayTotals).filter(m => m >= targetMins).length;
   const goalHitRate = activeDaysCount > 0 ? Math.min(100, Math.round((daysMetTarget / activeDaysCount) * 100)) : 0;
 
-  // 3. Session Pacing Stability (P: benchmark 50 mins)
+  // Session Pacing Stability (P: benchmark 50 mins)
   const pacingStability = Math.min(100, Math.round((avgSessionMin / 50) * 100));
 
-  // 4. Focus Quality Score (FQS): 0.35*DeepWork + 0.25*Consistency + 0.25*GoalHit + 0.15*Pacing
+  // Focus Quality Score (FQS): 0.35*DeepWork + 0.25*Consistency + 0.25*GoalHit + 0.15*Pacing
   const focusQualityScore = totalMinutes > 0
     ? Math.min(100, Math.max(0, Math.round(0.35 * deepWorkRatio + 0.25 * consistencyPct + 0.25 * goalHitRate + 0.15 * pacingStability)))
     : 0;
@@ -1623,12 +2306,9 @@ function computeAnalyticsReport(period) {
       daysAgo = Math.max(0, Math.round((curDate - lDate) / 86400000));
     }
     const sessionCount = subjectSessionCountMap[name] || 1;
-    // Hermann Ebbinghaus Spaced Repetition Stability Factor (S):
-    // 1 review -> S=2.5 days, 2 reviews -> S=5.0 days, 3+ reviews -> S=9.0 days
     const stabilityDays = sessionCount <= 1 ? 2.5 : (sessionCount === 2 ? 5.0 : 9.0);
-    // Retention Curve: R = round(100 * exp(-t / S))
     const retentionPct = daysAgo === 0 ? 100 : Math.min(100, Math.max(0, Math.round(100 * Math.exp(-daysAgo / stabilityDays))));
-    
+
     let recallStatus = 'Optimal Retention';
     if (retentionPct < 60) {
       recallStatus = 'Critical Recall Due';
@@ -1637,12 +2317,12 @@ function computeAnalyticsReport(period) {
     }
 
     const isNeglected = daysAgo >= 3;
-    return { 
-      name, 
-      mins, 
-      hours: (mins / 60).toFixed(1), 
-      pct, 
-      daysAgo, 
+    return {
+      name,
+      mins,
+      hours: (mins / 60).toFixed(1),
+      pct,
+      daysAgo,
       isNeglected,
       sessionCount,
       stabilityDays,
@@ -1662,7 +2342,12 @@ function computeAnalyticsReport(period) {
     return { name, mins, pct };
   }).sort((a, b) => b.mins - a.mins);
 
-  // Deterministic Cognitive Diagnostic Insights (100% Deterministic Algorithmic Logic)
+  // Compute Exam Projection & Fatigue Report
+  const examGoal = getExamGoal();
+  const examProjection = computeExamProjection(allStudy, examGoal);
+  const fatigueReport = computeFatigueReport(allStudy);
+
+  // Deterministic Cognitive Diagnostic Insights
   const smartInsights = [];
   if (totalMinutes > 0) {
     let peakBucket = Object.values(circadianBuckets).sort((a, b) => b.mins - a.mins)[0];
@@ -1676,6 +2361,23 @@ function computeAnalyticsReport(period) {
       icon: '🎯',
       text: `<strong>Focus Quality Score (${focusQualityScore}/100):</strong> Tier: <strong>${focusQualityTier}</strong>. Consistency: ${consistencyPct}%, Goal Hit: ${goalHitRate}%, Deep Work: ${deepWorkRatio}%.`
     });
+
+    smartInsights.push({
+      icon: '🔋',
+      text: `<strong>Cognitive Workload Index (${fatigueReport.fatigueScore}/100):</strong> ${fatigueReport.adviceText}`
+    });
+
+    if (examProjection.status === 'ON_TRACK') {
+      smartInsights.push({
+        icon: '🎯',
+        text: `<strong>Exam Horizon Projection:</strong> On schedule for <strong>${examProjection.examName}</strong> (${examProjection.completedHours.toFixed(1)}h done, pace: ${examProjection.currentDailyHours.toFixed(1)}h/d). Projected completion: <strong>${examProjection.projectedDate}</strong>.`
+      });
+    } else if (examProjection.status === 'MINOR_DEFICIT' || examProjection.status === 'CRITICAL_LAG') {
+      smartInsights.push({
+        icon: '⚠️',
+        text: `<strong>Exam Pace Deficit:</strong> <strong>${examProjection.examName}</strong> requires ${examProjection.requiredDailyHours.toFixed(1)}h/day, current velocity is ${examProjection.currentDailyHours.toFixed(1)}h/day. ${examProjection.statusDescription}`
+      });
+    }
 
     if (deepWorkRatio >= 60) {
       smartInsights.push({
@@ -1749,6 +2451,7 @@ function computeAnalyticsReport(period) {
     deepWorkMinutes,
     deepWorkRatio,
     velocity,
+    hourlyMins,
     circadianBuckets,
     peakFocusWindow,
     subjectEquilibrium,
@@ -1761,7 +2464,9 @@ function computeAnalyticsReport(period) {
     focusQualityTier,
     consistencyPct,
     goalHitRate,
-    pacingStability
+    pacingStability,
+    examProjection,
+    fatigueReport
   };
 }
 
@@ -1802,7 +2507,48 @@ function renderDeepAnalytics() {
     }
   }
 
-  // Focus Quality Score (FQS) Card
+  // 🎯 Render Exam & Syllabus Projection Calculator Card
+  const proj = report.examProjection;
+  const nameEl = document.getElementById('examTargetName');
+  if (nameEl) nameEl.textContent = proj.examName;
+  const subEl = document.getElementById('examTargetSub');
+  if (subEl) {
+    const scopeStr = proj.subjectScope && proj.subjectScope.length > 0 ? `Scope: ${proj.subjectScope.join(', ')}` : 'Scope: All Subjects';
+    subEl.textContent = `${scopeStr} • Deadline: ${proj.targetDate || 'Not set'}`;
+  }
+  const pillEl = document.getElementById('examCountdownPill');
+  if (pillEl) {
+    pillEl.textContent = proj.daysRemaining > 0 ? `⏳ ${proj.daysRemaining} Days Left` : (proj.daysRemaining === 0 ? '⏳ Exam Today' : '⚠️ Past Deadline');
+  }
+  const doneLabel = document.getElementById('examCompletedHoursLabel');
+  if (doneLabel) {
+    const pct = Math.min(100, Math.round((proj.completedHours / proj.targetHours) * 100));
+    doneLabel.textContent = `${proj.completedHours.toFixed(1)}h Completed (${pct}%)`;
+  }
+  const targetLabel = document.getElementById('examTargetHoursLabel');
+  if (targetLabel) targetLabel.textContent = `Target: ${proj.targetHours}h`;
+  const progFill = document.getElementById('examProgressFill');
+  if (progFill) {
+    const pct = Math.min(100, Math.round((proj.completedHours / proj.targetHours) * 100));
+    progFill.style.width = `${pct}%`;
+  }
+  const remVal = document.getElementById('examRemainingHoursVal');
+  if (remVal) remVal.textContent = `${proj.remainingHours.toFixed(1)}h`;
+  const reqVal = document.getElementById('examRequiredPaceVal');
+  if (reqVal) reqVal.textContent = `${proj.requiredDailyHours.toFixed(1)}h/d`;
+  const actVal = document.getElementById('examActualVelocityVal');
+  if (actVal) actVal.textContent = `${proj.currentDailyHours.toFixed(1)}h/d`;
+  const finishVal = document.getElementById('examProjectedDateVal');
+  if (finishVal) finishVal.textContent = proj.projectedDate;
+  const badgeEl = document.getElementById('examFeasibilityBadge');
+  if (badgeEl) {
+    badgeEl.textContent = proj.statusBadgeText;
+    badgeEl.className = `exam-status-badge ${proj.statusBadgeClass}`;
+  }
+  const statusTextEl = document.getElementById('examFeasibilityText');
+  if (statusTextEl) statusTextEl.textContent = proj.statusDescription;
+
+  // 🎯 Focus Quality Score (FQS) Card
   const fqsVal = document.getElementById('fqsScoreVal');
   if (fqsVal) fqsVal.textContent = report.focusQualityScore;
   const fqsTier = document.getElementById('fqsTierBadge');
@@ -1823,13 +2569,40 @@ function renderDeepAnalytics() {
   const fqsPace = document.getElementById('fqsPacingVal');
   if (fqsPace) fqsPace.textContent = `${report.pacingStability}%`;
 
-  // Peak focus badge
+  // 🔋 Cognitive Workload & Fatigue Card
+  const fatigue = report.fatigueReport;
+  const fatigueScoreVal = document.getElementById('fatigueScoreVal');
+  if (fatigueScoreVal) fatigueScoreVal.textContent = fatigue.fatigueScore;
+  const fatigueTierBadge = document.getElementById('fatigueTierBadge');
+  if (fatigueTierBadge) {
+    fatigueTierBadge.textContent = fatigue.tierLabel;
+    fatigueTierBadge.className = `fatigue-tier-badge ${fatigue.tierClass}`;
+  }
+  const fatigueFill = document.getElementById('fatigueFill');
+  if (fatigueFill) {
+    fatigueFill.style.width = `${fatigue.fatigueScore}%`;
+    fatigueFill.className = `fill ${fatigue.tierClass === 'fatigue' ? 'danger' : (fatigue.tierClass === 'sustained' ? 'gold' : 'green')}`;
+  }
+  const fatigueAvgLoad = document.getElementById('fatigueAvgLoadVal');
+  if (fatigueAvgLoad) fatigueAvgLoad.textContent = `${fatigue.avgDailyHours7d.toFixed(1)}h`;
+  const fatigueHighStrain = document.getElementById('fatigueHighStrainVal');
+  if (fatigueHighStrain) fatigueHighStrain.textContent = `${fatigue.consecutiveHighDays}d`;
+  const fatigueRestDays = document.getElementById('fatigueRestDaysVal');
+  if (fatigueRestDays) fatigueRestDays.textContent = `${fatigue.recoveryDaysCount}d`;
+  const fatigueAdvice = document.getElementById('fatigueAdviceText');
+  if (fatigueAdvice) fatigueAdvice.textContent = fatigue.adviceText;
+
+  // 🌅 Circadian Rhythm & 24h Focus Density Wave
   const peakBadge = document.getElementById('peakFocusBadge');
   if (peakBadge) {
     peakBadge.textContent = report.totalMinutes > 0 ? `Peak: ${report.peakFocusWindow}` : 'Peak: No Data';
   }
+  const densityCanvas = document.getElementById('circadianDensityCanvas');
+  if (densityCanvas) {
+    drawCircadianDensityCurve(densityCanvas, report.hourlyMins);
+  }
 
-  // Circadian bars
+  // Circadian Summary Bars
   const circContainer = document.getElementById('circadianBars');
   if (circContainer) {
     const buckets = Object.values(report.circadianBuckets);
@@ -1851,7 +2624,7 @@ function renderDeepAnalytics() {
     }).join('');
   }
 
-  // Deep Work & Velocity card
+  // ⚡ Deep Work & Velocity Card
   const dwVal = document.getElementById('deepWorkRatioVal');
   if (dwVal) dwVal.textContent = `${report.deepWorkRatio}%`;
   const avgVal = document.getElementById('avgSessionVal');
@@ -1874,7 +2647,13 @@ function renderDeepAnalytics() {
     dwSubtext.textContent = `${report.deepWorkMinutes} of ${report.totalMinutes} mins in sustained (≥45m) blocks`;
   }
 
-  // Subject Equilibrium & Ebbinghaus Scientific Recall Matrix
+  // 🕸️ Subject Equilibrium & Cognitive Radar Polygon
+  const radarCanvas = document.getElementById('subjectRadarCanvas');
+  if (radarCanvas) {
+    drawSubjectRadar(radarCanvas, report.subjectEquilibrium);
+  }
+
+  // Ebbinghaus Scientific Recall Matrix
   const eqList = document.getElementById('subjectEquilibriumList');
   if (eqList) {
     if (report.subjectEquilibrium.length === 0) {
@@ -1916,7 +2695,7 @@ function renderDeepAnalytics() {
     }
   }
 
-  // Cognitive Work-Type Distribution
+  // 🧩 Cognitive Work-Type Distribution
   const cwtList = document.getElementById('cognitiveWorkTypeList');
   if (cwtList) {
     if (report.cognitiveWorkTypes.length === 0) {
@@ -1940,7 +2719,9 @@ function renderDeepAnalytics() {
   }
 }
 
-/* ---------- full analysis pdf export ---------- */
+/* ============================================================
+   📑 FULL EXECUTIVE ANALYSIS PDF EXPORT (100% PARITY & VECTORS)
+   ============================================================ */
 async function exportAnalysisPdf() {
   if (!window.jspdf || !window.jspdf.jsPDF) {
     showToast('jsPDF library not loaded');
@@ -1959,7 +2740,7 @@ async function exportAnalysisPdf() {
     const periodLabel = currentAnalyticsPeriod === 'all' ? 'All Time' : `Last ${currentAnalyticsPeriod} Days`;
     const today = todayStr();
 
-    // 1. Header Banner
+    // Page 1: Dark Header Banner
     doc.setFillColor(4, 14, 8); // Dark #040e08
     doc.rect(0, 0, 210, 36, 'F');
 
@@ -1979,7 +2760,6 @@ async function exportAnalysisPdf() {
 
     let currentY = 42;
 
-    // If selected period has 0 sessions but user has historical data, provide full All-Time analysis
     const hasHistory = report.totalMinutes === 0 && report.allStudyTotalCount > 0;
     const effectiveReport = hasHistory ? computeAnalyticsReport('all') : report;
 
@@ -2003,7 +2783,7 @@ async function exportAnalysisPdf() {
       currentY = doc.lastAutoTable.finalY + 6;
     }
 
-    // 2. Executive KPIs Table
+    // 1. Executive KPIs Table
     const velText = report.totalMinutes > 0 
       ? `${report.velocity >= 0 ? '+' : ''}${report.velocity}% vs prior period`
       : (hasHistory ? `All-Time: ${effectiveReport.totalHours} hrs` : 'N/A (0 min in period)');
@@ -2045,32 +2825,88 @@ async function exportAnalysisPdf() {
       margin: { left: 14, right: 14 }
     });
 
-    currentY = doc.lastAutoTable.finalY + 8;
+    currentY = doc.lastAutoTable.finalY + 6;
 
-    // 3. Circadian Rhythm Table
-    const circRows = [
-      ['Morning (05:00 AM - 12:00 PM)', effectiveReport.circadianBuckets.morning],
-      ['Afternoon (12:00 PM - 05:00 PM)', effectiveReport.circadianBuckets.afternoon],
-      ['Evening (05:00 PM - 10:00 PM)', effectiveReport.circadianBuckets.evening],
-      ['Night (10:00 PM - 05:00 AM)', effectiveReport.circadianBuckets.night]
-    ].map(([label, b]) => {
-      const pct = effectiveReport.totalMinutes > 0 ? Math.round((b.mins / effectiveReport.totalMinutes) * 100) : 0;
-      return [label, `${(b.mins / 60).toFixed(1)} hrs`, `${b.mins} mins`, `${pct}%`];
-    });
+    // 2. Exam & Syllabus Projection Audit Table
+    const proj = effectiveReport.examProjection;
+    const projRows = [
+      [
+        cleanPdfText(`Exam / Goal: ${proj.examName}`),
+        cleanPdfText(`Deadline: ${proj.targetDate} (${proj.daysRemaining} days left)`),
+        cleanPdfText(`Status: ${proj.statusBadgeText}`)
+      ],
+      [
+        cleanPdfText(`Completed: ${proj.completedHours.toFixed(1)}h / ${proj.targetHours}h`),
+        cleanPdfText(`Remaining: ${proj.remainingHours.toFixed(1)}h`),
+        cleanPdfText(`Required Pace: ${proj.requiredDailyHours.toFixed(1)} hrs/day`)
+      ],
+      [
+        cleanPdfText(`Actual 7-Day Velocity: ${proj.currentDailyHours.toFixed(1)} hrs/day`),
+        cleanPdfText(`Pace Delta: ${proj.paceDeltaHours >= 0 ? '+' : ''}${proj.paceDeltaHours.toFixed(1)} hrs/day`),
+        cleanPdfText(`Projected Finish: ${proj.projectedDate}`)
+      ],
+      [
+        { content: cleanPdfText(`Projection Audit: ${proj.statusDescription}`), colSpan: 3, styles: { fontStyle: 'italic', textColor: [71, 85, 105] } }
+      ]
+    ];
 
     doc.autoTable({
       startY: currentY,
-      head: [['CIRCADIAN TIME-OF-DAY BREAKDOWN', 'HOURS', 'MINUTES', 'SHARE (%)']],
-      body: circRows,
-      theme: 'striped',
+      head: [['EXAM & SYLLABUS PROJECTION AUDIT TABLE', '', '']],
+      body: projRows,
+      theme: 'grid',
       headStyles: { fillColor: [6, 95, 70], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 9 },
       styles: { fontSize: 8, cellPadding: 2.5 },
       margin: { left: 14, right: 14 }
     });
 
-    currentY = doc.lastAutoTable.finalY + 8;
+    currentY = doc.lastAutoTable.finalY + 6;
 
-    // 4. Subject Equilibrium & Ebbinghaus Scientific Recall Matrix Table
+    // 3. Cognitive Workload & Fatigue Index Table
+    const fatigue = effectiveReport.fatigueReport;
+    const fatigueRows = [
+      [
+        cleanPdfText(`Fatigue Index Score: ${fatigue.fatigueScore} / 100`),
+        cleanPdfText(`Classification: ${fatigue.tierLabel}`),
+        cleanPdfText(`7-Day Daily Load: ${fatigue.avgDailyHours7d.toFixed(1)} hrs/day`)
+      ],
+      [
+        cleanPdfText(`High-Strain Days (>=5h): ${fatigue.consecutiveHighDays} consecutive`),
+        cleanPdfText(`Recovery Days (<2h): ${fatigue.recoveryDaysCount} of 7 days`),
+        cleanPdfText(`Rest Ratio: ${Math.round((fatigue.recoveryDaysCount / 7) * 100)}%`)
+      ],
+      [
+        { content: cleanPdfText(`Behavioral Assessment: ${fatigue.adviceText}`), colSpan: 3, styles: { fontStyle: 'italic', textColor: [71, 85, 105] } }
+      ]
+    ];
+
+    doc.autoTable({
+      startY: currentY,
+      head: [['COGNITIVE WORKLOAD & RECOVERY ASSESSMENT', '', '']],
+      body: fatigueRows,
+      theme: 'grid',
+      headStyles: { fillColor: [30, 41, 59], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 9 },
+      styles: { fontSize: 8, cellPadding: 2.5 },
+      margin: { left: 14, right: 14 }
+    });
+
+    currentY = doc.lastAutoTable.finalY + 6;
+
+    // 4. Vector 24-Hour Continuous Focus Density Wave (Drawn directly on Page 1)
+    doc.setFontSize(8.5);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(30, 41, 59);
+    doc.text('24-HOUR CONTINUOUS FOCUS DENSITY WAVE (00:00 - 23:59)', 14, currentY + 3);
+    currentY += 5;
+
+    drawPdfCircadianWave(doc, 14, currentY, 182, 38, effectiveReport.hourlyMins);
+    currentY += 44;
+
+    // ---------------- PAGE 2 ----------------
+    doc.addPage();
+    currentY = 18;
+
+    // 5. Subject Equilibrium & Ebbinghaus Scientific Recall Matrix Table
     const subjRows = effectiveReport.subjectEquilibrium.map(s => {
       const statusText = s.daysAgo === 0 ? 'Today' : (s.daysAgo === 1 ? 'Yesterday' : `${s.daysAgo} days ago`);
       const recallText = s.retentionPct < 60 
@@ -2092,18 +2928,23 @@ async function exportAnalysisPdf() {
       body: subjRows.length > 0 ? subjRows : [['No subjects recorded in this period', '-', '-', '-', '-', '-']],
       theme: 'striped',
       headStyles: { fillColor: [201, 150, 47], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8.5 },
-      styles: { fontSize: 7.5, cellPadding: 2.5 },
+      styles: { fontSize: 7.5, cellPadding: 2.2 },
       margin: { left: 14, right: 14 }
     });
 
     currentY = doc.lastAutoTable.finalY + 8;
 
-    if (currentY > 215) {
-      doc.addPage();
-      currentY = 20;
-    }
+    // 6. Vector Subject Equilibrium Radar Chart (Drawn directly on Page 2)
+    doc.setFontSize(8.5);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(30, 41, 59);
+    doc.text('CURRICULUM EQUILIBRIUM RADAR POLYGON', 14, currentY + 3);
+    currentY += 6;
 
-    // 5. Cognitive Work Modality Breakdown Table
+    drawPdfRadarChart(doc, 105, currentY + 32, 28, effectiveReport.subjectEquilibrium);
+    currentY += 68;
+
+    // 7. Cognitive Work Modality Breakdown Table
     const workRows = effectiveReport.cognitiveWorkTypes.map(w => {
       const activeType = ['Revision', 'Practice', 'Mock Test'].includes(w.name) ? 'Active Recall / Test' : 'Content Acquisition / Notes';
       return [cleanPdfText(w.name), `${w.mins} mins`, `${w.pct}%`, activeType];
@@ -2115,18 +2956,13 @@ async function exportAnalysisPdf() {
       body: workRows.length > 0 ? workRows : [['No activity recorded in this period', '-', '-', '-']],
       theme: 'striped',
       headStyles: { fillColor: [30, 41, 59], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 9 },
-      styles: { fontSize: 8, cellPadding: 2.5 },
+      styles: { fontSize: 8, cellPadding: 2.2 },
       margin: { left: 14, right: 14 }
     });
 
     currentY = doc.lastAutoTable.finalY + 8;
 
-    // 6. Deterministic Cognitive Insights Box
-    if (currentY > 225) {
-      doc.addPage();
-      currentY = 20;
-    }
-
+    // 8. Deterministic Cognitive Insights Box
     const insightRows = effectiveReport.smartInsights.map(i => {
       return [cleanPdfText(`${i.icon || '[Insight]'} ${i.text}`)];
     });
@@ -2141,15 +2977,12 @@ async function exportAnalysisPdf() {
       margin: { left: 14, right: 14 }
     });
 
-    currentY = doc.lastAutoTable.finalY + 8;
+    // ---------------- PAGE 3+ ----------------
+    // 9. Complete Session Audit Log Table
+    doc.addPage();
+    currentY = 18;
 
-    // 7. Complete Session Audit Log Table
-    if (currentY > 210) {
-      doc.addPage();
-      currentY = 20;
-    }
-
-    const sessionRows = effectiveReport.filteredSessions.slice(0, 50).map(s => {
+    const sessionRows = effectiveReport.filteredSessions.slice(0, 75).map(s => {
       const timeStr = s.ts ? formatTimeRange(s.ts, s.minutes) : s.date;
       return [s.date, cleanPdfText(timeStr), cleanPdfText(s.subject), cleanPdfText(s.workType || 'Other'), `${s.minutes}m`];
     });
@@ -2168,7 +3001,7 @@ async function exportAnalysisPdf() {
       margin: { left: 14, right: 14 }
     });
 
-    // Page Numbers Footer
+    // Page Numbers Footer on all pages
     const pageCount = doc.internal.getNumberOfPages();
     for (let i = 1; i <= pageCount; i++) {
       doc.setPage(i);
@@ -2186,7 +3019,7 @@ async function exportAnalysisPdf() {
   } finally {
     if (btn) {
       btn.disabled = false;
-      btn.innerHTML = '<span>📑</span> Analysis PDF';
+      btn.innerHTML = '<span>📑</span> Full Analysis PDF';
     }
   }
 }
@@ -2204,6 +3037,81 @@ function setupAnalyticsEvents() {
   const downloadAnalysisPdfBtn = document.getElementById('downloadAnalysisPdfBtn');
   if (downloadAnalysisPdfBtn) {
     downloadAnalysisPdfBtn.addEventListener('click', exportAnalysisPdf);
+  }
+
+  // Exam Goal Edit Modal Setup
+  const examGoalEditBtn = document.getElementById('examGoalEditBtn');
+  const examGoalModal = document.getElementById('examGoalModal');
+  const examGoalCancelBtn = document.getElementById('examGoalCancelBtn');
+  const examGoalSaveBtn = document.getElementById('examGoalSaveBtn');
+  const examGoalNameInput = document.getElementById('examGoalNameInput');
+  const examGoalDateInput = document.getElementById('examGoalDateInput');
+  const examGoalHoursInput = document.getElementById('examGoalHoursInput');
+  const examGoalScopeChips = document.getElementById('examGoalScopeChips');
+
+  let selectedScopes = new Set();
+
+  if (examGoalEditBtn && examGoalModal) {
+    examGoalEditBtn.addEventListener('click', () => {
+      const goal = getExamGoal();
+      if (examGoalNameInput) examGoalNameInput.value = goal.examName || '';
+      if (examGoalDateInput) examGoalDateInput.value = goal.targetDate || '';
+      if (examGoalHoursInput) examGoalHoursInput.value = goal.targetHours || 100;
+
+      selectedScopes = new Set(goal.subjectScope || []);
+
+      // Populate Scope Chips from distinct available subjects
+      if (examGoalScopeChips) {
+        const availableSubjs = [...new Set([
+          ...(prefs.subjects || []).map(s => typeof s === 'string' ? s : s.name),
+          ...sessions.map(s => s.subject && s.subject.includes(' - ') ? s.subject.split(' - ')[0] : s.subject)
+        ])].filter(Boolean);
+
+        examGoalScopeChips.innerHTML = availableSubjs.map(subj => {
+          const isAct = selectedScopes.has(subj);
+          return `<div class="sel-chip ${isAct ? 'active' : ''}" data-subject="${escapeHTML(subj)}">${escapeHTML(subj)}</div>`;
+        }).join('');
+
+        examGoalScopeChips.querySelectorAll('.sel-chip').forEach(chip => {
+          chip.addEventListener('click', () => {
+            const subj = chip.getAttribute('data-subject');
+            if (selectedScopes.has(subj)) {
+              selectedScopes.delete(subj);
+              chip.classList.remove('active');
+            } else {
+              selectedScopes.add(subj);
+              chip.classList.add('active');
+            }
+          });
+        });
+      }
+
+      examGoalModal.classList.add('show');
+    });
+  }
+
+  if (examGoalCancelBtn && examGoalModal) {
+    examGoalCancelBtn.addEventListener('click', () => {
+      examGoalModal.classList.remove('show');
+    });
+  }
+
+  if (examGoalSaveBtn && examGoalModal) {
+    examGoalSaveBtn.addEventListener('click', () => {
+      const name = examGoalNameInput?.value.trim() || 'Target Exam';
+      const date = examGoalDateInput?.value || '';
+      const hours = Number(examGoalHoursInput?.value) || 100;
+
+      saveExamGoal({
+        examName: name,
+        targetDate: date,
+        targetHours: hours,
+        subjectScope: Array.from(selectedScopes)
+      });
+
+      examGoalModal.classList.remove('show');
+      showToast('🎯 Exam goal updated successfully!');
+    });
   }
 }
 setupAnalyticsEvents();

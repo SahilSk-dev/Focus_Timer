@@ -250,6 +250,58 @@
           <!-- Empty Notice Banner when current filter has 0 sessions but all-time has data -->
           <div id="analyticsEmptyNotice" class="analytics-empty-notice" style="display:none;"></div>
 
+          <!-- Exam & Syllabus Projection Calculator Card (Full Width) -->
+          <div class="exam-projection-card" id="examProjectionCard">
+            <div class="exam-projection-header">
+              <div class="exam-projection-title-wrap">
+                <span class="exam-projection-icon">🎯</span>
+                <div>
+                  <div class="exam-projection-name" id="examTargetName">Target Exam / Syllabus</div>
+                  <div class="exam-projection-sub" id="examTargetSub">Deterministic Pace & Horizon Projection</div>
+                </div>
+              </div>
+              <div class="exam-projection-actions">
+                <span class="exam-countdown-pill" id="examCountdownPill">-- Days Left</span>
+                <button class="exam-edit-btn" id="examGoalEditBtn" title="Configure Exam / Syllabus Target">✏️ Edit Goal</button>
+              </div>
+            </div>
+
+            <!-- Syllabus Progress Bar -->
+            <div class="exam-progress-wrap">
+              <div class="exam-progress-labels">
+                <span id="examCompletedHoursLabel">0.0h Completed</span>
+                <span id="examTargetHoursLabel">Target: 150h</span>
+              </div>
+              <div class="track" style="height: 8px;"><div class="fill green" id="examProgressFill" style="width: 0%;"></div></div>
+            </div>
+
+            <!-- 4-Stat Metrics Grid -->
+            <div class="exam-metrics-grid">
+              <div class="exam-metric-box">
+                <div class="exam-metric-val" id="examRemainingHoursVal">0h</div>
+                <div class="exam-metric-label">Remaining Hours</div>
+              </div>
+              <div class="exam-metric-box">
+                <div class="exam-metric-val" id="examRequiredPaceVal">0.0h/d</div>
+                <div class="exam-metric-label">Required Daily Pace</div>
+              </div>
+              <div class="exam-metric-box">
+                <div class="exam-metric-val" id="examActualVelocityVal">0.0h/d</div>
+                <div class="exam-metric-label">Actual Velocity (7d)</div>
+              </div>
+              <div class="exam-metric-box">
+                <div class="exam-metric-val" id="examProjectedDateVal">--</div>
+                <div class="exam-metric-label">Projected Finish</div>
+              </div>
+            </div>
+
+            <!-- Feasibility Status Banner -->
+            <div class="exam-status-footer">
+              <div class="exam-status-badge" id="examFeasibilityBadge">Calculating Feasibility...</div>
+              <div class="exam-status-text" id="examFeasibilityText">Analyzing trailing 7-day study pace against syllabus target...</div>
+            </div>
+          </div>
+
           <!-- Desktop Analytics Grid -->
           <div class="analytics-grid">
             <!-- Card 1: Focus Quality Score (FQS / Cognitive Quality Index) -->
@@ -285,17 +337,53 @@
               </div>
             </div>
 
-            <!-- Card 2: Circadian Peak Focus Hours -->
+            <!-- Card 2: Cognitive Workload & Fatigue Index -->
+            <div class="analytics-card">
+              <div class="analytics-card-header">
+                <span class="analytics-icon">🔋</span>
+                <span class="analytics-card-title">Cognitive Workload & Fatigue</span>
+              </div>
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                <div style="display:flex; align-items:baseline; gap:4px;">
+                  <span class="fatigue-score-val" id="fatigueScoreVal">0</span>
+                  <span style="font-size:0.85rem; color:var(--text-dim); font-weight:600;">/ 100</span>
+                </div>
+                <div class="fatigue-tier-badge" id="fatigueTierBadge">Evaluating...</div>
+              </div>
+              <div class="track" style="margin-bottom:10px;"><div class="fill green" id="fatigueFill" style="width:0%;"></div></div>
+              <div class="analytics-stat-row">
+                <div>
+                  <div class="analytics-stat-val" id="fatigueAvgLoadVal">0.0h</div>
+                  <div class="analytics-stat-label">7d Daily Load</div>
+                </div>
+                <div>
+                  <div class="analytics-stat-val" id="fatigueHighStrainVal">0d</div>
+                  <div class="analytics-stat-label">High Strain (≥5h)</div>
+                </div>
+                <div>
+                  <div class="analytics-stat-val" id="fatigueRestDaysVal">0d</div>
+                  <div class="analytics-stat-label">Recovery (&lt;2h)</div>
+                </div>
+              </div>
+              <div class="analytics-stat-subtext" id="fatigueAdviceText" style="font-size:0.72rem; margin-top:8px;">
+                Optimal Cognitive Recovery: High endurance reserve for intensive study blocks.
+              </div>
+            </div>
+
+            <!-- Card 3: Circadian Rhythm & 24h Continuous Focus Density Wave -->
             <div class="analytics-card">
               <div class="analytics-card-header">
                 <span class="analytics-icon">🌅</span>
-                <span class="analytics-card-title">Circadian Rhythm & Peak Hours</span>
+                <span class="analytics-card-title">Circadian Rhythm & 24h Density</span>
               </div>
               <div class="peak-focus-badge" id="peakFocusBadge">Analyzing...</div>
-              <div class="circadian-bars" id="circadianBars"></div>
+              <div class="circadian-wave-wrap">
+                <canvas id="circadianDensityCanvas" width="480" height="150"></canvas>
+              </div>
+              <div class="circadian-bars" id="circadianBars" style="margin-top:10px;"></div>
             </div>
 
-            <!-- Card 3: Deep Work Stamina & Velocity -->
+            <!-- Card 4: Deep Work Stamina & Velocity -->
             <div class="analytics-card">
               <div class="analytics-card-header">
                 <span class="analytics-icon">⚡</span>
@@ -319,7 +407,7 @@
               <div class="analytics-stat-subtext" id="deepWorkSubtext">0 of 0 mins in deep focus blocks</div>
             </div>
 
-            <!-- Card 4: Cognitive Work-Type Distribution -->
+            <!-- Card 5: Cognitive Work-Type Distribution -->
             <div class="analytics-card">
               <div class="analytics-card-header">
                 <span class="analytics-icon">🧩</span>
@@ -328,13 +416,23 @@
               <div id="cognitiveWorkTypeList" class="worktype-breakdown-list"></div>
             </div>
 
-            <!-- Card 5: Subject Equilibrium & Ebbinghaus Recall Matrix (Full Width) -->
+            <!-- Card 6: Subject Equilibrium & Cognitive Radar Polygon (Full Width) -->
             <div class="analytics-card full-width">
               <div class="analytics-card-header">
                 <span class="analytics-icon">⚖️</span>
-                <span class="analytics-card-title">Subject Equilibrium & Ebbinghaus Recall Matrix</span>
+                <span class="analytics-card-title">Subject Equilibrium & Cognitive Radar</span>
               </div>
-              <div id="subjectEquilibriumList" class="equilibrium-list"></div>
+              <div class="equilibrium-flex-layout">
+                <div class="radar-chart-wrap" id="radarChartWrap">
+                  <div class="radar-chart-title">Curriculum Radar Polygon</div>
+                  <canvas id="subjectRadarCanvas" width="340" height="300"></canvas>
+                  <div id="radarFallbackNotice" class="radar-fallback-note" style="display:none;"></div>
+                </div>
+                <div class="equilibrium-list-wrap">
+                  <div class="radar-chart-title">Ebbinghaus Memory Decay & Retention Matrix</div>
+                  <div id="subjectEquilibriumList" class="equilibrium-list"></div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -518,6 +616,33 @@
 
     <div class="modal-btn-row" style="justify-content:center;">
       <button class="modal-btn primary" id="badgeModalClose" style="min-width:110px;">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Exam & Syllabus Target Modal -->
+<div class="modal-overlay" id="examGoalModal">
+  <div class="modal-box" style="max-width:440px;">
+    <div class="modal-title" style="margin-bottom:6px;">🎯 Exam & Syllabus Target</div>
+    <div style="font-size:0.8rem; color:var(--text-dim); margin-bottom:14px;">Set exam date and target syllabus hours to project required daily pace.</div>
+    <div class="field-label" for="examGoalNameInput">Target Exam / Goal Name</div>
+    <input type="text" id="examGoalNameInput" placeholder="e.g. Civil Services / Final Exam" maxlength="40" style="margin-bottom:12px;">
+    <div class="time-row" style="margin-bottom:12px;">
+      <div>
+        <label class="field-label" for="examGoalDateInput">Target Date</label>
+        <input type="date" id="examGoalDateInput">
+      </div>
+      <div>
+        <label class="field-label" for="examGoalHoursInput">Target Hours</label>
+        <input type="number" id="examGoalHoursInput" min="1" max="9999" step="5" placeholder="150">
+      </div>
+    </div>
+    <div class="field-label" style="margin-bottom:4px;">Subject Scope (Optional)</div>
+    <div class="hint" style="margin-bottom:8px; font-size:0.75rem;">Select specific subjects or leave all unselected to count everything.</div>
+    <div id="examGoalScopeChips" class="sel-chips" style="max-height:110px; overflow-y:auto; margin-bottom:16px;"></div>
+    <div class="modal-btn-row" style="justify-content:flex-end;">
+      <button class="modal-btn cancel" id="examGoalCancelBtn">Cancel</button>
+      <button class="modal-btn primary" id="examGoalSaveBtn">Save Goal</button>
     </div>
   </div>
 </div>

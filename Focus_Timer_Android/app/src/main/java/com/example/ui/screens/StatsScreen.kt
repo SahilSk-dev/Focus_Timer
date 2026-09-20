@@ -4,6 +4,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -13,6 +14,18 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.nativeCanvas
+import com.example.util.ExamGoal
+import com.example.util.ExamProjection
+import com.example.util.FatigueReport
+import com.example.util.SubjectEquilibriumItem
+import kotlin.math.abs
+import kotlin.math.cos
+import kotlin.math.sin
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -192,12 +205,19 @@ fun StatsScreen(
 
     // Cognitive Deep Analysis Engine computation (Computed asynchronously on Dispatchers.Default)
     var analyticsTimeframe by remember { mutableStateOf(AnalyticsTimeframe.LAST_7_DAYS) }
+    val examGoal by viewModel.examGoal.collectAsState()
+    val availableSubjects = remember(studySessions) {
+        studySessions.map { it.subject.split(" - ").firstOrNull() ?: it.subject }
+            .filter { it.isNotBlank() }
+            .distinct()
+            .sorted()
+    }
     val analyticsReport by produceState(
         initialValue = AnalyticsReport.empty(analyticsTimeframe),
-        studySessions, analyticsTimeframe
+        studySessions, analyticsTimeframe, examGoal
     ) {
         value = withContext(Dispatchers.Default) {
-            AnalyticsEngine.computeReport(studySessions, analyticsTimeframe)
+            AnalyticsEngine.computeReport(studySessions, analyticsTimeframe, examGoal)
         }
     }
 
@@ -499,6 +519,11 @@ fun StatsScreen(
             report = analyticsReport,
             currentTimeframe = analyticsTimeframe,
             onTimeframeSelected = { analyticsTimeframe = it },
+            examGoal = examGoal,
+            onSaveExamGoal = { name, date, hours, scope ->
+                viewModel.updateExamGoal(name, date, hours, scope)
+            },
+            availableSubjects = availableSubjects,
             onExportPdf = {
                 try {
                     PdfExportHelper.generateAndShareAnalysisPdf(
@@ -1424,13 +1449,31 @@ private fun calculate7DaysRanking(sessions: List<StudySessionEntity>): List<Rank
     return map.entries.sortedByDescending { it.value }.map { RankItem(it.key, it.value) }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun DeepAnalysisEngineSection(
     report: AnalyticsReport,
     currentTimeframe: AnalyticsTimeframe,
     onTimeframeSelected: (AnalyticsTimeframe) -> Unit,
+    examGoal: ExamGoal,
+    onSaveExamGoal: (String, String, Double, Set<String>) -> Unit,
+    availableSubjects: List<String>,
     onExportPdf: () -> Unit
 ) {
+    var showGoalDialog by remember { mutableStateOf(false) }
+
+    if (showGoalDialog) {
+        ExamGoalEditDialog(
+            currentGoal = examGoal,
+            availableSubjects = availableSubjects,
+            onDismiss = { showGoalDialog = false },
+            onSave = { name, date, hours, scope ->
+                onSaveExamGoal(name, date, hours, scope)
+                showGoalDialog = false
+            }
+        )
+    }
+
     Surface(
         modifier = Modifier.fillMaxWidth(),
         color = PanelDark,
@@ -1517,7 +1560,17 @@ private fun DeepAnalysisEngineSection(
 
             Spacer(modifier = Modifier.height(14.dp))
 
-            // 0. Focus Quality Score (FQS / Cognitive Quality Index)
+            // 0. Exam & Syllabus Target Projection
+            report.examProjection?.let { proj ->
+                ExamProjectionCard(
+                    goal = examGoal,
+                    projection = proj,
+                    onEditClick = { showGoalDialog = true }
+                )
+                Spacer(modifier = Modifier.height(10.dp))
+            }
+
+            // 0.5 Focus Quality Score (FQS / Cognitive Quality Index)
             Surface(
                 modifier = Modifier.fillMaxWidth(),
                 color = PanelElevated,
@@ -1643,6 +1696,11 @@ private fun DeepAnalysisEngineSection(
 
             Spacer(modifier = Modifier.height(10.dp))
 
+            // 0.75 Cognitive Workload & Fatigue Index
+            CognitiveFatigueCard(fatigue = report.fatigueReport)
+
+            Spacer(modifier = Modifier.height(10.dp))
+
             // 1. Circadian Peak Focus Card
             Surface(
                 modifier = Modifier.fillMaxWidth(),
@@ -1685,7 +1743,24 @@ private fun DeepAnalysisEngineSection(
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    Text(
+                        text = "24-HOUR FOCUS DENSITY WAVE",
+                        color = TextDim,
+                        fontSize = 9.5.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    CircadianDensityWaveCanvas(
+                        hourlyMins = report.hourlyMins,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(90.dp)
+                    )
+
+                    Spacer(modifier = Modifier.height(10.dp))
 
                     val maxCirc = (report.circadianBuckets.maxOfOrNull { it.minutes } ?: 1).coerceAtLeast(1)
                     report.circadianBuckets.forEach { bucket ->
@@ -1803,7 +1878,24 @@ private fun DeepAnalysisEngineSection(
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Bold
                     )
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    Text(
+                        text = "CURRICULUM EQUILIBRIUM RADAR POLYGON",
+                        color = TextDim,
+                        fontSize = 9.5.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    SubjectRadarCanvas(
+                        subjects = report.subjectEquilibrium,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(180.dp)
+                    )
+
+                    Spacer(modifier = Modifier.height(12.dp))
 
                     if (report.subjectEquilibrium.isEmpty()) {
                         Text(text = "No subjects recorded in this period.", color = TextDim, fontSize = 11.sp)
@@ -1899,3 +1991,754 @@ private fun DeepAnalysisEngineSection(
         }
     }
 }
+
+// ============================================================
+// EXAM GOAL EDIT DIALOG
+// ============================================================
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun ExamGoalEditDialog(
+    currentGoal: ExamGoal,
+    availableSubjects: List<String>,
+    onDismiss: () -> Unit,
+    onSave: (name: String, targetDate: String, targetHours: Double, subjectScope: Set<String>) -> Unit
+) {
+    var name by remember { mutableStateOf(currentGoal.name) }
+    var targetDate by remember { mutableStateOf(currentGoal.targetDate) }
+    var targetHoursText by remember { mutableStateOf(currentGoal.targetHours.toString()) }
+    var selectedScope by remember { mutableStateOf(currentGoal.subjectScope) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                text = "Configure Exam & Target",
+                color = TextPrimary,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Bold
+            )
+        },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text("Exam / Goal Name", color = TextDim) },
+                    singleLine = true,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = GoldAccent,
+                        unfocusedBorderColor = LineBorder,
+                        focusedTextColor = TextPrimary,
+                        unfocusedTextColor = TextPrimary
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                OutlinedTextField(
+                    value = targetDate,
+                    onValueChange = { targetDate = it },
+                    label = { Text("Target Date (YYYY-MM-DD)", color = TextDim) },
+                    singleLine = true,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = GoldAccent,
+                        unfocusedBorderColor = LineBorder,
+                        focusedTextColor = TextPrimary,
+                        unfocusedTextColor = TextPrimary
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                OutlinedTextField(
+                    value = targetHoursText,
+                    onValueChange = { targetHoursText = it },
+                    label = { Text("Total Syllabus Target (Hours)", color = TextDim) },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    singleLine = true,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = GoldAccent,
+                        unfocusedBorderColor = LineBorder,
+                        focusedTextColor = TextPrimary,
+                        unfocusedTextColor = TextPrimary
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Text(
+                    text = "Subject Scope (optional)",
+                    color = TextDim,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+
+                // All subjects chip
+                val isAllSelected = selectedScope.isEmpty()
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(if (isAllSelected) GoldAccent else PanelElevated)
+                        .border(1.dp, if (isAllSelected) GoldAccent else LineBorder, RoundedCornerShape(16.dp))
+                        .clickable { selectedScope = emptySet() }
+                        .padding(horizontal = 10.dp, vertical = 5.dp)
+                ) {
+                    Text(
+                        text = "All Subjects",
+                        color = if (isAllSelected) BgDark else TextDim,
+                        fontSize = 11.sp,
+                        fontWeight = if (isAllSelected) FontWeight.Bold else FontWeight.Normal
+                    )
+                }
+
+                if (availableSubjects.isNotEmpty()) {
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        availableSubjects.forEach { subj ->
+                            val isSubjSelected = selectedScope.contains(subj)
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(16.dp))
+                                    .background(if (isSubjSelected) SuccessGreen else PanelElevated)
+                                    .border(1.dp, if (isSubjSelected) SuccessGreen else LineBorder, RoundedCornerShape(16.dp))
+                                    .clickable {
+                                        selectedScope = if (isSubjSelected) {
+                                            selectedScope - subj
+                                        } else {
+                                            selectedScope + subj
+                                        }
+                                    }
+                                    .padding(horizontal = 10.dp, vertical = 5.dp)
+                            ) {
+                                Text(
+                                    text = subj,
+                                    color = if (isSubjSelected) BgDark else TextDim,
+                                    fontSize = 11.sp,
+                                    fontWeight = if (isSubjSelected) FontWeight.Bold else FontWeight.Normal
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    val parsedHours = targetHoursText.toDoubleOrNull() ?: currentGoal.targetHours
+                    val cleanDate = targetDate.trim().ifBlank { currentGoal.targetDate }
+                    val cleanName = name.trim().ifBlank { currentGoal.name }
+                    onSave(cleanName, cleanDate, parsedHours, selectedScope)
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = GoldAccent)
+            ) {
+                Text("Save Goal", color = BgDark, fontWeight = FontWeight.Bold)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel", color = TextDim)
+            }
+        },
+        containerColor = PanelDark,
+        shape = RoundedCornerShape(14.dp)
+    )
+}
+
+// ============================================================
+// EXAM & SYLLABUS TARGET PROJECTION CARD
+// ============================================================
+@Composable
+private fun ExamProjectionCard(
+    goal: ExamGoal,
+    projection: ExamProjection,
+    onEditClick: () -> Unit
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = PanelElevated,
+        shape = RoundedCornerShape(12.dp),
+        border = BorderStroke(1.dp, LineBorder)
+    ) {
+        Column(modifier = Modifier.padding(14.dp)) {
+            // Header row
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
+                    Text(
+                        text = "🎯 ${goal.name}",
+                        color = TextPrimary,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        text = "Target Date: ${goal.targetDate}",
+                        color = TextDim,
+                        fontSize = 10.sp
+                    )
+                }
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    val daysRemaining = projection.daysRemaining
+                    val (countdownText, countdownColor, countdownBg) = when {
+                        daysRemaining > 0 -> Triple("$daysRemaining days left", GoldBright, Color(0xFF2E2718))
+                        daysRemaining == 0 -> Triple("Target is Today", Color(0xFF60A5FA), Color(0xFF1E3A8A))
+                        else -> Triple("${abs(daysRemaining)}d overdue", Color(0xFFF87171), Color(0xFF450A0A))
+                    }
+
+                    Surface(
+                        shape = RoundedCornerShape(6.dp),
+                        color = countdownBg,
+                        border = BorderStroke(1.dp, countdownColor.copy(alpha = 0.5f))
+                    ) {
+                        Text(
+                            text = countdownText,
+                            color = countdownColor,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp)
+                        )
+                    }
+
+                    IconButton(
+                        onClick = onEditClick,
+                        modifier = Modifier.size(28.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Edit,
+                            contentDescription = "Edit Target Goal",
+                            tint = GoldLight,
+                            modifier = Modifier.size(15.dp)
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // Progress Bar
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.Bottom
+            ) {
+                Text(
+                    text = "${String.format(Locale.US, "%.1f", projection.completedHours)}h / ${String.format(Locale.US, "%.0f", goal.targetHours)}h",
+                    color = GoldBright,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.ExtraBold
+                )
+                Text(
+                    text = "${projection.progressPercentage}% Completed",
+                    color = SuccessGreen,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+
+            Spacer(modifier = Modifier.height(6.dp))
+
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(6.dp)
+                    .clip(RoundedCornerShape(3.dp))
+                    .background(Color.White.copy(alpha = 0.08f))
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth((projection.progressPercentage / 100f).coerceIn(0f, 1f))
+                        .height(6.dp)
+                        .clip(RoundedCornerShape(3.dp))
+                        .background(GoldAccent)
+                )
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // 4-Metric Grid
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
+                    Text(text = "${String.format(Locale.US, "%.1f", projection.completedHours)}h", color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                    Text(text = "Completed", color = TextDim, fontSize = 9.sp)
+                }
+                Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
+                    Text(text = "${String.format(Locale.US, "%.1f", projection.remainingHours)}h", color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                    Text(text = "Remaining", color = TextDim, fontSize = 9.sp)
+                }
+                Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
+                    Text(text = "${String.format(Locale.US, "%.1f", projection.requiredDailyHours)}h/d", color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                    Text(text = "Required Pace", color = TextDim, fontSize = 9.sp)
+                }
+                Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
+                    Text(text = "${String.format(Locale.US, "%.1f", projection.currentDailyHours)}h/d", color = GoldBright, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                    Text(text = "7d Velocity", color = TextDim, fontSize = 9.sp)
+                }
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // Feasibility status badge & description
+            val (statusText, statusBg, statusBorder, statusFg) = when (projection.status) {
+                "COMPLETE" -> Quadruple("🎯 Goal Achieved (100%)", Color(0xFF064E3B), SuccessGreen, SuccessGreen)
+                "ON_TRACK" -> Quadruple("✓ On Pace / Ahead (+${String.format(Locale.US, "%.1f", projection.paceDeltaHours)}h/d)", Color(0xFF064E3B), SuccessGreen, SuccessGreen)
+                "MINOR_DEFICIT" -> Quadruple("⚠️ Minor Deficit (${String.format(Locale.US, "%.1f", projection.paceDeltaHours)}h/d)", Color(0xFF78350F), Color(0xFFF59E0B), Color(0xFFFBBF24))
+                "CRITICAL_LAG" -> Quadruple("🚨 Critical Deficit (${String.format(Locale.US, "%.1f", projection.paceDeltaHours)}h/d)", Color(0xFF450A0A), Color(0xFFEF4444), Color(0xFFF87171))
+                "DEADLINE_TODAY" -> Quadruple("⏳ Target Date is Today", Color(0xFF1E3A8A), Color(0xFF3B82F6), Color(0xFF60A5FA))
+                else -> Quadruple("⚠️ Target Date Passed", Color(0xFF450A0A), Color(0xFFEF4444), Color(0xFFF87171))
+            }
+
+            Surface(
+                shape = RoundedCornerShape(6.dp),
+                color = statusBg,
+                border = BorderStroke(1.dp, statusBorder.copy(alpha = 0.6f)),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)) {
+                    Text(
+                        text = statusText,
+                        color = statusFg,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = projection.statusDescription,
+                        color = statusFg.copy(alpha = 0.85f),
+                        fontSize = 9.5.sp,
+                        lineHeight = 13.sp
+                    )
+                }
+            }
+        }
+    }
+}
+
+// ============================================================
+// COGNITIVE WORKLOAD & FATIGUE INDEX CARD
+// ============================================================
+@Composable
+private fun CognitiveFatigueCard(
+    fatigue: FatigueReport
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = PanelElevated,
+        shape = RoundedCornerShape(12.dp),
+        border = BorderStroke(1.dp, LineBorder)
+    ) {
+        Column(modifier = Modifier.padding(14.dp)) {
+            // Header row
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "⚡ Cognitive Workload & Fatigue Index",
+                    color = TextPrimary,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold
+                )
+
+                val (tierBg, tierBorder, tierFg) = when (fatigue.classificationTier) {
+                    "OPTIMAL_RECOVERY" -> Triple(Color(0xFF064E3B), SuccessGreen, SuccessGreen)
+                    "SUSTAINED_HIGH_LOAD" -> Triple(Color(0xFF78350F), Color(0xFFF59E0B), Color(0xFFFBBF24))
+                    else -> Triple(Color(0xFF450A0A), Color(0xFFEF4444), Color(0xFFF87171))
+                }
+
+                Surface(
+                    shape = RoundedCornerShape(6.dp),
+                    color = tierBg,
+                    border = BorderStroke(1.dp, tierBorder)
+                ) {
+                    Text(
+                        text = fatigue.tierLabel,
+                        color = tierFg,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // Score Row
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.Bottom
+            ) {
+                Text(
+                    text = "${fatigue.fatigueScore}",
+                    color = when {
+                        fatigue.fatigueScore < 40 -> SuccessGreen
+                        fatigue.fatigueScore < 75 -> Color(0xFFFBBF24)
+                        else -> Color(0xFFF87171)
+                    },
+                    fontSize = 28.sp,
+                    fontWeight = FontWeight.ExtraBold
+                )
+                Text(
+                    text = " / 100",
+                    color = TextDim,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.padding(bottom = 4.dp, start = 2.dp)
+                )
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(5.dp)
+                    .clip(RoundedCornerShape(2.5.dp))
+                    .background(Color.White.copy(alpha = 0.08f))
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth((fatigue.fatigueScore.toFloat() / 100f).coerceIn(0f, 1f))
+                        .height(5.dp)
+                        .clip(RoundedCornerShape(2.5.dp))
+                        .background(
+                            when {
+                                fatigue.fatigueScore < 40 -> SuccessGreen
+                                fatigue.fatigueScore < 75 -> Color(0xFFF59E0B)
+                                else -> Color(0xFFEF4444)
+                            }
+                        )
+                )
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // 3-Metric Row
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
+                    Text(text = "${String.format(Locale.US, "%.1f", fatigue.avgDailyHours7d)}h/d", color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                    Text(text = "7d Daily Load", color = TextDim, fontSize = 9.sp)
+                }
+                Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
+                    Text(text = "${fatigue.consecutiveHighDays}d", color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                    Text(text = "High Strain (≥5h)", color = TextDim, fontSize = 9.sp)
+                }
+                Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
+                    Text(text = "${fatigue.recoveryDaysCount} / 7", color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                    Text(text = "Recovery (<2h)", color = TextDim, fontSize = 9.sp)
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Text(
+                text = fatigue.adviceText,
+                color = TextDim,
+                fontSize = 10.sp,
+                lineHeight = 14.sp
+            )
+        }
+    }
+}
+
+// ============================================================
+// CIRCADIAN CONTINUOUS DENSITY WAVE CANVAS
+// ============================================================
+@Composable
+private fun CircadianDensityWaveCanvas(
+    hourlyMins: IntArray,
+    modifier: Modifier = Modifier
+) {
+    Canvas(modifier = modifier) {
+        val w = size.width
+        val h = size.height
+        val padLeft = 20.dp.toPx()
+        val padRight = 14.dp.toPx()
+        val padTop = 14.dp.toPx()
+        val padBottom = 18.dp.toPx()
+        val plotW = w - padLeft - padRight
+        val plotH = h - padTop - padBottom
+
+        val maxMins = (hourlyMins.maxOrNull() ?: 10).coerceAtLeast(10).toFloat()
+
+        val points = Array(24) { i ->
+            val x = padLeft + (i.toFloat() / 23f) * plotW
+            val y = padTop + plotH * (1f - (hourlyMins[i].toFloat() / maxMins))
+            Offset(x, y)
+        }
+
+        // Draw area path
+        val areaPath = Path().apply {
+            moveTo(points[0].x, padTop + plotH)
+            lineTo(points[0].x, points[0].y)
+            for (i in 0 until points.size - 1) {
+                val p0 = points[maxOf(0, i - 1)]
+                val p1 = points[i]
+                val p2 = points[i + 1]
+                val p3 = points[minOf(points.size - 1, i + 2)]
+
+                val cp1x = p1.x + (p2.x - p0.x) / 6f
+                var cp1y = p1.y + (p2.y - p0.y) / 6f
+                val cp2x = p2.x - (p3.x - p1.x) / 6f
+                var cp2y = p2.y - (p3.y - p1.y) / 6f
+
+                val baseY = padTop + plotH
+                if (cp1y > baseY) cp1y = baseY
+                if (cp2y > baseY) cp2y = baseY
+
+                cubicTo(cp1x, cp1y, cp2x, cp2y, p2.x, p2.y)
+            }
+            lineTo(points[23].x, padTop + plotH)
+            close()
+        }
+
+        drawPath(
+            path = areaPath,
+            brush = Brush.verticalGradient(
+                colors = listOf(
+                    Color(0x5510B981),
+                    Color(0x1810B981),
+                    Color(0x0210B981)
+                ),
+                startY = padTop,
+                endY = padTop + plotH
+            )
+        )
+
+        // Draw stroke line
+        val strokePath = Path().apply {
+            moveTo(points[0].x, points[0].y)
+            for (i in 0 until points.size - 1) {
+                val p0 = points[maxOf(0, i - 1)]
+                val p1 = points[i]
+                val p2 = points[i + 1]
+                val p3 = points[minOf(points.size - 1, i + 2)]
+
+                val cp1x = p1.x + (p2.x - p0.x) / 6f
+                var cp1y = p1.y + (p2.y - p0.y) / 6f
+                val cp2x = p2.x - (p3.x - p1.x) / 6f
+                var cp2y = p2.y - (p3.y - p1.y) / 6f
+
+                val baseY = padTop + plotH
+                if (cp1y > baseY) cp1y = baseY
+                if (cp2y > baseY) cp2y = baseY
+
+                cubicTo(cp1x, cp1y, cp2x, cp2y, p2.x, p2.y)
+            }
+        }
+
+        drawPath(
+            path = strokePath,
+            color = Color(0xFF34D399),
+            style = Stroke(width = 1.8.dp.toPx())
+        )
+
+        // Peak point marker
+        var peakIdx = 0
+        var peakVal = 0
+        hourlyMins.forEachIndexed { idx, v ->
+            if (v > peakVal) {
+                peakVal = v
+                peakIdx = idx
+            }
+        }
+
+        if (peakVal > 0) {
+            val peakPt = points[peakIdx]
+            drawCircle(
+                color = Color(0x5534D399),
+                radius = 6.dp.toPx(),
+                center = peakPt
+            )
+            drawCircle(
+                color = Color(0xFF10B981),
+                radius = 3.dp.toPx(),
+                center = peakPt
+            )
+            drawCircle(
+                color = Color.White,
+                radius = 3.dp.toPx(),
+                center = peakPt,
+                style = Stroke(width = 1.dp.toPx())
+            )
+        }
+
+        // Hour labels on X-axis using nativeCanvas
+        val hourTicks = listOf(0, 4, 8, 12, 16, 20, 23)
+        val textPaint = android.graphics.Paint().apply {
+            color = android.graphics.Color.rgb(148, 163, 184)
+            textSize = 8.5.sp.toPx()
+            isAntiAlias = true
+            textAlign = android.graphics.Paint.Align.CENTER
+        }
+        hourTicks.forEach { hIdx ->
+            val pt = points[hIdx]
+            val ampm = if (hIdx >= 12) "p" else "a"
+            val hr = if (hIdx % 12 == 0) 12 else hIdx % 12
+            drawContext.canvas.nativeCanvas.drawText(
+                "$hr$ampm",
+                pt.x,
+                h - 2.dp.toPx(),
+                textPaint
+            )
+        }
+    }
+}
+
+// ============================================================
+// SUBJECT EQUILIBRIUM RADAR POLYGON CANVAS
+// ============================================================
+@Composable
+private fun SubjectRadarCanvas(
+    subjects: List<SubjectEquilibriumItem>,
+    modifier: Modifier = Modifier
+) {
+    if (subjects.size < 3) {
+        Box(
+            modifier = modifier
+                .fillMaxWidth()
+                .background(PanelDark, RoundedCornerShape(8.dp))
+                .border(1.dp, LineBorder, RoundedCornerShape(8.dp))
+                .padding(14.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(text = "⚖️", fontSize = 22.sp)
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "Polygonal Radar Standby",
+                    color = TextPrimary,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = "Radar web polygon requires 3+ subjects (currently ${subjects.size} recorded). Comparative balance bars are displayed below.",
+                    color = TextDim,
+                    fontSize = 10.sp,
+                    textAlign = TextAlign.Center
+                )
+            }
+        }
+        return
+    }
+
+    val topSubjects = subjects.take(8)
+    val n = topSubjects.size
+
+    Canvas(modifier = modifier) {
+        val cx = size.width / 2f
+        val cy = size.height / 2f
+        val radius = minOf(cx, cy) - 30.dp.toPx()
+
+        // 1. Concentric Web Rings (25%, 50%, 75%, 100%)
+        val rings = listOf(0.25f, 0.50f, 0.75f, 1.0f)
+        rings.forEachIndexed { index, pct ->
+            val r = radius * pct
+            val ringPath = Path().apply {
+                for (i in 0 until n) {
+                    val angle = -Math.PI / 2.0 + (2.0 * Math.PI * i) / n
+                    val x = cx + (r * cos(angle)).toFloat()
+                    val y = cy + (r * sin(angle)).toFloat()
+                    if (i == 0) moveTo(x, y) else lineTo(x, y)
+                }
+                close()
+            }
+            drawPath(
+                path = ringPath,
+                color = if (index == 3) Color(0x33FFFFFF) else Color(0x15FFFFFF),
+                style = Stroke(width = if (index == 3) 1.2.dp.toPx() else 0.8.dp.toPx())
+            )
+        }
+
+        // 2. Spokes
+        for (i in 0 until n) {
+            val angle = -Math.PI / 2.0 + (2.0 * Math.PI * i) / n
+            val x = cx + (radius * cos(angle)).toFloat()
+            val y = cy + (radius * sin(angle)).toFloat()
+            drawLine(
+                color = Color(0x1EFFFFFF),
+                start = Offset(cx, cy),
+                end = Offset(x, y),
+                strokeWidth = 1.dp.toPx()
+            )
+        }
+
+        // 3. Data Polygon
+        val maxMins = maxOf(topSubjects.maxOfOrNull { it.minutes } ?: 1, 1).toFloat()
+        val dataPoints = topSubjects.mapIndexed { i, s ->
+            val angle = -Math.PI / 2.0 + (2.0 * Math.PI * i) / n
+            val norm = (s.minutes.toFloat() / maxMins).coerceIn(0.08f, 1.0f)
+            val r = radius * norm
+            Offset(cx + (r * cos(angle)).toFloat(), cy + (r * sin(angle)).toFloat())
+        }
+
+        val dataPath = Path().apply {
+            dataPoints.forEachIndexed { i, pt ->
+                if (i == 0) moveTo(pt.x, pt.y) else lineTo(pt.x, pt.y)
+            }
+            close()
+        }
+
+        drawPath(
+            path = dataPath,
+            brush = Brush.radialGradient(
+                colors = listOf(Color(0x5510B981), Color(0x2210B981)),
+                center = Offset(cx, cy),
+                radius = radius
+            )
+        )
+        drawPath(
+            path = dataPath,
+            color = Color(0xFF34D399),
+            style = Stroke(width = 2.dp.toPx())
+        )
+
+        // 4. Vertex dots & labels
+        val labelPaint = android.graphics.Paint().apply {
+            color = android.graphics.Color.rgb(241, 245, 249)
+            textSize = 9.sp.toPx()
+            isAntiAlias = true
+            textAlign = android.graphics.Paint.Align.CENTER
+        }
+
+        dataPoints.forEachIndexed { i, pt ->
+            drawCircle(color = Color(0xFF10B981), radius = 3.dp.toPx(), center = pt)
+            drawCircle(color = Color.White, radius = 3.dp.toPx(), center = pt, style = Stroke(width = 1.dp.toPx()))
+
+            val subj = topSubjects[i]
+            val angle = -Math.PI / 2.0 + (2.0 * Math.PI * i) / n
+            val labelDist = radius + 14.dp.toPx()
+            val lx = cx + (labelDist * cos(angle)).toFloat()
+            val ly = cy + (labelDist * sin(angle)).toFloat()
+            val cleanName = if (subj.subjectName.length > 9) subj.subjectName.take(8) + ".." else subj.subjectName
+
+            drawContext.canvas.nativeCanvas.drawText(
+                cleanName,
+                lx,
+                ly + 3.dp.toPx(),
+                labelPaint
+            )
+        }
+    }
+}
+
+private data class Quadruple<A, B, C, D>(val first: A, val second: B, val third: C, val fourth: D)
+

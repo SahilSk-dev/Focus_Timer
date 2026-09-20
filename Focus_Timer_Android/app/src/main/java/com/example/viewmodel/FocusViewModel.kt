@@ -29,6 +29,7 @@ import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import com.example.ui.theme.AppTheme
+import com.example.util.ExamGoal
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -40,6 +41,32 @@ class FocusViewModel(application: Application) : AndroidViewModel(application) {
         AppTheme.fromId(prefs.getString("app_theme", "dark"))
     )
     val currentAppTheme: StateFlow<AppTheme> = _currentAppTheme.asStateFlow()
+
+    private val _examGoal = MutableStateFlow(
+        ExamGoal(
+            examName = prefs.getString("exam_goal_name", "Target Exam / Syllabus") ?: "Target Exam / Syllabus",
+            targetDate = prefs.getString("exam_goal_date", "") ?: "",
+            targetHours = prefs.getFloat("exam_goal_hours", 150f).toDouble(),
+            subjectScope = prefs.getStringSet("exam_goal_scope", emptySet()) ?: emptySet()
+        )
+    )
+    val examGoal: StateFlow<ExamGoal> = _examGoal.asStateFlow()
+
+    fun updateExamGoal(name: String, targetDate: String, targetHours: Double, subjectScope: Set<String>) {
+        val newGoal = ExamGoal(
+            examName = name.ifBlank { "Target Exam / Syllabus" },
+            targetDate = targetDate,
+            targetHours = targetHours.coerceAtLeast(1.0),
+            subjectScope = subjectScope
+        )
+        _examGoal.value = newGoal
+        prefs.edit()
+            .putString("exam_goal_name", newGoal.examName)
+            .putString("exam_goal_date", newGoal.targetDate)
+            .putFloat("exam_goal_hours", newGoal.targetHours.toFloat())
+            .putStringSet("exam_goal_scope", newGoal.subjectScope)
+            .apply()
+    }
 
     fun toggleTheme() {
         val nextTheme = if (_currentAppTheme.value.isLight) AppTheme.OLED_DARK else AppTheme.PURE_WHITE
