@@ -1,13 +1,21 @@
 package com.example.ui.screens
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Size
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -108,6 +116,7 @@ import kotlin.math.abs
 // ============================================================
 // DATA MODEL FOR MILESTONE BADGES
 // ============================================================
+@Immutable
 data class MilestoneBadge(
     val id: String,
     val title: String,
@@ -179,10 +188,15 @@ fun StatsScreen(
     }
     val analyticsReport by produceState(
         initialValue = AnalyticsReport.empty(analyticsTimeframe),
-        studySessions, analyticsTimeframe, examGoal
+        studySessions, analyticsTimeframe, examGoal, dailyTarget
     ) {
         value = withContext(Dispatchers.Default) {
-            AnalyticsEngine.computeReport(studySessions, analyticsTimeframe, examGoal)
+            AnalyticsEngine.computeReport(
+                allSessions = studySessions,
+                timeframe = analyticsTimeframe,
+                examGoal = examGoal,
+                dailyTargetMinutes = dailyTarget
+            )
         }
     }
 
@@ -327,13 +341,15 @@ fun StatsScreen(
                             .clip(RoundedCornerShape(3.dp))
                             .background(LineBorder)
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth(targetPct / 100f)
-                                .height(6.dp)
-                                .clip(RoundedCornerShape(3.dp))
-                                .background(GoldGradientBrush)
-                        )
+                        if (targetPct > 0) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth(targetPct / 100f)
+                                    .height(6.dp)
+                                    .clip(RoundedCornerShape(3.dp))
+                                    .background(GoldGradientBrush)
+                            )
+                        }
                     }
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(text = "$targetPct% achieved", color = GoldLight, fontSize = 10.sp)
@@ -372,13 +388,15 @@ fun StatsScreen(
                             .clip(RoundedCornerShape(3.dp))
                             .background(LineBorder)
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth(xpPct / 100f)
-                                .height(6.dp)
-                                .clip(RoundedCornerShape(3.dp))
-                                .background(SuccessGreen)
-                        )
+                        if (xpPct > 0) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth(xpPct / 100f)
+                                    .height(6.dp)
+                                    .clip(RoundedCornerShape(3.dp))
+                                    .background(SuccessGreen)
+                            )
+                        }
                     }
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(text = "$currentXp / $xpPerLevel XP", color = TextDim, fontSize = 10.sp)
@@ -389,14 +407,7 @@ fun StatsScreen(
         Spacer(modifier = Modifier.height(20.dp))
 
         // ============================================================
-        // 3. MILESTONES & BADGES (Milestone Rewards Section)
-        // ============================================================
-        MilestonesAndBadgesSection(allBadges = allBadges)
-
-        Spacer(modifier = Modifier.height(20.dp))
-
-        // ============================================================
-        // 3.5 COGNITIVE DEEP ANALYSIS ENGINE
+        // 3. COGNITIVE DEEP ANALYSIS ENGINE
         // ============================================================
         DeepAnalysisEngineSection(
             report = analyticsReport,
@@ -694,6 +705,13 @@ fun StatsScreen(
             }
         }
 
+        Spacer(modifier = Modifier.height(20.dp))
+
+        // ============================================================
+        // 7. MILESTONES & BADGES
+        // ============================================================
+        MilestonesAndBadgesSection(allBadges = allBadges)
+
         Spacer(modifier = Modifier.height(30.dp))
     }
 
@@ -827,6 +845,7 @@ private fun MilestonesAndBadgesSection(
     allBadges: List<MilestoneBadge>,
     modifier: Modifier = Modifier
 ) {
+    var isExpanded by rememberSaveable { mutableStateOf(false) }
     var badgeFilter by remember { mutableStateOf("all") }
     var selectedBadgeForDetail by remember { mutableStateOf<MilestoneBadge?>(null) }
 
@@ -842,97 +861,138 @@ private fun MilestonesAndBadgesSection(
         displayedBadges.chunked(2)
     }
 
-    Column(modifier = modifier.fillMaxWidth()) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column {
-                Text(
-                    text = "Milestones & Badges",
-                    style = TextStyle(
-                        brush = GoldGradientBrush,
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                )
-                Text(
-                    text = "Earn rewards by hitting focus goals",
-                    color = TextDim,
-                    fontSize = 11.sp
-                )
-            }
-
-            Surface(
-                color = PanelElevated,
-                shape = RoundedCornerShape(12.dp),
-                border = BorderStroke(1.dp, LineBorder)
-            ) {
-                Text(
-                    text = "$unlockedBadgeCount/${allBadges.size} Earned 🏆",
-                    color = GoldBright,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.height(10.dp))
-
-        // Badge Filter Tabs (All / Earned / Locked)
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
-            listOf(
-                Triple("all", "All (${allBadges.size})", allBadges.size),
-                Triple("unlocked", "Earned ($unlockedBadgeCount)", unlockedBadgeCount),
-                Triple("locked", "Locked (${allBadges.size - unlockedBadgeCount})", allBadges.size - unlockedBadgeCount)
-            ).forEach { (key, label, _) ->
-                val isSelected = badgeFilter == key
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(6.dp))
-                        .background(if (isSelected) GoldAccent else PanelElevated)
-                        .clickable { badgeFilter = key }
-                        .padding(horizontal = 10.dp, vertical = 5.dp)
-                ) {
-                    Text(
-                        text = label,
-                        color = if (isSelected) BgDark else TextDim,
-                        fontSize = 11.sp,
-                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
-                    )
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        // Badges 2-Column Responsive Paired Grid (Zero multi-pass thrashing, even 50/50 sizing)
-        pairedBadges.forEach { pair ->
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        color = PanelDark,
+        shape = RoundedCornerShape(12.dp),
+        border = BorderStroke(1.dp, LineBorder)
+    ) {
+        Column(modifier = Modifier.padding(14.dp)) {
+            // Header with click-to-expand toggle
             Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(8.dp))
+                    .clickable { isExpanded = !isExpanded }
+                    .padding(vertical = 2.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                BadgeCard(
-                    badge = pair[0],
-                    onClick = { selectedBadgeForDetail = pair[0] },
-                    modifier = Modifier.weight(1f)
-                )
-                if (pair.size > 1) {
-                    BadgeCard(
-                        badge = pair[1],
-                        onClick = { selectedBadgeForDetail = pair[1] },
-                        modifier = Modifier.weight(1f)
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Milestones & Badges",
+                        style = TextStyle(
+                            brush = GoldGradientBrush,
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold
+                        )
                     )
-                } else {
-                    Spacer(modifier = Modifier.weight(1f))
+                    Text(
+                        text = if (isExpanded) "Earn rewards by hitting focus goals" else "Tap to view milestone achievements",
+                        color = TextDim,
+                        fontSize = 11.sp
+                    )
+                }
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Surface(
+                        color = PanelElevated,
+                        shape = RoundedCornerShape(12.dp),
+                        border = BorderStroke(1.dp, LineBorder)
+                    ) {
+                        Text(
+                            text = "$unlockedBadgeCount/${allBadges.size} Earned 🏆",
+                            color = GoldBright,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                        )
+                    }
+
+                    Icon(
+                        imageVector = if (isExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                        contentDescription = if (isExpanded) "Collapse" else "Expand",
+                        tint = GoldLight,
+                        modifier = Modifier.size(20.dp)
+                    )
                 }
             }
-            Spacer(modifier = Modifier.height(10.dp))
+
+            AnimatedVisibility(
+                visible = isExpanded,
+                enter = fadeIn() + expandVertically(),
+                exit = fadeOut() + shrinkVertically()
+            ) {
+                Column {
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // Badge Filter Tabs (All / Earned / Locked)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        listOf(
+                            Triple("all", "All (${allBadges.size})", allBadges.size),
+                            Triple("unlocked", "Earned ($unlockedBadgeCount)", unlockedBadgeCount),
+                            Triple("locked", "Locked (${allBadges.size - unlockedBadgeCount})", allBadges.size - unlockedBadgeCount)
+                        ).forEach { (key, label, _) ->
+                            val isSelected = badgeFilter == key
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(if (isSelected) GoldAccent else PanelElevated)
+                                    .clickable { badgeFilter = key }
+                                    .padding(horizontal = 10.dp, vertical = 5.dp)
+                            ) {
+                                Text(
+                                    text = label,
+                                    color = if (isSelected) BgDark else TextDim,
+                                    fontSize = 11.sp,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // Badges 2-Column Responsive Paired Grid
+                    if (displayedBadges.isEmpty()) {
+                        Text(
+                            text = "No badges match this filter.",
+                            color = TextDim,
+                            fontSize = 12.sp,
+                            modifier = Modifier.padding(vertical = 12.dp)
+                        )
+                    } else {
+                        pairedBadges.forEach { pair ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                BadgeCard(
+                                    badge = pair[0],
+                                    onClick = { selectedBadgeForDetail = pair[0] },
+                                    modifier = Modifier.weight(1f)
+                                )
+                                if (pair.size > 1) {
+                                    BadgeCard(
+                                        badge = pair[1],
+                                        onClick = { selectedBadgeForDetail = pair[1] },
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                } else {
+                                    Spacer(modifier = Modifier.weight(1f))
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(10.dp))
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -990,13 +1050,15 @@ private fun BadgeDetailDialog(
                         .clip(RoundedCornerShape(4.dp))
                         .background(LineBorder)
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth(pct / 100f)
-                            .height(8.dp)
-                            .clip(RoundedCornerShape(4.dp))
-                            .background(if (badge.isUnlocked) GoldGradientBrush else SolidColor(SuccessGreen))
-                    )
+                    if (pct > 0) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth(pct / 100f)
+                                .height(8.dp)
+                                .clip(RoundedCornerShape(4.dp))
+                                .background(if (badge.isUnlocked) GoldGradientBrush else SolidColor(SuccessGreen))
+                        )
+                    }
                 }
 
                 Spacer(modifier = Modifier.height(12.dp))
@@ -1045,7 +1107,9 @@ private fun BadgeCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val pct = ((badge.currentVal.toFloat() / badge.targetVal) * 100).toInt().coerceIn(0, 100)
+    val pct = remember(badge.currentVal, badge.targetVal) {
+        ((badge.currentVal.toFloat() / badge.targetVal) * 100).toInt().coerceIn(0, 100)
+    }
 
     Surface(
         modifier = modifier
@@ -1136,13 +1200,15 @@ private fun BadgeCard(
                     .clip(RoundedCornerShape(2.dp))
                     .background(LineBorder)
             ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth(pct / 100f)
-                        .height(4.dp)
-                        .clip(RoundedCornerShape(2.dp))
-                        .background(if (badge.isUnlocked) GoldGradientBrush else SolidColor(SuccessGreen))
-                )
+                if (pct > 0) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth(pct / 100f)
+                            .height(4.dp)
+                            .clip(RoundedCornerShape(2.dp))
+                            .background(if (badge.isUnlocked) GoldGradientBrush else SolidColor(SuccessGreen))
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(3.dp))
@@ -1240,24 +1306,34 @@ private fun HeatmapGrid(sessions: List<StudySessionEntity>) {
         Color(0xFFC9962F)
     )
 
-    // 12 columns x 7 rows
+    // 12 columns x 7 rows drawn on a single fast Canvas
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .horizontalScroll(rememberScrollState()),
-        horizontalArrangement = Arrangement.spacedBy(4.dp)
+            .horizontalScroll(rememberScrollState())
     ) {
-        for (col in 0 until 12) {
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Canvas(
+            modifier = Modifier
+                .width(188.dp) // 12 cols * 12dp + 11 gaps * 4dp = 188dp
+                .height(108.dp) // 7 rows * 12dp + 6 gaps * 4dp = 108dp
+        ) {
+            val cellSize = 12.dp.toPx()
+            val spacing = 4.dp.toPx()
+            val cornerRadius = CornerRadius(2.dp.toPx(), 2.dp.toPx())
+
+            for (col in 0 until 12) {
                 for (row in 0 until 7) {
                     val index = col * 7 + row
                     if (index < cells.size) {
                         val cell = cells[index]
-                        Box(
-                            modifier = Modifier
-                                .size(12.dp)
-                                .clip(RoundedCornerShape(2.dp))
-                                .background(colors[cell.third])
+                        val color = colors[cell.third]
+                        val x = col * (cellSize + spacing)
+                        val y = row * (cellSize + spacing)
+                        drawRoundRect(
+                            color = color,
+                            topLeft = Offset(x, y),
+                            size = Size(cellSize, cellSize),
+                            cornerRadius = cornerRadius
                         )
                     }
                 }
@@ -1269,7 +1345,9 @@ private fun HeatmapGrid(sessions: List<StudySessionEntity>) {
 // ============================================================
 // HELPER LOGIC: STREAKS, STATS & BADGES
 // ============================================================
+@Immutable
 private data class DayInfo(val dateStr: String, val dayLabel: String)
+@Immutable
 private data class RankItem(val subjectName: String, val minutes: Int)
 
 private fun calculateMilestoneBadges(

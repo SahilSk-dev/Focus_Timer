@@ -66,7 +66,8 @@ data class ExamProjection(
     val status: String,
     val statusBadgeText: String,
     val statusDescription: String,
-    val subjectScope: Set<String>
+    val subjectScope: Set<String>,
+    val progressPercentage: Int = if (targetHours > 0) Math.round((completedHours / targetHours) * 100).toInt().coerceIn(0, 100) else 0
 )
 
 data class FatigueReport(
@@ -138,7 +139,8 @@ object AnalyticsEngine {
     fun computeReport(
         allSessions: List<StudySessionEntity>,
         timeframe: AnalyticsTimeframe,
-        examGoal: ExamGoal? = null
+        examGoal: ExamGoal? = null,
+        dailyTargetMinutes: Int = 120
     ): AnalyticsReport {
         val studySessions = allSessions.filter { !it.isNonStudy }
         val now = Calendar.getInstance()
@@ -167,11 +169,11 @@ object AnalyticsEngine {
         val totalHours = totalMinutes / 60.0
         val sessionCount = filteredSessions.size
         val activeDaysCount = filteredSessions.map { it.date }.distinct().size
-        val avgSessionMinutes = if (sessionCount > 0) totalMinutes / sessionCount else 0
+        val avgSessionMinutes = if (sessionCount > 0) Math.round(totalMinutes.toDouble() / sessionCount).toInt() else 0
 
         // Deep Work: sessions >= 45m
         val deepWorkMinutes = filteredSessions.filter { it.minutes >= 45 }.sumOf { it.minutes }
-        val deepWorkRatio = if (totalMinutes > 0) ((deepWorkMinutes.toFloat() / totalMinutes) * 100).toInt() else 0
+        val deepWorkRatio = if (totalMinutes > 0) Math.round((deepWorkMinutes.toDouble() / totalMinutes) * 100).toInt() else 0
 
         // Deterministic Algorithmic Pillars for Focus Quality Score (FQS / Cognitive Quality Index: 0-100)
         // 1. Consistency Percentage (C)
@@ -184,31 +186,31 @@ object AnalyticsEngine {
                     val dFirst = DateFormatterCache.parseIsoDate(sortedDates.first())
                     val dLast = DateFormatterCache.parseIsoDate(sortedDates.last())
                     if (dFirst != null && dLast != null) {
-                        max(1, (((dLast.time - dFirst.time) / (24 * 3600 * 1000)).toInt() + 1))
+                        max(1, Math.round((dLast.time - dFirst.time).toDouble() / (24 * 3600 * 1000)).toInt() + 1)
                     } else 1
                 } else 1
             }
         }
         val consistencyPct = if (daysInPeriod > 0) {
-            ((activeDaysCount.toFloat() / daysInPeriod) * 100).toInt().coerceIn(0, 100)
+            Math.round((activeDaysCount.toDouble() / daysInPeriod) * 100).toInt().coerceIn(0, 100)
         } else 0
 
-        // 2. Daily Goal Hit Rate (G, standard target 120m)
+        // 2. Daily Goal Hit Rate (G, user configurable daily target)
         val dailyMinsMap = mutableMapOf<String, Int>()
         filteredSessions.forEach { s ->
             dailyMinsMap[s.date] = (dailyMinsMap[s.date] ?: 0) + s.minutes
         }
-        val daysMetTarget = dailyMinsMap.values.count { it >= 120 }
+        val daysMetTarget = dailyMinsMap.values.count { it >= dailyTargetMinutes }
         val goalHitRate = if (activeDaysCount > 0) {
-            ((daysMetTarget.toFloat() / activeDaysCount) * 100).toInt().coerceIn(0, 100)
+            Math.round((daysMetTarget.toDouble() / activeDaysCount) * 100).toInt().coerceIn(0, 100)
         } else 0
 
         // 3. Session Pacing Stability (P, benchmark 50m)
-        val pacingStability = ((avgSessionMinutes.toFloat() / 50f) * 100).toInt().coerceIn(0, 100)
+        val pacingStability = Math.round((avgSessionMinutes.toDouble() / 50.0) * 100).toInt().coerceIn(0, 100)
 
         // 4. Focus Quality Score (FQS): 0.35*DeepWork + 0.25*Consistency + 0.25*GoalHit + 0.15*Pacing
         val focusQualityScore = if (totalMinutes > 0) {
-            (0.35f * deepWorkRatio + 0.25f * consistencyPct + 0.25f * goalHitRate + 0.15f * pacingStability).toInt().coerceIn(0, 100)
+            Math.round(0.35 * deepWorkRatio + 0.25 * consistencyPct + 0.25 * goalHitRate + 0.15 * pacingStability).toInt().coerceIn(0, 100)
         } else 0
 
         val focusQualityTier = when {
@@ -221,7 +223,7 @@ object AnalyticsEngine {
         // Velocity
         val priorMinutes = priorSessions.sumOf { it.minutes }
         val velocityPercentage = if (priorMinutes > 0 && totalMinutes > 0) {
-            (((totalMinutes - priorMinutes).toFloat() / priorMinutes) * 100).toInt()
+            Math.round(((totalMinutes - priorMinutes).toDouble() / priorMinutes) * 100).toInt()
         } else if (totalMinutes > 0 && daysLimit != null) {
             100
         } else {
@@ -229,6 +231,7 @@ object AnalyticsEngine {
         }
 
         // Circadian Time-of-Day Distribution with exact hour-boundary splitting
+        val hourlyDouble = DoubleArray(24)
         val hourlyMins = IntArray(24)
         val startCal = Calendar.getInstance()
         val endCal = Calendar.getInstance()
@@ -252,11 +255,14 @@ object AnalyticsEngine {
                 if (overlapEnd > overlapStart) {
                     endCal.timeInMillis = curHourStart
                     val h = endCal.get(Calendar.HOUR_OF_DAY)
-                    val mins = ((overlapEnd - overlapStart) / 60000L).toInt()
-                    hourlyMins[h] += mins
+                    val mins = (overlapEnd - overlapStart).toDouble() / 60000.0
+                    hourlyDouble[h] += mins
                 }
                 curHourStart = nextHourStart
             }
+        }
+        for (h in 0..23) {
+            hourlyMins[h] = Math.round(hourlyDouble[h]).toInt()
         }
 
         var morningMins = 0

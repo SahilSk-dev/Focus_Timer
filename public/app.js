@@ -105,14 +105,26 @@ async function loadAll(){
     
     if (unsubSessions) unsubSessions();
     unsubSessions = onSnapshot(q, (snap) => {
-      sessions = snap.docs.map(d => ({ id:d.id, ...d.data() }));
+      const raw = snap.docs.map(d => ({ id:d.id, ...d.data() }));
+      const byTs = new Map();
+      raw.forEach(s => {
+        const key = s.ts || s.timestamp || s.id;
+        if (!byTs.has(key)) byTs.set(key, s);
+      });
+      sessions = Array.from(byTs.values());
       refreshEverything();
     });
 
     const qNS = collection(db, 'users', currentUser.uid, 'nonStudySessions');
     if (unsubNonStudySessions) unsubNonStudySessions();
     unsubNonStudySessions = onSnapshot(qNS, (snap) => {
-      nonStudySessions = snap.docs.map(d => ({ id:d.id, ...d.data(), isNonStudy: true }));
+      const raw = snap.docs.map(d => ({ id:d.id, ...d.data(), isNonStudy: true }));
+      const byTs = new Map();
+      raw.forEach(s => {
+        const key = s.ts || s.timestamp || s.id;
+        if (!byTs.has(key)) byTs.set(key, s);
+      });
+      nonStudySessions = Array.from(byTs.values());
       refreshEverything();
     });
 
@@ -174,9 +186,12 @@ async function addSession(subjName, minutes, workType){
   
   if(isNS) {
     rec.isNonStudy = true;
+    rec.id = String(rec.ts);
     if (currentUser) {
-      try { await addDoc(collection(db, 'users', currentUser.uid, 'nonStudySessions'), rec); }
-      catch(e) {
+      try {
+        const docRef = doc(db, 'users', currentUser.uid, 'nonStudySessions', String(rec.ts));
+        await setDoc(docRef, rec, { merge: true });
+      } catch(e) {
         showToast('No internet! Non-study session saved offline.');
         rec.id = 'ns' + Date.now();
         nonStudySessions.push(rec);
@@ -188,9 +203,12 @@ async function addSession(subjName, minutes, workType){
       localSet('st_nonstudy_sessions', nonStudySessions);
     }
   } else {
+    rec.id = String(rec.ts);
     if(currentUser){
-      try { await addDoc(collection(db,'users',currentUser.uid,'sessions'), rec); }
-      catch(e) {
+      try {
+        const docRef = doc(db, 'users', currentUser.uid, 'sessions', String(rec.ts));
+        await setDoc(docRef, rec, { merge: true });
+      } catch(e) {
         showToast('No internet! Session saved offline.');
         rec.id = 'l' + Date.now();
         sessions.push(rec);
@@ -330,7 +348,7 @@ function renderAuthBar(){
   if(currentUser){
     authbar.innerHTML = `
       <div class="userchip">
-        <img src="${currentUser.photoURL || ''}" onerror="this.style.display='none'">
+        <img src="${currentUser.photoURL || ''}" alt="${currentUser.displayName || 'User'} profile picture" onerror="this.style.display='none'">
         <span>${currentUser.displayName || currentUser.email || 'User'}</span>
       </div>
       <button class="signout" id="signOutBtn">Sign Out</button>`;
@@ -850,9 +868,12 @@ function startTimer(fromResume=false){
       totalSeconds = (pomoPhase==='work' ? WORK_MIN : BREAK_MIN) * 60;
       stopwatchMode = false;
     } else {
-      const h=parseInt(hoursEl.value)||0, m=parseInt(minutesEl.value)||0;
-      totalSeconds = h*3600+m*60;
-      stopwatchMode = totalSeconds<=0;
+      const rawH = parseInt(hoursEl.value) || 0;
+      const rawM = parseInt(minutesEl.value) || 0;
+      const h = Math.min(12, Math.max(0, rawH));
+      const m = Math.min(59, Math.max(0, rawM));
+      totalSeconds = h * 3600 + m * 60;
+      stopwatchMode = totalSeconds <= 0;
     }
     remaining = stopwatchMode ? 0 : totalSeconds;
   }
@@ -1030,7 +1051,7 @@ function renderLevel(){
   const levelNumEl = document.getElementById('levelNum');
   if (levelNumEl) levelNumEl.textContent = 'Level ' + level;
   const xpMetaEl = document.getElementById('xpMeta');
-  if (xpMetaEl) xpMetaEl.textContent = xp+' / '+XP_PER_LEVEL+' mins';
+  if (xpMetaEl) xpMetaEl.textContent = xp+' / '+XP_PER_LEVEL+' XP';
   const xpFillEl = document.getElementById('xpFill');
   if (xpFillEl) xpFillEl.style.width = Math.round(xp/XP_PER_LEVEL*100)+'%';
 

@@ -342,10 +342,18 @@ class FirebaseSyncManager(
             }
             val workTypesList = workTypes.map { it.name }
 
+            val examGoalMap = hashMapOf(
+                "examName" to (prefs.getString("exam_goal_name", "Target Exam / Syllabus") ?: "Target Exam / Syllabus"),
+                "targetDate" to (prefs.getString("exam_goal_date", "") ?: ""),
+                "targetHours" to prefs.getFloat("exam_goal_hours", 150f).toDouble(),
+                "subjectScope" to (prefs.getStringSet("exam_goal_scope", emptySet()) ?: emptySet()).toList()
+            )
+
             val data = hashMapOf(
                 "dailyTarget" to dailyTarget,
                 "subjects" to subjectsList,
-                "workTypes" to workTypesList
+                "workTypes" to workTypesList,
+                "examGoal" to examGoalMap
             )
 
             firestore.collection("users")
@@ -412,6 +420,24 @@ class FirebaseSyncManager(
                 val wtEntities = rawWorkTypes.mapNotNull { it?.toString() }.map { WorkTypeEntity(name = it) }
                 studyDao.insertWorkTypes(wtEntities)
                 studyDao.deduplicateWorkTypes()
+            }
+
+            // 4. Exam Goal
+            @Suppress("UNCHECKED_CAST")
+            val rawExamGoal = snapshot.get("examGoal") as? Map<String, Any>
+            if (rawExamGoal != null) {
+                val name = rawExamGoal["examName"] as? String ?: "Target Exam / Syllabus"
+                val date = rawExamGoal["targetDate"] as? String ?: ""
+                val hours = (rawExamGoal["targetHours"] as? Number)?.toFloat() ?: 150f
+                @Suppress("UNCHECKED_CAST")
+                val scope = (rawExamGoal["subjectScope"] as? List<*>)?.mapNotNull { it?.toString() }?.toSet() ?: emptySet()
+
+                prefs.edit()
+                    .putString("exam_goal_name", name)
+                    .putString("exam_goal_date", date)
+                    .putFloat("exam_goal_hours", hours)
+                    .putStringSet("exam_goal_scope", scope)
+                    .apply()
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error applying cloud prefs: ${e.message}")

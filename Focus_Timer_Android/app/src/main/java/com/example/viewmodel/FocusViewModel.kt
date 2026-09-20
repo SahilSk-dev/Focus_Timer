@@ -25,6 +25,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -66,6 +67,20 @@ class FocusViewModel(application: Application) : AndroidViewModel(application) {
             .putFloat("exam_goal_hours", newGoal.targetHours.toFloat())
             .putStringSet("exam_goal_scope", newGoal.subjectScope)
             .apply()
+
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val subs = repository.allSubjects.first()
+                val wts = repository.allWorkTypes.first()
+                repository.syncManager.uploadPrefsToCloud(
+                    dailyTarget = _dailyTargetMinutes.value,
+                    subjects = subs,
+                    workTypes = wts
+                )
+            } catch (e: Exception) {
+                // Ignore network/offline error
+            }
+        }
     }
 
     fun reloadSettingsAndExamGoal() {
@@ -510,7 +525,10 @@ class FocusViewModel(application: Application) : AndroidViewModel(application) {
         _stopwatchMode.value = false
         repository.clearRunningTimerState()
 
-        if (wasActive && finalSecs >= 60) {
+        val isBreakPhase = _pomodoroMode.value && _pomoPhase.value == "break"
+        if (isBreakPhase) {
+            showToast("☕ Break cancelled")
+        } else if (wasActive && finalSecs >= 60) {
             val mins = (finalSecs / 60).toInt()
             saveSession(mins)
         } else if (wasActive && finalSecs > 0) {
