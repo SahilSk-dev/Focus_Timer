@@ -70,6 +70,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -130,22 +131,13 @@ fun StatsScreen(
     val dailyTarget by viewModel.dailyTargetMinutes.collectAsState()
 
     var statsTab by remember { mutableStateOf("daily") } // "daily" or "weekly"
-    var badgeFilter by remember { mutableStateOf("all") } // "all", "unlocked", "locked"
-    var selectedBadgeForDetail by remember { mutableStateOf<MilestoneBadge?>(null) }
     var showTargetEditDialog by remember { mutableStateOf(false) }
 
     val todayStr = remember { FocusRepository.getTodayString() }
     val studySessions = remember(allSessions) { allSessions.filter { !it.isNonStudy } }
 
-    // Day Streak calculation (Computed asynchronously on Dispatchers.Default)
-    val streakPair by produceState(
-        initialValue = 0 to 0,
-        studySessions
-    ) {
-        value = withContext(Dispatchers.Default) {
-            calculateStreaks(studySessions)
-        }
-    }
+    // Day Streak calculation (Computed synchronously for instant 60fps render)
+    val streakPair = remember(studySessions) { calculateStreaks(studySessions) }
     val currentStreak = streakPair.first
     val bestStreak = streakPair.second
 
@@ -165,42 +157,15 @@ fun StatsScreen(
     val currentXp = remember(totalStudyMinutes) { totalStudyMinutes % xpPerLevel }
     val xpPct = remember(currentXp) { ((currentXp.toFloat() / xpPerLevel) * 100).toInt().coerceIn(0, 100) }
 
-    // Week comparison (Computed asynchronously on Dispatchers.Default)
-    val weekComparison by produceState(
-        initialValue = "",
-        studySessions
-    ) {
-        value = withContext(Dispatchers.Default) {
-            calculateWeekComparison(studySessions)
-        }
-    }
+    // Week comparison (Computed synchronously for instant 60fps render)
+    val weekComparison = remember(studySessions) { calculateWeekComparison(studySessions) }
 
-    // Last 7 days ranking (Computed asynchronously on Dispatchers.Default)
-    val rankingList by produceState(
-        initialValue = emptyList(),
-        studySessions
-    ) {
-        value = withContext(Dispatchers.Default) {
-            calculate7DaysRanking(studySessions)
-        }
-    }
+    // Last 7 days ranking (Computed synchronously for instant 60fps render)
+    val rankingList = remember(studySessions) { calculate7DaysRanking(studySessions) }
 
-    // Milestone Badges calculation (Computed asynchronously on Dispatchers.Default)
-    val allBadges by produceState(
-        initialValue = emptyList(),
-        studySessions, currentStreak, bestStreak, totalStudyMinutes
-    ) {
-        value = withContext(Dispatchers.Default) {
-            calculateMilestoneBadges(studySessions, currentStreak, bestStreak, totalStudyMinutes)
-        }
-    }
-    val unlockedBadgeCount = remember(allBadges) { allBadges.count { it.isUnlocked } }
-    val displayedBadges = remember(allBadges, badgeFilter) {
-        when (badgeFilter) {
-            "unlocked" -> allBadges.filter { it.isUnlocked }
-            "locked" -> allBadges.filter { !it.isUnlocked }
-            else -> allBadges
-        }
+    // Milestone Badges calculation (Computed synchronously for instant 60fps render)
+    val allBadges = remember(studySessions, currentStreak, bestStreak, totalStudyMinutes) {
+        calculateMilestoneBadges(studySessions, currentStreak, bestStreak, totalStudyMinutes)
     }
 
     // Cognitive Deep Analysis Engine computation (Computed asynchronously on Dispatchers.Default)
@@ -426,89 +391,7 @@ fun StatsScreen(
         // ============================================================
         // 3. MILESTONES & BADGES (Milestone Rewards Section)
         // ============================================================
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column {
-                Text(
-                    text = "Milestones & Badges",
-                    style = TextStyle(
-                        brush = GoldGradientBrush,
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                )
-                Text(
-                    text = "Earn rewards by hitting focus goals",
-                    color = TextDim,
-                    fontSize = 11.sp
-                )
-            }
-
-            Surface(
-                color = PanelElevated,
-                shape = RoundedCornerShape(12.dp),
-                border = BorderStroke(1.dp, LineBorder)
-            ) {
-                Text(
-                    text = "$unlockedBadgeCount/${allBadges.size} Earned 🏆",
-                    color = GoldBright,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.height(10.dp))
-
-        // Badge Filter Tabs (All / Earned / Locked)
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
-            listOf(
-                Triple("all", "All (${allBadges.size})", allBadges.size),
-                Triple("unlocked", "Earned ($unlockedBadgeCount)", unlockedBadgeCount),
-                Triple("locked", "Locked (${allBadges.size - unlockedBadgeCount})", allBadges.size - unlockedBadgeCount)
-            ).forEach { (key, label, count) ->
-                val isSelected = badgeFilter == key
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(6.dp))
-                        .background(if (isSelected) GoldAccent else PanelElevated)
-                        .clickable { badgeFilter = key }
-                        .padding(horizontal = 10.dp, vertical = 5.dp)
-                ) {
-                    Text(
-                        text = label,
-                        color = if (isSelected) BgDark else TextDim,
-                        fontSize = 11.sp,
-                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
-                    )
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        // Badges 2-Column Responsive Grid
-        FlowRow(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-            maxItemsInEachRow = 2
-        ) {
-            displayedBadges.forEach { badge ->
-                BadgeCard(
-                    badge = badge,
-                    onClick = { selectedBadgeForDetail = badge },
-                    modifier = Modifier.weight(1f)
-                )
-            }
-        }
+        MilestonesAndBadgesSection(allBadges = allBadges)
 
         Spacer(modifier = Modifier.height(20.dp))
 
@@ -608,9 +491,15 @@ fun StatsScreen(
         ) {
             Column(modifier = Modifier.padding(14.dp)) {
                 if (statsTab == "daily") {
-                    val todaySess = studySessions.filter { it.date == todayStr }
-                    val bySubj = todaySess.groupBy { it.subject }.mapValues { it.value.sumOf { s -> s.minutes } }
-                    val maxVal = bySubj.values.maxOrNull() ?: 1
+                    val todaySess = remember(studySessions, todayStr) {
+                        studySessions.filter { it.date == todayStr }
+                    }
+                    val bySubj = remember(todaySess) {
+                        todaySess.groupBy { it.subject }.mapValues { it.value.sumOf { s -> s.minutes } }
+                    }
+                    val maxVal = remember(bySubj) {
+                        bySubj.values.maxOrNull() ?: 1
+                    }
 
                     if (bySubj.isEmpty()) {
                         Text(
@@ -638,11 +527,13 @@ fun StatsScreen(
                     }
                 } else {
                     val last7Days = remember { getLast7Days() }
-                    val totals = last7Days.map { d ->
-                        studySessions.filter { it.date == d.dateStr }.sumOf { it.minutes }
+                    val totals = remember(studySessions, last7Days) {
+                        last7Days.map { d ->
+                            studySessions.filter { it.date == d.dateStr }.sumOf { it.minutes }
+                        }
                     }
-                    val grandTotal = totals.sum()
-                    val maxVal = (totals.maxOrNull() ?: 1).coerceAtLeast(1)
+                    val grandTotal = remember(totals) { totals.sum() }
+                    val maxVal = remember(totals) { (totals.maxOrNull() ?: 1).coerceAtLeast(1) }
 
                     if (grandTotal == 0) {
                         Text(
@@ -807,91 +698,8 @@ fun StatsScreen(
     }
 
     // ============================================================
-    // DIALOGS: BADGE DETAIL & DAILY TARGET EDIT
+    // DIALOGS: DAILY TARGET EDIT
     // ============================================================
-    selectedBadgeForDetail?.let { badge ->
-        AlertDialog(
-            onDismissRequest = { selectedBadgeForDetail = null },
-            title = {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(text = badge.icon, fontSize = 24.sp)
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(text = badge.title, color = GoldBright, fontSize = 16.sp, fontWeight = FontWeight.Bold)
-                }
-            },
-            text = {
-                Column {
-                    Text(text = badge.description, color = TextPrimary, fontSize = 13.sp)
-                    Spacer(modifier = Modifier.height(14.dp))
-
-                    val pct = ((badge.currentVal.toFloat() / badge.targetVal) * 100).toInt().coerceIn(0, 100)
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text(text = "Milestone Goal", color = TextDim, fontSize = 11.sp)
-                        Text(
-                            text = "${badge.currentVal} / ${badge.targetVal} ${badge.unit}",
-                            color = if (badge.isUnlocked) GoldBright else TextDim,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(6.dp))
-
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(8.dp)
-                            .clip(RoundedCornerShape(4.dp))
-                            .background(LineBorder)
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth(pct / 100f)
-                                .height(8.dp)
-                                .clip(RoundedCornerShape(4.dp))
-                                .background(if (badge.isUnlocked) GoldGradientBrush else SolidColor(SuccessGreen))
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    Surface(
-                        color = if (badge.isUnlocked) PanelElevated else Color(0xFF1E1E22),
-                        shape = RoundedCornerShape(6.dp),
-                        border = BorderStroke(1.dp, if (badge.isUnlocked) GoldAccent else LineBorder)
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                imageVector = if (badge.isUnlocked) Icons.Default.CheckCircle else Icons.Default.Lock,
-                                contentDescription = null,
-                                tint = if (badge.isUnlocked) GoldBright else TextDim,
-                                modifier = Modifier.size(14.dp)
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                text = if (badge.isUnlocked) "Reward Unlocked! ✨" else "In Progress ($pct%)",
-                                color = if (badge.isUnlocked) GoldBright else TextDim,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                    }
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = { selectedBadgeForDetail = null }) {
-                    Text("Done", color = GoldBright, fontWeight = FontWeight.Bold)
-                }
-            },
-            containerColor = PanelDark
-        )
-    }
 
     if (showTargetEditDialog) {
         var inputTarget by remember(dailyTarget) { mutableStateOf(dailyTarget.toString()) }
@@ -1009,6 +817,223 @@ private fun MetricCard(
             )
         }
     }
+}
+
+// ============================================================
+// COMPONENT: MILESTONES & BADGES SECTION (ISOLATED PERFORMANCE)
+// ============================================================
+@Composable
+private fun MilestonesAndBadgesSection(
+    allBadges: List<MilestoneBadge>,
+    modifier: Modifier = Modifier
+) {
+    var badgeFilter by remember { mutableStateOf("all") }
+    var selectedBadgeForDetail by remember { mutableStateOf<MilestoneBadge?>(null) }
+
+    val unlockedBadgeCount = remember(allBadges) { allBadges.count { it.isUnlocked } }
+    val displayedBadges = remember(allBadges, badgeFilter) {
+        when (badgeFilter) {
+            "unlocked" -> allBadges.filter { it.isUnlocked }
+            "locked" -> allBadges.filter { !it.isUnlocked }
+            else -> allBadges
+        }
+    }
+    val pairedBadges = remember(displayedBadges) {
+        displayedBadges.chunked(2)
+    }
+
+    Column(modifier = modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column {
+                Text(
+                    text = "Milestones & Badges",
+                    style = TextStyle(
+                        brush = GoldGradientBrush,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                )
+                Text(
+                    text = "Earn rewards by hitting focus goals",
+                    color = TextDim,
+                    fontSize = 11.sp
+                )
+            }
+
+            Surface(
+                color = PanelElevated,
+                shape = RoundedCornerShape(12.dp),
+                border = BorderStroke(1.dp, LineBorder)
+            ) {
+                Text(
+                    text = "$unlockedBadgeCount/${allBadges.size} Earned 🏆",
+                    color = GoldBright,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(10.dp))
+
+        // Badge Filter Tabs (All / Earned / Locked)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            listOf(
+                Triple("all", "All (${allBadges.size})", allBadges.size),
+                Triple("unlocked", "Earned ($unlockedBadgeCount)", unlockedBadgeCount),
+                Triple("locked", "Locked (${allBadges.size - unlockedBadgeCount})", allBadges.size - unlockedBadgeCount)
+            ).forEach { (key, label, _) ->
+                val isSelected = badgeFilter == key
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(if (isSelected) GoldAccent else PanelElevated)
+                        .clickable { badgeFilter = key }
+                        .padding(horizontal = 10.dp, vertical = 5.dp)
+                ) {
+                    Text(
+                        text = label,
+                        color = if (isSelected) BgDark else TextDim,
+                        fontSize = 11.sp,
+                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        // Badges 2-Column Responsive Paired Grid (Zero multi-pass thrashing, even 50/50 sizing)
+        pairedBadges.forEach { pair ->
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                BadgeCard(
+                    badge = pair[0],
+                    onClick = { selectedBadgeForDetail = pair[0] },
+                    modifier = Modifier.weight(1f)
+                )
+                if (pair.size > 1) {
+                    BadgeCard(
+                        badge = pair[1],
+                        onClick = { selectedBadgeForDetail = pair[1] },
+                        modifier = Modifier.weight(1f)
+                    )
+                } else {
+                    Spacer(modifier = Modifier.weight(1f))
+                }
+            }
+            Spacer(modifier = Modifier.height(10.dp))
+        }
+    }
+
+    // Isolated Badge Detail Dialog (recomposes ONLY this section)
+    selectedBadgeForDetail?.let { badge ->
+        BadgeDetailDialog(
+            badge = badge,
+            onDismiss = { selectedBadgeForDetail = null }
+        )
+    }
+}
+
+// ============================================================
+// COMPONENT: BADGE DETAIL DIALOG (ISOLATED)
+// ============================================================
+@Composable
+private fun BadgeDetailDialog(
+    badge: MilestoneBadge,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(text = badge.icon, fontSize = 24.sp)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(text = badge.title, color = GoldBright, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+            }
+        },
+        text = {
+            Column {
+                Text(text = badge.description, color = TextPrimary, fontSize = 13.sp)
+                Spacer(modifier = Modifier.height(14.dp))
+
+                val pct = ((badge.currentVal.toFloat() / badge.targetVal) * 100).toInt().coerceIn(0, 100)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(text = "Milestone Goal", color = TextDim, fontSize = 11.sp)
+                    Text(
+                        text = "${badge.currentVal} / ${badge.targetVal} ${badge.unit}",
+                        color = if (badge.isUnlocked) GoldBright else TextDim,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(6.dp))
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(8.dp)
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(LineBorder)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth(pct / 100f)
+                            .height(8.dp)
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(if (badge.isUnlocked) GoldGradientBrush else SolidColor(SuccessGreen))
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Surface(
+                    color = if (badge.isUnlocked) PanelElevated else Color(0xFF1E1E22),
+                    shape = RoundedCornerShape(6.dp),
+                    border = BorderStroke(1.dp, if (badge.isUnlocked) GoldAccent else LineBorder)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = if (badge.isUnlocked) Icons.Default.CheckCircle else Icons.Default.Lock,
+                            contentDescription = null,
+                            tint = if (badge.isUnlocked) GoldBright else TextDim,
+                            modifier = Modifier.size(14.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = if (badge.isUnlocked) "Reward Unlocked! ✨" else "In Progress ($pct%)",
+                            color = if (badge.isUnlocked) GoldBright else TextDim,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Done", color = GoldBright, fontWeight = FontWeight.Bold)
+            }
+        },
+        containerColor = PanelDark
+    )
 }
 
 // ============================================================
@@ -1190,12 +1215,11 @@ private fun HeatmapGrid(sessions: List<StudySessionEntity>) {
 
     val days = 84 // 12 weeks
     val cells = remember(totalsByDate) {
-        val list = mutableListOf<Triple<String, Int, Int>>() // date, minutes, level
-        val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
-        for (i in days - 1 downTo 0) {
-            val c = Calendar.getInstance()
-            c.add(Calendar.DAY_OF_YEAR, -i)
-            val dStr = sdf.format(c.time)
+        val list = ArrayList<Triple<String, Int, Int>>(days)
+        val cal = Calendar.getInstance()
+        cal.add(Calendar.DAY_OF_YEAR, -(days - 1))
+        for (i in 0 until days) {
+            val dStr = com.example.util.DateFormatterCache.formatIsoDate(cal.timeInMillis)
             val mins = totalsByDate[dStr] ?: 0
             val lvl = when {
                 mins == 0 -> 0
@@ -1204,6 +1228,7 @@ private fun HeatmapGrid(sessions: List<StudySessionEntity>) {
                 else -> 3
             }
             list.add(Triple(dStr, mins, lvl))
+            cal.add(Calendar.DAY_OF_YEAR, 1)
         }
         list
     }
@@ -2467,6 +2492,16 @@ private fun CircadianDensityWaveCanvas(
     hourlyMins: IntArray,
     modifier: Modifier = Modifier
 ) {
+    val density = LocalDensity.current
+    val textPaint = remember(density) {
+        android.graphics.Paint().apply {
+            color = android.graphics.Color.rgb(148, 163, 184)
+            textSize = with(density) { 8.5.sp.toPx() }
+            isAntiAlias = true
+            textAlign = android.graphics.Paint.Align.CENTER
+        }
+    }
+
     Canvas(modifier = modifier) {
         val w = size.width
         val h = size.height
@@ -2583,12 +2618,6 @@ private fun CircadianDensityWaveCanvas(
 
         // Hour labels on X-axis using nativeCanvas
         val hourTicks = listOf(0, 4, 8, 12, 16, 20, 23)
-        val textPaint = android.graphics.Paint().apply {
-            color = android.graphics.Color.rgb(148, 163, 184)
-            textSize = 8.5.sp.toPx()
-            isAntiAlias = true
-            textAlign = android.graphics.Paint.Align.CENTER
-        }
         hourTicks.forEach { hIdx ->
             val pt = points[hIdx]
             val ampm = if (hIdx >= 12) "p" else "a"
@@ -2642,6 +2671,16 @@ private fun SubjectRadarCanvas(
 
     val topSubjects = subjects.take(8)
     val n = topSubjects.size
+
+    val density = LocalDensity.current
+    val labelPaint = remember(density) {
+        android.graphics.Paint().apply {
+            color = android.graphics.Color.rgb(241, 245, 249)
+            textSize = with(density) { 9.sp.toPx() }
+            isAntiAlias = true
+            textAlign = android.graphics.Paint.Align.CENTER
+        }
+    }
 
     Canvas(modifier = modifier) {
         val cx = size.width / 2f
@@ -2712,13 +2751,6 @@ private fun SubjectRadarCanvas(
         )
 
         // 4. Vertex dots & labels
-        val labelPaint = android.graphics.Paint().apply {
-            color = android.graphics.Color.rgb(241, 245, 249)
-            textSize = 9.sp.toPx()
-            isAntiAlias = true
-            textAlign = android.graphics.Paint.Align.CENTER
-        }
-
         dataPoints.forEachIndexed { i, pt ->
             drawCircle(color = Color(0xFF10B981), radius = 3.dp.toPx(), center = pt)
             drawCircle(color = Color.White, radius = 3.dp.toPx(), center = pt, style = Stroke(width = 1.dp.toPx()))

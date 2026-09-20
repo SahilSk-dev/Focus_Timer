@@ -1,4 +1,4 @@
-const CACHE_NAME = 'focus-timer-cache-v44';
+const CACHE_NAME = 'focus-timer-cache-v45';
 const urlsToCache = [
   './index.html',
   './app.js',
