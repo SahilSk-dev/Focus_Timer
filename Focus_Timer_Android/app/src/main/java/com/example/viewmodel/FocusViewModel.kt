@@ -70,8 +70,8 @@ class FocusViewModel(application: Application) : AndroidViewModel(application) {
 
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                val subs = repository.allSubjects.first()
-                val wts = repository.allWorkTypes.first()
+                val subs = repository.getAllSubjects().first()
+                val wts = repository.getAllWorkTypes().first()
                 repository.syncManager.uploadPrefsToCloud(
                     dailyTarget = _dailyTargetMinutes.value,
                     subjects = subs,

@@ -2106,10 +2106,10 @@ private fun ExamGoalEditDialog(
     onDismiss: () -> Unit,
     onSave: (name: String, targetDate: String, targetHours: Double, subjectScope: Set<String>) -> Unit
 ) {
-    var name by remember { mutableStateOf(currentGoal.examName) }
-    var targetDate by remember { mutableStateOf(currentGoal.targetDate) }
-    var targetHoursText by remember { mutableStateOf(currentGoal.targetHours.toString()) }
-    var selectedScope by remember { mutableStateOf(currentGoal.subjectScope) }
+    var name by remember(currentGoal) { mutableStateOf(currentGoal.examName) }
+    var targetDate by remember(currentGoal) { mutableStateOf(currentGoal.targetDate) }
+    var targetHoursText by remember(currentGoal) { mutableStateOf(currentGoal.targetHours.toString()) }
+    var selectedScope by remember(currentGoal) { mutableStateOf(currentGoal.subjectScope) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
