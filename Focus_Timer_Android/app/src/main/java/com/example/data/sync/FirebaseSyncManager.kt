@@ -38,8 +38,20 @@ class FirebaseSyncManager(
         const val WEB_CLIENT_ID = "486309866833-g02tgb2ip175690ns4p885csmh89q8ip.apps.googleusercontent.com"
     }
 
-    private val auth: FirebaseAuth by lazy { FirebaseAuth.getInstance() }
-    private val firestore: FirebaseFirestore by lazy { FirebaseFirestore.getInstance() }
+    private val auth: FirebaseAuth?
+        get() = try {
+            FirebaseAuth.getInstance()
+        } catch (_: Throwable) {
+            null
+        }
+
+    private val firestore: FirebaseFirestore?
+        get() = try {
+            FirebaseFirestore.getInstance()
+        } catch (_: Throwable) {
+            null
+        }
+
     private val prefs: SharedPreferences =
         context.getSharedPreferences("focus_timer_prefs", Context.MODE_PRIVATE)
 
@@ -59,18 +71,21 @@ class FirebaseSyncManager(
 
     init {
         try {
-            _currentUser.value = auth.currentUser
-            auth.addAuthStateListener { fbAuth ->
-                val user = fbAuth.currentUser
-                _currentUser.value = user
-                if (user != null) {
-                    startRealtimeSync(user.uid)
-                } else {
-                    stopRealtimeSync()
+            val fbAuth = auth
+            if (fbAuth != null) {
+                _currentUser.value = fbAuth.currentUser
+                fbAuth.addAuthStateListener { listenerAuth ->
+                    val user = listenerAuth.currentUser
+                    _currentUser.value = user
+                    if (user != null) {
+                        startRealtimeSync(user.uid)
+                    } else {
+                        stopRealtimeSync()
+                    }
                 }
-            }
-            if (auth.currentUser != null) {
-                startRealtimeSync(auth.currentUser!!.uid)
+                if (fbAuth.currentUser != null) {
+                    startRealtimeSync(fbAuth.currentUser!!.uid)
+                }
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error initializing FirebaseAuth: ${e.message}")
@@ -79,6 +94,7 @@ class FirebaseSyncManager(
 
     fun startRealtimeSync(uid: String) {
         stopRealtimeSync()
+        val fs = firestore ?: return
         _isSyncing.value = true
         _syncStatus.value = "Connecting to Cloud..."
 
@@ -100,7 +116,7 @@ class FirebaseSyncManager(
         }
 
         // 2. Listen to /users/{uid}/sessions
-        sessionListener = firestore.collection("users")
+        sessionListener = fs.collection("users")
             .document(uid)
             .collection("sessions")
             .addSnapshotListener { snapshot, error ->
@@ -119,7 +135,7 @@ class FirebaseSyncManager(
             }
 
         // 3. Listen to /users/{uid}/nonStudySessions
-        nonStudySessionListener = firestore.collection("users")
+        nonStudySessionListener = fs.collection("users")
             .document(uid)
             .collection("nonStudySessions")
             .addSnapshotListener { snapshot, error ->
@@ -136,7 +152,7 @@ class FirebaseSyncManager(
             }
 
         // 4. Listen to /users/{uid}/meta/prefs (Subjects, WorkTypes, DailyTarget matching Web)
-        prefsListener = firestore.collection("users")
+        prefsListener = fs.collection("users")
             .document(uid)
             .collection("meta")
             .document("prefs")
@@ -184,10 +200,11 @@ class FirebaseSyncManager(
             val credential = result.credential
 
             if (credential.type == GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL) {
+                val fbAuth = auth ?: return Result.failure(Exception("Firebase not initialized"))
                 val googleIdTokenCredential = GoogleIdTokenCredential.createFrom(credential.data)
                 val idToken = googleIdTokenCredential.idToken
                 val authCredential = GoogleAuthProvider.getCredential(idToken, null)
-                val authResult = auth.signInWithCredential(authCredential).await()
+                val authResult = fbAuth.signInWithCredential(authCredential).await()
                 val user = authResult.user
                 if (user != null) {
                     _currentUser.value = user
@@ -220,15 +237,16 @@ class FirebaseSyncManager(
     }
 
     suspend fun uploadSession(session: StudySessionEntity, previousIsNonStudy: Boolean? = null) {
-        val user = auth.currentUser ?: return
+        val user = auth?.currentUser ?: return
+        val fs = firestore ?: return
         try {
             // If category flipped (Study <-> NonStudy), remove from previous collection first
             if (previousIsNonStudy != null && previousIsNonStudy != session.isNonStudy) {
                 val oldCol = if (previousIsNonStudy) "nonStudySessions" else "sessions"
                 try {
-                    val oldDocRef = firestore.collection("users").document(user.uid).collection(oldCol).document(session.timestamp.toString())
+                    val oldDocRef = fs.collection("users").document(user.uid).collection(oldCol).document(session.timestamp.toString())
                     oldDocRef.delete().await()
-                    val querySnap = firestore.collection("users").document(user.uid).collection(oldCol).whereEqualTo("ts", session.timestamp).get().await()
+                    val querySnap = fs.collection("users").document(user.uid).collection(oldCol).whereEqualTo("ts", session.timestamp).get().await()
                     for (doc in querySnap.documents) {
                         doc.reference.delete().await()
                     }
@@ -247,7 +265,7 @@ class FirebaseSyncManager(
                 "ts" to session.timestamp,
                 "isNonStudy" to session.isNonStudy
             )
-            val docRef = firestore.collection("users")
+            val docRef = fs.collection("users")
                 .document(user.uid)
                 .collection(collectionName)
                 .document(session.timestamp.toString())
@@ -261,10 +279,11 @@ class FirebaseSyncManager(
     }
 
     suspend fun deleteSessionFromCloud(timestamp: Long, isNonStudy: Boolean) {
-        val user = auth.currentUser ?: return
+        val user = auth?.currentUser ?: return
+        val fs = firestore ?: return
         try {
             val collectionName = if (isNonStudy) "nonStudySessions" else "sessions"
-            val col = firestore.collection("users").document(user.uid).collection(collectionName)
+            val col = fs.collection("users").document(user.uid).collection(collectionName)
 
             // 1. Delete if doc id is the timestamp
             col.document(timestamp.toString()).delete().await()
@@ -281,10 +300,11 @@ class FirebaseSyncManager(
     }
 
     suspend fun bulkDeleteSessionsFromCloud(timestamps: List<Long>) {
-        val user = auth.currentUser ?: return
+        val user = auth?.currentUser ?: return
+        val fs = firestore ?: return
         try {
-            val sessionsCol = firestore.collection("users").document(user.uid).collection("sessions")
-            val nonStudyCol = firestore.collection("users").document(user.uid).collection("nonStudySessions")
+            val sessionsCol = fs.collection("users").document(user.uid).collection("sessions")
+            val nonStudyCol = fs.collection("users").document(user.uid).collection("nonStudySessions")
 
             for (ts in timestamps) {
                 sessionsCol.document(ts.toString()).delete()
@@ -296,14 +316,15 @@ class FirebaseSyncManager(
     }
 
     suspend fun uploadRestoredSessionsToCloud(sessions: List<StudySessionEntity>) {
-        val user = auth.currentUser ?: return
+        val user = auth?.currentUser ?: return
+        val fs = firestore ?: return
         if (sessions.isEmpty()) return
         try {
-            val sessionsCol = firestore.collection("users").document(user.uid).collection("sessions")
-            val nonStudyCol = firestore.collection("users").document(user.uid).collection("nonStudySessions")
+            val sessionsCol = fs.collection("users").document(user.uid).collection("sessions")
+            val nonStudyCol = fs.collection("users").document(user.uid).collection("nonStudySessions")
 
             sessions.chunked(400).forEach { chunk ->
-                val batch = firestore.batch()
+                val batch = fs.batch()
                 for (s in chunk) {
                     val targetCol = if (s.isNonStudy) nonStudyCol else sessionsCol
                     val data = hashMapOf(
@@ -330,7 +351,8 @@ class FirebaseSyncManager(
         subjects: List<SubjectEntity>,
         workTypes: List<WorkTypeEntity>
     ) {
-        val user = auth.currentUser ?: return
+        val user = auth?.currentUser ?: return
+        val fs = firestore ?: return
         try {
             val subjectsList = subjects.map { s ->
                 hashMapOf(
@@ -356,14 +378,14 @@ class FirebaseSyncManager(
                 "examGoal" to examGoalMap
             )
 
-            firestore.collection("users")
+            fs.collection("users")
                 .document(user.uid)
                 .collection("meta")
                 .document("prefs")
                 .set(data, SetOptions.merge())
                 .await()
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to update prefs to cloud: ${e.message}")
+            Log.e(TAG, "Failed to upload prefs: ${e.message}")
         }
     }
 
@@ -445,16 +467,17 @@ class FirebaseSyncManager(
     }
 
     private suspend fun uploadLocalSessionsToCloud(uid: String) {
+        val fs = firestore ?: return
         try {
             val localSessions = studyDao.getAllSessions().first()
             if (localSessions.isEmpty()) return
 
-            val sessionsCol = firestore.collection("users").document(uid).collection("sessions")
-            val nonStudyCol = firestore.collection("users").document(uid).collection("nonStudySessions")
+            val sessionsCol = fs.collection("users").document(uid).collection("sessions")
+            val nonStudyCol = fs.collection("users").document(uid).collection("nonStudySessions")
 
             // Process in atomic batches of 400 (well within Firestore 500-op limit)
             localSessions.chunked(400).forEach { chunk ->
-                val batch = firestore.batch()
+                val batch = fs.batch()
                 for (s in chunk) {
                     val targetCol = if (s.isNonStudy) nonStudyCol else sessionsCol
                     val data = hashMapOf(
@@ -537,7 +560,7 @@ class FirebaseSyncManager(
     }
 
     suspend fun manualSyncNow() {
-        val user = auth.currentUser ?: return
+        val user = auth?.currentUser ?: return
         _isSyncing.value = true
         _syncStatus.value = "Syncing..."
         try {
@@ -556,7 +579,7 @@ class FirebaseSyncManager(
     }
 
     fun signOut() {
-        auth.signOut()
+        auth?.signOut()
         _currentUser.value = null
         stopRealtimeSync()
     }
