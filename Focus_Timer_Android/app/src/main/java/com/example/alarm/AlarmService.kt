@@ -31,6 +31,7 @@ class AlarmService : Service() {
         const val ACTION_UPDATE_TRACKING = "com.example.action.UPDATE_TRACKING"
         const val EXTRA_TITLE = "extra_alarm_title"
         const val EXTRA_TIME_TEXT = "extra_time_text"
+        const val EXTRA_IS_MUTED = "extra_is_muted"
         const val CHANNEL_ID = "focus_alarm_channel_high"
         const val TRACKING_CHANNEL_ID = "focus_timer_running_channel"
         const val NOTIFICATION_ID = 2001
@@ -90,7 +91,8 @@ class AlarmService : Service() {
             }
             ACTION_START_ALARM -> {
                 val title = intent.getStringExtra(EXTRA_TITLE) ?: "Study Session"
-                startAlarm(title)
+                val isMuted = intent.getBooleanExtra(EXTRA_IS_MUTED, false)
+                startAlarm(title, isMuted)
             }
             ACTION_STOP_ALARM -> {
                 stopAlarm()
@@ -170,7 +172,7 @@ class AlarmService : Service() {
         }
     }
 
-    private fun startAlarm(title: String) {
+    private fun startAlarm(title: String, isMuted: Boolean = false) {
         _isAlarmRinging.value = true
 
         // Acquire wake lock to keep screen/CPU awake
@@ -219,8 +221,13 @@ class AlarmService : Service() {
             startForeground(NOTIFICATION_ID, notification)
         }
 
-        // Start playing alarm ringtone
-        playRingtone()
+        val prefs = getSharedPreferences("focus_timer_prefs", Context.MODE_PRIVATE)
+        val isSoundMuted = isMuted || prefs.getBoolean("is_sound_muted", false)
+
+        // Start playing alarm ringtone ONLY if sound is not muted
+        if (!isSoundMuted) {
+            playRingtone()
+        }
 
         // Start vibration
         startVibration()
@@ -228,10 +235,12 @@ class AlarmService : Service() {
 
     private fun playRingtone() {
         try {
-            // Maximize volume
-            AlarmSoundManager.ensureMaxAlarmVolume(applicationContext)
-
             val prefs = getSharedPreferences("focus_timer_prefs", Context.MODE_PRIVATE)
+            val isVolumeBoost = prefs.getBoolean("alarm_volume_boost", true)
+            if (isVolumeBoost) {
+                // Maximize volume only when user enabled Maximum Volume Boost
+                AlarmSoundManager.ensureMaxAlarmVolume(applicationContext)
+            }
             val toneId = prefs.getString("alarm_tone_id", "ultra_siren") ?: "ultra_siren"
             val toneOption = AlarmToneOption.fromId(toneId)
             val customUriStr = prefs.getString("alarm_custom_uri", null)

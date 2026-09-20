@@ -18,13 +18,19 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -73,6 +79,7 @@ import androidx.compose.ui.unit.sp
 import com.example.ui.theme.ActiveTheme
 import com.example.ui.theme.AppTheme
 import com.example.ui.theme.BgDark
+import com.example.ui.theme.DangerRed
 import com.example.ui.theme.GoldAccent
 import com.example.ui.theme.GoldBright
 import com.example.ui.theme.GoldDark
@@ -119,6 +126,8 @@ fun TimerScreen(
     val isDialVisible by viewModel.isDialVisible.collectAsState()
     val isEditMode by viewModel.isEditMode.collectAsState()
     val isFullscreen by viewModel.isFullscreen.collectAsState()
+    val showResetConfirmDialog by viewModel.showResetConfirmDialog.collectAsState()
+    val pendingResetMinutes by viewModel.pendingResetMinutes.collectAsState()
 
     val subjects by viewModel.allSubjects.collectAsState()
     val workTypes by viewModel.allWorkTypes.collectAsState()
@@ -213,6 +222,161 @@ fun TimerScreen(
             }
         }
 
+        Spacer(modifier = Modifier.height(4.dp))
+
+        // Hero Timer Stage (Clock + Phase Badge + Start/Pause/Reset above the fold!)
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            color = PanelDark,
+            shape = RoundedCornerShape(16.dp),
+            border = BorderStroke(1.dp, LineBorder)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                // Top Fullscreen Button & Active Subject Badge
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    if (selectedSubject.isNotBlank()) {
+                        val subText = if (!selectedSubSubject.isNullOrBlank()) "$selectedSubject - $selectedSubSubject" else selectedSubject
+                        Text(
+                            text = "🎯 $subText",
+                            color = GoldLight,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    } else {
+                        Text(
+                            text = "⚠️ Select a subject below",
+                            color = TextDim,
+                            fontSize = 13.sp
+                        )
+                    }
+
+                    IconButton(
+                        onClick = { viewModel.toggleFullscreen() },
+                        modifier = Modifier.size(44.dp).testTag("fullscreen_btn")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Fullscreen,
+                            contentDescription = "Full Screen",
+                            tint = GoldLight
+                        )
+                    }
+                }
+
+                // Status hint text
+                Text(
+                    text = when {
+                        selectedSubject.isBlank() -> "Select a subject to begin"
+                        !isTimerActive && !isRunning -> "Press Start to begin studying"
+                        isRunning && stopwatchMode -> "Stopwatch running..."
+                        isRunning && pomodoroMode -> if (pomoPhase == "work") "Focusing (25m)..." else "Break (5m)..."
+                        isRunning -> "Countdown running..."
+                        else -> "Paused - press Start to resume"
+                    },
+                    color = if (selectedSubject.isBlank() && !isTimerActive) GoldAccent else GoldLight,
+                    fontSize = 13.sp,
+                    modifier = Modifier.padding(vertical = 4.dp)
+                )
+
+                // Big Golden Display (Isolated recomposition)
+                IsolatedTimerDisplay(viewModel = viewModel)
+
+                // Pomodoro Phase Badge
+                if (pomodoroMode && isTimerActive) {
+                    Box(
+                        modifier = Modifier
+                            .background(
+                                color = if (pomoPhase == "work") Color(0x33C9962F) else Color(0x338BA888),
+                                shape = RoundedCornerShape(16.dp)
+                            )
+                            .border(
+                                width = 1.dp,
+                                color = if (pomoPhase == "work") GoldAccent else Color(0xFF8BA888),
+                                shape = RoundedCornerShape(16.dp)
+                            )
+                            .padding(horizontal = 12.dp, vertical = 4.dp)
+                    ) {
+                        Text(
+                            text = if (pomoPhase == "work") "⏳ Focus Session (25 mins)" else "☕ Break (5 mins)",
+                            color = if (pomoPhase == "work") GoldBright else Color(0xFF8BA888),
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(12.dp))
+                }
+
+                // Action Buttons (Start, Pause, Reset)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Button(
+                        onClick = { viewModel.startTimer() },
+                        enabled = !isRunning,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (currentTheme.isLight) Color(0xFF0F172A) else Color(0xFFFFFFFF),
+                            contentColor = if (currentTheme.isLight) Color(0xFFFFFFFF) else Color(0xFF000000),
+                            disabledContainerColor = LineBorder,
+                            disabledContentColor = TextDim
+                        ),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(48.dp)
+                            .testTag("start_btn")
+                    ) {
+                        Text("Start", fontWeight = FontWeight.Bold)
+                    }
+
+                    Button(
+                        onClick = { viewModel.pauseTimer() },
+                        enabled = isRunning,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (currentTheme.isLight) Color(0xFFF1F5F9) else PanelElevated,
+                            contentColor = if (currentTheme.isLight) Color(0xFF0F172A) else TextPrimary,
+                            disabledContainerColor = if (currentTheme.isLight) Color(0xFFF8FAFC) else PanelDark,
+                            disabledContentColor = TextDim
+                        ),
+                        shape = RoundedCornerShape(8.dp),
+                        border = BorderStroke(1.dp, LineBorder),
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(48.dp)
+                            .testTag("pause_btn")
+                    ) {
+                        Text("Pause", fontWeight = FontWeight.SemiBold)
+                    }
+
+                    Button(
+                        onClick = { viewModel.resetTimer() },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (currentTheme.isLight) Color(0xFFF1F5F9) else PanelElevated,
+                            contentColor = if (currentTheme.isLight) Color(0xFF0F172A) else TextPrimary
+                        ),
+                        shape = RoundedCornerShape(8.dp),
+                        border = BorderStroke(1.dp, LineBorder),
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(48.dp)
+                            .testTag("reset_btn")
+                    ) {
+                        Text("Reset", fontWeight = FontWeight.SemiBold)
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(18.dp))
+
         // Subject Selection Area
         Column(modifier = Modifier.fillMaxWidth()) {
             Row(
@@ -225,24 +389,44 @@ fun TimerScreen(
                     color = GoldLight,
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Medium,
-                    
                 )
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     IconButton(
                         onClick = { viewModel.toggleEditMode() },
-                        modifier = Modifier.size(32.dp).testTag("edit_mode_toggle")
+                        modifier = Modifier.size(48.dp).testTag("edit_mode_toggle")
                     ) {
                         Icon(
                             imageVector = Icons.Default.Edit,
-                            contentDescription = "Edit Mode",
+                            contentDescription = if (isEditMode) "Done editing subjects" else "Edit subjects",
                             tint = if (isEditMode) GoldBright else TextDim,
-                            modifier = Modifier.size(16.dp)
+                            modifier = Modifier.size(20.dp)
                         )
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(6.dp))
+            if (isEditMode) {
+                Surface(
+                    color = GoldAccent.copy(alpha = 0.15f),
+                    border = BorderStroke(1.dp, GoldAccent.copy(alpha = 0.5f)),
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "✏️ Edit Mode: Tap any subject to edit/rename, or ＋ to add.",
+                            color = GoldBright,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(4.dp))
 
             FlowRow(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -255,11 +439,10 @@ fun TimerScreen(
                         name = subj.name,
                         isCore = subj.isCore,
                         isSelected = isSelected,
+                        isEditMode = isEditMode,
                         isTimerActive = isTimerActive,
                         onClick = { viewModel.selectSubject(subj) },
-                        onLongClick = {
-                            if (isEditMode) onEditSubject(subj.name, subj.id)
-                        }
+                        onEdit = { onEditSubject(subj.name, subj.id) }
                     )
                 }
 
@@ -362,13 +545,13 @@ fun TimerScreen(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     IconButton(
                         onClick = { viewModel.toggleMute() },
-                        modifier = Modifier.size(36.dp).testTag("mute_button")
+                        modifier = Modifier.size(48.dp).testTag("mute_button")
                     ) {
                         Icon(
                             imageVector = if (isMuted) Icons.Default.NotificationsOff else Icons.Default.Notifications,
-                            contentDescription = "Mute Toggle",
+                            contentDescription = if (isMuted) "Alarm sound is muted. Tap to unmute" else "Alarm sound is active. Tap to mute",
                             tint = if (isMuted) TextDim else GoldBright,
-                            modifier = Modifier.size(20.dp)
+                            modifier = Modifier.size(22.dp)
                         )
                     }
                     Spacer(modifier = Modifier.width(6.dp))
@@ -387,8 +570,6 @@ fun TimerScreen(
                 }
             }
         }
-
-        // (Golden Dial removed for clean distraction-free study layout)
 
         // Custom Time Row (Hidden in Pomodoro Mode)
         AnimatedVisibility(visible = !pomodoroMode) {
@@ -439,143 +620,62 @@ fun TimerScreen(
             }
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(24.dp))
+    }
 
-        // Dial and Digital Timer Display Container
-        Surface(
-            modifier = Modifier.fillMaxWidth(),
-            color = PanelDark,
-            shape = RoundedCornerShape(16.dp),
-            border = BorderStroke(1.dp, LineBorder)
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                // Top Fullscreen Button
+    // Reset Confirmation Dialog (When user spent >= 1m)
+    if (showResetConfirmDialog) {
+        AlertDialog(
+            onDismissRequest = { viewModel.cancelResetDialog() },
+            title = {
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    IconButton(
-                        onClick = { viewModel.toggleFullscreen() },
-                        modifier = Modifier.testTag("fullscreen_btn")
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Fullscreen,
-                            contentDescription = "Full Screen",
-                            tint = GoldLight
-                        )
-                    }
+                    Text("⏱️", fontSize = 24.sp)
+                    Text(
+                        text = "Reset Timer?",
+                        color = GoldBright,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 18.sp
+                    )
                 }
-
-                // Status hint text
-                Text(
-                    text = when {
-                        !isTimerActive && !isRunning -> "Press Start to begin studying"
-                        isRunning && stopwatchMode -> "Stopwatch running..."
-                        isRunning && pomodoroMode -> if (pomoPhase == "work") "Focusing (25m)..." else "Break (5m)..."
-                        isRunning -> "Countdown running..."
-                        else -> "Paused - press Start to resume"
-                    },
-                    color = GoldLight,
-                    fontSize = 13.sp,
-                    
-                    modifier = Modifier.padding(vertical = 4.dp)
-                )
-
-                // Big Golden Display (Isolated recomposition)
-                IsolatedTimerDisplay(viewModel = viewModel)
-
-                // Pomodoro Phase Badge
-                if (pomodoroMode && isTimerActive) {
-                    Box(
-                        modifier = Modifier
-                            .background(
-                                color = if (pomoPhase == "work") Color(0x33C9962F) else Color(0x338BA888),
-                                shape = RoundedCornerShape(16.dp)
-                            )
-                            .border(
-                                width = 1.dp,
-                                color = if (pomoPhase == "work") GoldAccent else Color(0xFF8BA888),
-                                shape = RoundedCornerShape(16.dp)
-                            )
-                            .padding(horizontal = 12.dp, vertical = 4.dp)
-                    ) {
-                        Text(
-                            text = if (pomoPhase == "work") "⏳ Focus Session (25 mins)" else "☕ Break (5 mins)",
-                            color = if (pomoPhase == "work") GoldBright else Color(0xFF8BA888),
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Medium
-                        )
-                    }
-                    Spacer(modifier = Modifier.height(12.dp))
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        text = "You studied for $pendingResetMinutes minute${if (pendingResetMinutes == 1) "" else "s"}. Would you like to finish and save this session?",
+                        color = TextPrimary,
+                        fontSize = 14.sp
+                    )
+                    Text(
+                        text = "• Finish & Save: Records $pendingResetMinutes min into history & resets timer.\n• Discard: Resets timer without saving this session.",
+                        color = TextDim,
+                        fontSize = 12.sp
+                    )
                 }
-
-                // Action Buttons (Start, Pause, Reset)
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+            },
+            confirmButton = {
+                Button(
+                    onClick = { viewModel.confirmResetAndSave() },
+                    colors = ButtonDefaults.buttonColors(containerColor = GoldAccent, contentColor = BgDark),
+                    shape = RoundedCornerShape(8.dp)
                 ) {
-                    Button(
-                        onClick = { viewModel.startTimer() },
-                        enabled = !isRunning,
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = if (currentTheme.isLight) Color(0xFF0F172A) else Color(0xFFFFFFFF),
-                            contentColor = if (currentTheme.isLight) Color(0xFFFFFFFF) else Color(0xFF000000),
-                            disabledContainerColor = LineBorder,
-                            disabledContentColor = TextDim
-                        ),
-                        shape = RoundedCornerShape(8.dp),
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(46.dp)
-                            .testTag("start_btn")
-                    ) {
-                        Text("Start", fontWeight = FontWeight.Bold)
+                    Text("Finish & Save (${pendingResetMinutes}m)", fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    TextButton(onClick = { viewModel.confirmResetAndDiscard() }) {
+                        Text("Discard", color = DangerRed)
                     }
-
-                    Button(
-                        onClick = { viewModel.pauseTimer() },
-                        enabled = isRunning,
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = if (currentTheme.isLight) Color(0xFFF1F5F9) else PanelElevated,
-                            contentColor = if (currentTheme.isLight) Color(0xFF0F172A) else TextPrimary,
-                            disabledContainerColor = if (currentTheme.isLight) Color(0xFFF8FAFC) else PanelDark,
-                            disabledContentColor = TextDim
-                        ),
-                        shape = RoundedCornerShape(8.dp),
-                        border = BorderStroke(1.dp, LineBorder),
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(46.dp)
-                            .testTag("pause_btn")
-                    ) {
-                        Text("Pause", fontWeight = FontWeight.SemiBold)
-                    }
-
-                    Button(
-                        onClick = { viewModel.resetTimer() },
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = if (currentTheme.isLight) Color(0xFFF1F5F9) else PanelElevated,
-                            contentColor = if (currentTheme.isLight) Color(0xFF0F172A) else TextPrimary
-                        ),
-                        shape = RoundedCornerShape(8.dp),
-                        border = BorderStroke(1.dp, LineBorder),
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(46.dp)
-                            .testTag("reset_btn")
-                    ) {
-                        Text("Reset", fontWeight = FontWeight.SemiBold)
+                    TextButton(onClick = { viewModel.cancelResetDialog() }) {
+                        Text("Cancel", color = TextDim)
                     }
                 }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(30.dp))
+            },
+            containerColor = PanelDark
+        )
     }
 }
 
@@ -584,11 +684,13 @@ private fun SubjectChip(
     name: String,
     isCore: Boolean,
     isSelected: Boolean,
+    isEditMode: Boolean,
     isTimerActive: Boolean,
     onClick: () -> Unit,
-    onLongClick: () -> Unit
+    onEdit: () -> Unit
 ) {
     val borderColor = when {
+        isEditMode -> GoldAccent
         isSelected -> GoldBright
         isCore -> GoldAccent.copy(alpha = 0.8f)
         else -> LineBorder
@@ -607,23 +709,39 @@ private fun SubjectChip(
     }
 
     Box(
+        contentAlignment = Alignment.Center,
         modifier = Modifier
+            .defaultMinSize(minWidth = 48.dp, minHeight = 44.dp)
             .clip(RoundedCornerShape(20.dp))
             .background(backgroundColor)
             .border(
-                width = if (isSelected) 1.5.dp else 1.dp,
+                width = if (isSelected || isEditMode) 1.5.dp else 1.dp,
                 color = borderColor,
                 shape = RoundedCornerShape(20.dp)
             )
-            .clickable { onClick() }
-            .padding(horizontal = 14.dp, vertical = 7.dp)
+            .semantics {
+                this.role = Role.RadioButton
+                this.selected = isSelected
+            }
+            .clickable {
+                if (isEditMode) onEdit() else onClick()
+            }
+            .padding(horizontal = 14.dp, vertical = 8.dp)
     ) {
-        Text(
-            text = name,
-            color = textColor,
-            fontSize = 13.sp,
-            fontWeight = if (isSelected || isCore) FontWeight.SemiBold else FontWeight.Normal,
-        )
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            if (isEditMode) {
+                Text(text = "✏️", fontSize = 11.sp)
+            }
+            Text(
+                text = name,
+                color = textColor,
+                fontSize = 13.sp,
+                fontWeight = if (isSelected || isCore) FontWeight.SemiBold else FontWeight.Normal,
+            )
+        }
     }
 }
 
@@ -635,7 +753,9 @@ private fun SubChip(
     onClick: () -> Unit
 ) {
     Box(
+        contentAlignment = Alignment.Center,
         modifier = Modifier
+            .defaultMinSize(minWidth = 48.dp, minHeight = 44.dp)
             .clip(RoundedCornerShape(20.dp))
             .background(if (isSelected) GoldAccent.copy(alpha = 0.22f) else PanelDark)
             .border(
@@ -643,14 +763,17 @@ private fun SubChip(
                 color = if (isSelected) GoldBright else LineBorder,
                 shape = RoundedCornerShape(20.dp)
             )
+            .semantics {
+                this.role = Role.RadioButton
+                this.selected = isSelected
+            }
             .clickable { onClick() }
-            .padding(horizontal = 12.dp, vertical = 5.dp)
+            .padding(horizontal = 12.dp, vertical = 8.dp)
     ) {
         Text(
             text = "↳ $name",
             color = if (isSelected) (if (ActiveTheme.isLight) ActiveTheme.primary else GoldBright) else TextDim,
             fontSize = 12.sp,
-            
         )
     }
 }
@@ -663,7 +786,9 @@ private fun WorkTypeChip(
     onClick: () -> Unit
 ) {
     Box(
+        contentAlignment = Alignment.Center,
         modifier = Modifier
+            .defaultMinSize(minWidth = 48.dp, minHeight = 44.dp)
             .clip(RoundedCornerShape(20.dp))
             .background(if (isSelected) GoldAccent.copy(alpha = 0.22f) else PanelDark)
             .border(
@@ -671,14 +796,17 @@ private fun WorkTypeChip(
                 color = if (isSelected) GoldBright else LineBorder,
                 shape = RoundedCornerShape(20.dp)
             )
+            .semantics {
+                this.role = Role.RadioButton
+                this.selected = isSelected
+            }
             .clickable { onClick() }
-            .padding(horizontal = 12.dp, vertical = 6.dp)
+            .padding(horizontal = 12.dp, vertical = 8.dp)
     ) {
         Text(
             text = name,
             color = if (isSelected) (if (ActiveTheme.isLight) ActiveTheme.primary else GoldBright) else TextDim,
             fontSize = 12.sp,
-            
         )
     }
 }
@@ -689,17 +817,18 @@ private fun AddChip(
     onClick: () -> Unit
 ) {
     Box(
+        contentAlignment = Alignment.Center,
         modifier = Modifier
+            .defaultMinSize(minWidth = 48.dp, minHeight = 44.dp)
             .clip(RoundedCornerShape(20.dp))
             .border(1.dp, LineBright, RoundedCornerShape(20.dp))
             .clickable { onClick() }
-            .padding(horizontal = 12.dp, vertical = 6.dp)
+            .padding(horizontal = 12.dp, vertical = 8.dp)
     ) {
         Text(
             text = label,
             color = GoldLight,
             fontSize = 12.sp,
-            
         )
     }
 }
@@ -785,7 +914,7 @@ private fun FullscreenFocusLayout(
             Spacer(modifier = Modifier.height(16.dp))
 
             Row(
-                modifier = Modifier.width(360.dp),
+                modifier = Modifier.fillMaxWidth().widthIn(max = 420.dp),
                 horizontalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 Button(

@@ -352,7 +352,7 @@ fun StatsScreen(
                         }
                     }
                     Spacer(modifier = Modifier.height(4.dp))
-                    Text(text = "$targetPct% achieved", color = GoldLight, fontSize = 10.sp)
+                    Text(text = "$targetPct% achieved", color = GoldLight, fontSize = 11.sp)
                 }
             }
 
@@ -399,7 +399,7 @@ fun StatsScreen(
                         }
                     }
                     Spacer(modifier = Modifier.height(4.dp))
-                    Text(text = "$currentXp / $xpPerLevel XP", color = TextDim, fontSize = 10.sp)
+                    Text(text = "$currentXp / $xpPerLevel XP", color = TextDim, fontSize = 11.sp)
                 }
             }
         }
@@ -690,7 +690,7 @@ fun StatsScreen(
                     horizontalArrangement = Arrangement.End,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(text = "Less", color = TextDim, fontSize = 10.sp)
+                    Text(text = "Less", color = TextDim, fontSize = 11.sp)
                     Spacer(modifier = Modifier.width(4.dp))
                     Box(modifier = Modifier.size(10.dp).background(Color(0xFF1C1C1A), RoundedCornerShape(2.dp)))
                     Spacer(modifier = Modifier.width(3.dp))
@@ -700,7 +700,7 @@ fun StatsScreen(
                     Spacer(modifier = Modifier.width(3.dp))
                     Box(modifier = Modifier.size(10.dp).background(Color(0xFFC9962F), RoundedCornerShape(2.dp)))
                     Spacer(modifier = Modifier.width(4.dp))
-                    Text(text = "More", color = TextDim, fontSize = 10.sp)
+                    Text(text = "More", color = TextDim, fontSize = 11.sp)
                 }
             }
         }
@@ -1147,9 +1147,9 @@ private fun BadgeCard(
                         Text(
                             text = "Earned ✨",
                             color = GoldBright,
-                            fontSize = 9.sp,
+                            fontSize = 11.sp,
                             fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                         )
                     }
                 } else {
@@ -1161,8 +1161,8 @@ private fun BadgeCard(
                         Text(
                             text = "$pct%",
                             color = TextDim,
-                            fontSize = 9.sp,
-                            modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
+                            fontSize = 11.sp,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                         )
                     }
                 }
@@ -1184,10 +1184,10 @@ private fun BadgeCard(
             Text(
                 text = badge.description,
                 color = TextDim,
-                fontSize = 10.sp,
+                fontSize = 11.sp,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
-                lineHeight = 13.sp
+                lineHeight = 15.sp
             )
 
             Spacer(modifier = Modifier.height(8.dp))
@@ -1216,7 +1216,7 @@ private fun BadgeCard(
             Text(
                 text = "${badge.currentVal}/${badge.targetVal} ${badge.unit}",
                 color = if (badge.isUnlocked) GoldLight else TextDim,
-                fontSize = 9.sp
+                fontSize = 11.sp
             )
         }
     }
@@ -1716,7 +1716,7 @@ private fun DeepAnalysisEngineSection(
                                     "Moderate Pacing" -> Color(0xFFFBBF24)
                                     else -> Color(0xFFF87171)
                                 },
-                                fontSize = 10.sp,
+                                fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold,
                                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                             )
@@ -1770,19 +1770,19 @@ private fun DeepAnalysisEngineSection(
                     ) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
                             Text(text = "${report.consistencyPct}%", color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                            Text(text = "Consistency", color = TextDim, fontSize = 9.sp)
+                            Text(text = "Consistency", color = TextDim, fontSize = 11.sp)
                         }
                         Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
                             Text(text = "${report.goalHitRate}%", color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                            Text(text = "Goal Hit", color = TextDim, fontSize = 9.sp)
+                            Text(text = "Goal Hit", color = TextDim, fontSize = 11.sp)
                         }
                         Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
                             Text(text = "${report.pacingStability}%", color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                            Text(text = "Pacing", color = TextDim, fontSize = 9.sp)
+                            Text(text = "Pacing", color = TextDim, fontSize = 11.sp)
                         }
                         Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
                             Text(text = "${report.deepWorkRatio}%", color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                            Text(text = "Deep Work", color = TextDim, fontSize = 9.sp)
+                            Text(text = "Deep Work", color = TextDim, fontSize = 11.sp)
                         }
                     }
 
@@ -1790,7 +1790,7 @@ private fun DeepAnalysisEngineSection(
                     Text(
                         text = "Formula: 0.35·DeepWork + 0.25·Consistency + 0.25·GoalHit + 0.15·Pacing",
                         color = TextDim,
-                        fontSize = 9.sp,
+                        fontSize = 11.sp,
                         textAlign = TextAlign.Center,
                         modifier = Modifier.fillMaxWidth()
                     )
@@ -1837,7 +1837,7 @@ private fun DeepAnalysisEngineSection(
                             Text(
                                 text = if (isNoStudy) "No Study Data" else "Peak: ${report.peakFocusWindow}",
                                 color = if (isNoStudy) TextDim else GoldBright,
-                                fontSize = 10.sp,
+                                fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold,
                                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                                 maxLines = 1,
@@ -1851,7 +1851,7 @@ private fun DeepAnalysisEngineSection(
                     Text(
                         text = "24-HOUR FOCUS DENSITY WAVE",
                         color = TextDim,
-                        fontSize = 9.5.sp,
+                        fontSize = 11.sp,
                         fontWeight = FontWeight.Bold
                     )
                     Spacer(modifier = Modifier.height(4.dp))
@@ -1926,17 +1926,17 @@ private fun DeepAnalysisEngineSection(
                     ) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
                             Text(text = "${report.deepWorkRatio}%", color = TextPrimary, fontSize = 16.sp, fontWeight = FontWeight.Bold)
-                            Text(text = "Deep Work (≥45m)", color = TextDim, fontSize = 10.sp, textAlign = TextAlign.Center)
+                            Text(text = "Deep Work (≥45m)", color = TextDim, fontSize = 11.sp, textAlign = TextAlign.Center)
                         }
                         Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
                             Text(text = "${report.avgSessionMinutes}m", color = TextPrimary, fontSize = 16.sp, fontWeight = FontWeight.Bold)
-                            Text(text = "Avg Duration", color = TextDim, fontSize = 10.sp, textAlign = TextAlign.Center)
+                            Text(text = "Avg Duration", color = TextDim, fontSize = 11.sp, textAlign = TextAlign.Center)
                         }
                         Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
                             val sign = if (report.velocityPercentage >= 0) "+" else ""
                             val col = if (report.velocityPercentage >= 0) SuccessGreen else Color(0xFFEF4444)
                             Text(text = "$sign${report.velocityPercentage}%", color = col, fontSize = 16.sp, fontWeight = FontWeight.Bold)
-                            Text(text = "Velocity", color = TextDim, fontSize = 10.sp, textAlign = TextAlign.Center)
+                            Text(text = "Velocity", color = TextDim, fontSize = 11.sp, textAlign = TextAlign.Center)
                         }
                     }
 
@@ -1960,7 +1960,7 @@ private fun DeepAnalysisEngineSection(
                     Text(
                         text = "${report.deepWorkMinutes} of ${report.totalMinutes} mins in sustained blocks",
                         color = TextDim,
-                        fontSize = 10.sp
+                        fontSize = 11.sp
                     )
                 }
             }
@@ -1986,7 +1986,7 @@ private fun DeepAnalysisEngineSection(
                     Text(
                         text = "CURRICULUM EQUILIBRIUM RADAR POLYGON",
                         color = TextDim,
-                        fontSize = 9.5.sp,
+                        fontSize = 11.sp,
                         fontWeight = FontWeight.Bold
                     )
                     Spacer(modifier = Modifier.height(6.dp))
@@ -2021,7 +2021,7 @@ private fun DeepAnalysisEngineSection(
                                     Row(verticalAlignment = Alignment.CenterVertically) {
                                         Text(text = subj.subjectName, color = TextPrimary, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                                         Spacer(modifier = Modifier.width(4.dp))
-                                        Text(text = "(${subj.percentage}% share)", color = TextDim, fontSize = 10.sp)
+                                        Text(text = "(${subj.percentage}% share)", color = TextDim, fontSize = 11.sp)
                                     }
                                     Spacer(modifier = Modifier.height(2.dp))
                                     Box(
@@ -2044,7 +2044,7 @@ private fun DeepAnalysisEngineSection(
                                         Text(
                                             text = "R: ${subj.retentionPct}% (S=${subj.stabilityDays}d)",
                                             color = statusColor,
-                                            fontSize = 9.sp,
+                                            fontSize = 11.sp,
                                             fontWeight = FontWeight.Bold
                                         )
                                         Spacer(modifier = Modifier.width(6.dp))
@@ -2070,20 +2070,20 @@ private fun DeepAnalysisEngineSection(
                                     Text(
                                         text = "${String.format(Locale.US, "%.1f", subj.hours)}h",
                                         color = TextPrimary,
-                                        fontSize = 11.sp,
+                                        fontSize = 12.sp,
                                         fontWeight = FontWeight.Bold
                                     )
                                     val statusText = if (subj.daysAgo == 0) "Today" else if (subj.daysAgo == 1) "Yesterday" else "${subj.daysAgo}d ago"
                                     Text(
                                         text = subj.recallStatus,
                                         color = statusColor,
-                                        fontSize = 9.sp,
+                                        fontSize = 11.sp,
                                         fontWeight = FontWeight.Bold
                                     )
                                     Text(
                                         text = statusText,
                                         color = TextDim,
-                                        fontSize = 9.sp
+                                        fontSize = 11.sp
                                     )
                                 }
                             }
@@ -2286,7 +2286,7 @@ private fun ExamProjectionCard(
                     Text(
                         text = "Target Date: ${goal.targetDate}",
                         color = TextDim,
-                        fontSize = 10.sp
+                        fontSize = 11.sp
                     )
                 }
 
@@ -2309,7 +2309,7 @@ private fun ExamProjectionCard(
                         Text(
                             text = countdownText,
                             color = countdownColor,
-                            fontSize = 10.sp,
+                            fontSize = 11.sp,
                             fontWeight = FontWeight.Bold,
                             modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp)
                         )
@@ -2317,13 +2317,13 @@ private fun ExamProjectionCard(
 
                     IconButton(
                         onClick = onEditClick,
-                        modifier = Modifier.size(28.dp)
+                        modifier = Modifier.size(44.dp)
                     ) {
                         Icon(
                             imageVector = Icons.Default.Edit,
                             contentDescription = "Edit Target Goal",
                             tint = GoldLight,
-                            modifier = Modifier.size(15.dp)
+                            modifier = Modifier.size(18.dp)
                         )
                     }
                 }
@@ -2378,19 +2378,19 @@ private fun ExamProjectionCard(
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
                     Text(text = "${String.format(Locale.US, "%.1f", projection.completedHours)}h", color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                    Text(text = "Completed", color = TextDim, fontSize = 9.sp)
+                    Text(text = "Completed", color = TextDim, fontSize = 11.sp)
                 }
                 Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
                     Text(text = "${String.format(Locale.US, "%.1f", projection.remainingHours)}h", color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                    Text(text = "Remaining", color = TextDim, fontSize = 9.sp)
+                    Text(text = "Remaining", color = TextDim, fontSize = 11.sp)
                 }
                 Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
                     Text(text = "${String.format(Locale.US, "%.1f", projection.requiredDailyHours)}h/d", color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                    Text(text = "Required Pace", color = TextDim, fontSize = 9.sp)
+                    Text(text = "Required Pace", color = TextDim, fontSize = 11.sp)
                 }
                 Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
                     Text(text = "${String.format(Locale.US, "%.1f", projection.currentDailyHours)}h/d", color = GoldBright, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                    Text(text = "7d Velocity", color = TextDim, fontSize = 9.sp)
+                    Text(text = "7d Velocity", color = TextDim, fontSize = 11.sp)
                 }
             }
 
@@ -2422,8 +2422,8 @@ private fun ExamProjectionCard(
                     Text(
                         text = projection.statusDescription,
                         color = statusFg.copy(alpha = 0.85f),
-                        fontSize = 9.5.sp,
-                        lineHeight = 13.sp
+                        fontSize = 11.sp,
+                        lineHeight = 15.sp
                     )
                 }
             }
@@ -2472,7 +2472,7 @@ private fun CognitiveFatigueCard(
                     Text(
                         text = fatigue.tierLabel,
                         color = tierFg,
-                        fontSize = 10.sp,
+                        fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                     )
@@ -2538,15 +2538,15 @@ private fun CognitiveFatigueCard(
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
                     Text(text = "${String.format(Locale.US, "%.1f", fatigue.avgDailyHours7d)}h/d", color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                    Text(text = "7d Daily Load", color = TextDim, fontSize = 9.sp)
+                    Text(text = "7d Daily Load", color = TextDim, fontSize = 11.sp)
                 }
                 Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
                     Text(text = "${fatigue.consecutiveHighDays}d", color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                    Text(text = "High Strain (≥5h)", color = TextDim, fontSize = 9.sp)
+                    Text(text = "High Strain (≥5h)", color = TextDim, fontSize = 11.sp)
                 }
                 Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
                     Text(text = "${fatigue.recoveryDaysCount} / 7", color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                    Text(text = "Recovery (<2h)", color = TextDim, fontSize = 9.sp)
+                    Text(text = "Recovery (<2h)", color = TextDim, fontSize = 11.sp)
                 }
             }
 
@@ -2555,8 +2555,8 @@ private fun CognitiveFatigueCard(
             Text(
                 text = fatigue.adviceText,
                 color = TextDim,
-                fontSize = 10.sp,
-                lineHeight = 14.sp
+                fontSize = 12.sp,
+                lineHeight = 16.sp
             )
         }
     }
@@ -2739,7 +2739,7 @@ private fun SubjectRadarCanvas(
                 Text(
                     text = "Radar web polygon requires 3+ subjects (currently ${subjects.size} recorded). Comparative balance bars are displayed below.",
                     color = TextDim,
-                    fontSize = 10.sp,
+                    fontSize = 11.sp,
                     textAlign = TextAlign.Center
                 )
             }
@@ -2754,7 +2754,7 @@ private fun SubjectRadarCanvas(
     val labelPaint = remember(density) {
         android.graphics.Paint().apply {
             color = android.graphics.Color.rgb(241, 245, 249)
-            textSize = with(density) { 9.sp.toPx() }
+            textSize = with(density) { 11.sp.toPx() }
             isAntiAlias = true
             textAlign = android.graphics.Paint.Align.CENTER
         }

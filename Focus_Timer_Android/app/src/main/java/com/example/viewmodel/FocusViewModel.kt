@@ -183,14 +183,20 @@ class FocusViewModel(application: Application) : AndroidViewModel(application) {
     private val _inputMinutes = MutableStateFlow(0)
     val inputMinutes: StateFlow<Int> = _inputMinutes.asStateFlow()
 
-    private val _selectedSubject = MutableStateFlow("Bengali")
+    private val _selectedSubject = MutableStateFlow("")
     val selectedSubject: StateFlow<String> = _selectedSubject.asStateFlow()
 
-    private val _selectedSubSubject = MutableStateFlow<String?>("Text")
+    private val _selectedSubSubject = MutableStateFlow<String?>(null)
     val selectedSubSubject: StateFlow<String?> = _selectedSubSubject.asStateFlow()
 
     private val _selectedWorkType = MutableStateFlow("Revision")
     val selectedWorkType: StateFlow<String> = _selectedWorkType.asStateFlow()
+
+    private val _showResetConfirmDialog = MutableStateFlow(false)
+    val showResetConfirmDialog: StateFlow<Boolean> = _showResetConfirmDialog.asStateFlow()
+
+    private val _pendingResetMinutes = MutableStateFlow(0)
+    val pendingResetMinutes: StateFlow<Int> = _pendingResetMinutes.asStateFlow()
 
     private val _isMuted = MutableStateFlow(repository.isSoundMuted)
     val isMuted: StateFlow<Boolean> = _isMuted.asStateFlow()
@@ -406,6 +412,10 @@ class FocusViewModel(application: Application) : AndroidViewModel(application) {
 
 
     fun startTimer() {
+        if (_selectedSubject.value.isBlank()) {
+            showToast("Please select a subject to start")
+            return
+        }
         vibratePhone(40)
         if (!_isTimerActive.value) {
             // First time start
@@ -509,13 +519,32 @@ class FocusViewModel(application: Application) : AndroidViewModel(application) {
         vibratePhone(60)
         AlarmHelper.cancelAlarm(getApplication())
         AlarmService.stop(getApplication())
-        val wasRunning = _isRunning.value
         val wasActive = _isTimerActive.value
         val wasStopwatch = _stopwatchMode.value
         val finalSecs = if (wasStopwatch) {
             _remainingSeconds.value
         } else {
             _totalSeconds.value - _remainingSeconds.value
+        }
+
+        val isBreakPhase = _pomodoroMode.value && _pomoPhase.value == "break"
+        if (isBreakPhase) {
+            pauseTimer()
+            _isTimerActive.value = false
+            _remainingSeconds.value = 0
+            _totalSeconds.value = 0
+            _stopwatchMode.value = false
+            repository.clearRunningTimerState()
+            _pomoPhase.value = "work"
+            showToast("☕ Break cancelled")
+            return
+        }
+
+        if (wasActive && finalSecs >= 60) {
+            pauseTimer()
+            _pendingResetMinutes.value = (finalSecs / 60).toInt()
+            _showResetConfirmDialog.value = true
+            return
         }
 
         pauseTimer()
@@ -525,19 +554,49 @@ class FocusViewModel(application: Application) : AndroidViewModel(application) {
         _stopwatchMode.value = false
         repository.clearRunningTimerState()
 
-        val isBreakPhase = _pomodoroMode.value && _pomoPhase.value == "break"
-        if (isBreakPhase) {
-            showToast("☕ Break cancelled")
-        } else if (wasActive && finalSecs >= 60) {
-            val mins = (finalSecs / 60).toInt()
-            saveSession(mins)
-        } else if (wasActive && finalSecs > 0) {
+        if (wasActive && finalSecs > 0) {
             showToast("Not saved as it was less than 1 min")
         }
 
         if (_pomodoroMode.value) {
             _pomoPhase.value = "work"
         }
+    }
+
+    fun confirmResetAndSave() {
+        val mins = _pendingResetMinutes.value
+        _showResetConfirmDialog.value = false
+        _pendingResetMinutes.value = 0
+        _isTimerActive.value = false
+        _remainingSeconds.value = 0
+        _totalSeconds.value = 0
+        _stopwatchMode.value = false
+        repository.clearRunningTimerState()
+        if (_pomodoroMode.value) {
+            _pomoPhase.value = "work"
+        }
+        if (mins >= 1) {
+            saveSession(mins)
+        }
+    }
+
+    fun confirmResetAndDiscard() {
+        _showResetConfirmDialog.value = false
+        _pendingResetMinutes.value = 0
+        _isTimerActive.value = false
+        _remainingSeconds.value = 0
+        _totalSeconds.value = 0
+        _stopwatchMode.value = false
+        repository.clearRunningTimerState()
+        if (_pomodoroMode.value) {
+            _pomoPhase.value = "work"
+        }
+        showToast("Session discarded")
+    }
+
+    fun cancelResetDialog() {
+        _showResetConfirmDialog.value = false
+        _pendingResetMinutes.value = 0
     }
 
     private fun onTimerFinished() {
@@ -552,6 +611,7 @@ class FocusViewModel(application: Application) : AndroidViewModel(application) {
             val serviceIntent = Intent(getApplication(), AlarmService::class.java).apply {
                 action = AlarmService.ACTION_START_ALARM
                 putExtra(AlarmService.EXTRA_TITLE, _selectedSubject.value)
+                putExtra(AlarmService.EXTRA_IS_MUTED, _isMuted.value)
             }
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 getApplication<Application>().startForegroundService(serviceIntent)
