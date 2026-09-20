@@ -252,7 +252,40 @@
 
           <!-- Desktop Analytics Grid -->
           <div class="analytics-grid">
-            <!-- Card 1: Circadian Peak Focus Hours -->
+            <!-- Card 1: Focus Quality Score (FQS / Cognitive Quality Index) -->
+            <div class="analytics-card">
+              <div class="analytics-card-header">
+                <span class="analytics-icon">🎯</span>
+                <span class="analytics-card-title">Focus Quality Score (FQS)</span>
+              </div>
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                <div style="display:flex; align-items:baseline; gap:4px;">
+                  <span class="fqs-score-val" id="fqsScoreVal">0</span>
+                  <span style="font-size:0.85rem; color:var(--text-dim); font-weight:600;">/ 100</span>
+                </div>
+                <div class="fqs-tier-badge" id="fqsTierBadge">Analyzing...</div>
+              </div>
+              <div class="track" style="margin-bottom:10px;"><div class="fill green" id="fqsFill" style="width:0%;"></div></div>
+              <div class="analytics-stat-row">
+                <div>
+                  <div class="analytics-stat-val" id="fqsConsistencyVal">0%</div>
+                  <div class="analytics-stat-label">Consistency (25%)</div>
+                </div>
+                <div>
+                  <div class="analytics-stat-val" id="fqsGoalHitVal">0%</div>
+                  <div class="analytics-stat-label">Daily Goal (25%)</div>
+                </div>
+                <div>
+                  <div class="analytics-stat-val" id="fqsPacingVal">0%</div>
+                  <div class="analytics-stat-label">Pacing (15%)</div>
+                </div>
+              </div>
+              <div class="analytics-stat-subtext" style="font-size:0.68rem; margin-top:8px;">
+                Formula: 0.35·DeepWork + 0.25·Consistency + 0.25·GoalHit + 0.15·Pacing
+              </div>
+            </div>
+
+            <!-- Card 2: Circadian Peak Focus Hours -->
             <div class="analytics-card">
               <div class="analytics-card-header">
                 <span class="analytics-icon">🌅</span>
@@ -262,7 +295,7 @@
               <div class="circadian-bars" id="circadianBars"></div>
             </div>
 
-            <!-- Card 2: Deep Work Stamina & Velocity -->
+            <!-- Card 3: Deep Work Stamina & Velocity -->
             <div class="analytics-card">
               <div class="analytics-card-header">
                 <span class="analytics-icon">⚡</span>
@@ -286,22 +319,22 @@
               <div class="analytics-stat-subtext" id="deepWorkSubtext">0 of 0 mins in deep focus blocks</div>
             </div>
 
-            <!-- Card 3: Subject Equilibrium & Neglect Matrix -->
-            <div class="analytics-card full-width">
-              <div class="analytics-card-header">
-                <span class="analytics-icon">⚖️</span>
-                <span class="analytics-card-title">Subject Equilibrium & Neglect Matrix</span>
-              </div>
-              <div id="subjectEquilibriumList" class="equilibrium-list"></div>
-            </div>
-
             <!-- Card 4: Cognitive Work-Type Distribution -->
-            <div class="analytics-card full-width">
+            <div class="analytics-card">
               <div class="analytics-card-header">
                 <span class="analytics-icon">🧩</span>
                 <span class="analytics-card-title">Cognitive Method Modality</span>
               </div>
               <div id="cognitiveWorkTypeList" class="worktype-breakdown-list"></div>
+            </div>
+
+            <!-- Card 5: Subject Equilibrium & Ebbinghaus Recall Matrix (Full Width) -->
+            <div class="analytics-card full-width">
+              <div class="analytics-card-header">
+                <span class="analytics-icon">⚖️</span>
+                <span class="analytics-card-title">Subject Equilibrium & Ebbinghaus Recall Matrix</span>
+              </div>
+              <div id="subjectEquilibriumList" class="equilibrium-list"></div>
             </div>
           </div>
         </div>

@@ -317,12 +317,21 @@ object PdfExportHelper {
         val attentionTextPaint = Paint().apply {
             color = Color.rgb(220, 38, 38) // Red #DC2626
             textSize = 7.5f
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+            isAntiAlias = true
+        }
+
+        val warningStatusPaint = Paint().apply {
+            color = Color.rgb(217, 119, 6) // Amber/Orange #D97706
+            textSize = 7.5f
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
             isAntiAlias = true
         }
 
         val successStatusPaint = Paint().apply {
             color = Color.rgb(5, 150, 105) // Green
             textSize = 7.5f
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
             isAntiAlias = true
         }
 
@@ -372,49 +381,60 @@ object PdfExportHelper {
         var y = 118f
 
         // 2. Executive Performance & Focus Stamina Summary
-        canvas1.drawRect(36f, y, 559f, y + 26f, emeraldHeaderPaint)
-        canvas1.drawText("EXECUTIVE PERFORMANCE & FOCUS STAMINA", 44f, y + 11f, headerTextPaint)
-        canvas1.drawText("SUMMARY (${report.timeframe.label.uppercase()})", 44f, y + 21f, headerTextPaint)
-        y += 26f
+        canvas1.drawRect(36f, y, 559f, y + 24f, emeraldHeaderPaint)
+        canvas1.drawText("EXECUTIVE PERFORMANCE & FOCUS STAMINA SUMMARY", 44f, y + 10f, headerTextPaint)
+        canvas1.drawText("TIMEFRAME: ${report.timeframe.label.uppercase()} | DETERMINISTIC COGNITIVE METRICS", 44f, y + 19f, headerTextPaint)
+        y += 24f
 
-        val rowH = 26f
+        val rowH = 21f
         val colW1 = 180f
         val colW2 = 170f
         val colW3 = 173f
 
-        // Row 1
+        // Row 1: Focus Volume & Sessions
         canvas1.drawRect(36f, y, 559f, y + rowH, rowBgPaint)
         canvas1.drawRect(36f, y, 36f + colW1, y + rowH, gridPaint)
         canvas1.drawRect(36f + colW1, y, 36f + colW1 + colW2, y + rowH, gridPaint)
         canvas1.drawRect(36f + colW1 + colW2, y, 559f, y + rowH, gridPaint)
 
-        canvas1.drawText("Total Focus: ${String.format(Locale.US, "%.1f", report.totalHours)} hrs (${report.totalMinutes} mins)", 44f, y + 16f, cellTextPaint)
-        canvas1.drawText("Total Sessions: ${report.sessionCount}", 36f + colW1 + 8f, y + 16f, cellTextPaint)
-        canvas1.drawText("Active Days: ${report.activeDaysCount}", 36f + colW1 + colW2 + 8f, y + 16f, cellTextPaint)
+        canvas1.drawText("Total Focus: ${String.format(Locale.US, "%.1f", report.totalHours)} hrs (${report.totalMinutes} mins)", 44f, y + 14f, cellTextPaint)
+        canvas1.drawText("Total Sessions: ${report.sessionCount}", 36f + colW1 + 8f, y + 14f, cellTextPaint)
+        canvas1.drawText("Active Days: ${report.activeDaysCount}", 36f + colW1 + colW2 + 8f, y + 14f, cellTextPaint)
         y += rowH
 
-        // Row 2
+        // Row 2: Focus Quality Score (FQS)
         canvas1.drawRect(36f, y, 559f, y + rowH, altRowBgPaint)
         canvas1.drawRect(36f, y, 36f + colW1, y + rowH, gridPaint)
         canvas1.drawRect(36f + colW1, y, 36f + colW1 + colW2, y + rowH, gridPaint)
         canvas1.drawRect(36f + colW1 + colW2, y, 559f, y + rowH, gridPaint)
 
-        val velSign = if (report.velocityPercentage >= 0) "+" else ""
-        canvas1.drawText("Deep Work Ratio: ${report.deepWorkRatio}% (>= 45m blocks)", 44f, y + 16f, cellTextPaint)
-        canvas1.drawText("Avg Session Length: ${report.avgSessionMinutes} mins", 36f + colW1 + 8f, y + 16f, cellTextPaint)
-        canvas1.drawText("Study Velocity: $velSign${report.velocityPercentage}% vs prior period", 36f + colW1 + colW2 + 8f, y + 16f, cellTextPaint)
+        canvas1.drawText("Focus Quality Score (FQS): ${report.focusQualityScore}/100", 44f, y + 14f, cellBoldTextPaint)
+        canvas1.drawText("Cognitive Tier: ${report.focusQualityTier}", 36f + colW1 + 8f, y + 14f, cellBoldTextPaint)
+        canvas1.drawText("FQS Formula: 0.35*D + 0.25*C + 0.25*G + 0.15*P", 36f + colW1 + colW2 + 8f, y + 14f, cellTextPaint)
         y += rowH
 
-        // Row 3
+        // Row 3: Stamina & Velocity
         canvas1.drawRect(36f, y, 559f, y + rowH, rowBgPaint)
         canvas1.drawRect(36f, y, 36f + colW1, y + rowH, gridPaint)
         canvas1.drawRect(36f + colW1, y, 36f + colW1 + colW2, y + rowH, gridPaint)
         canvas1.drawRect(36f + colW1 + colW2, y, 559f, y + rowH, gridPaint)
 
-        canvas1.drawText("Circadian Peak Focus Window: ${report.peakFocusWindow}", 44f, y + 16f, cellTextPaint)
-        canvas1.drawText("Streak Status: $currentStreak days current (Best: $bestStreak)", 36f + colW1 + 8f, y + 16f, cellTextPaint)
-        canvas1.drawText("Data Integrity: Verified Local/Cloud", 36f + colW1 + colW2 + 8f, y + 16f, cellTextPaint)
-        y += rowH + 14f
+        val velSign = if (report.velocityPercentage >= 0) "+" else ""
+        canvas1.drawText("Deep Work Ratio: ${report.deepWorkRatio}% (>= 45m blocks)", 44f, y + 14f, cellTextPaint)
+        canvas1.drawText("Avg Session Length: ${report.avgSessionMinutes} mins", 36f + colW1 + 8f, y + 14f, cellTextPaint)
+        canvas1.drawText("Study Velocity: $velSign${report.velocityPercentage}% vs prior period", 36f + colW1 + colW2 + 8f, y + 14f, cellTextPaint)
+        y += rowH
+
+        // Row 4: Rhythm & Discipline
+        canvas1.drawRect(36f, y, 559f, y + rowH, altRowBgPaint)
+        canvas1.drawRect(36f, y, 36f + colW1, y + rowH, gridPaint)
+        canvas1.drawRect(36f + colW1, y, 36f + colW1 + colW2, y + rowH, gridPaint)
+        canvas1.drawRect(36f + colW1 + colW2, y, 559f, y + rowH, gridPaint)
+
+        canvas1.drawText("Circadian Peak Window: ${report.peakFocusWindow}", 44f, y + 14f, cellTextPaint)
+        canvas1.drawText("Consistency: ${report.consistencyPct}% | Goal Hit: ${report.goalHitRate}%", 36f + colW1 + 8f, y + 14f, cellTextPaint)
+        canvas1.drawText("Streak Status: $currentStreak days (Best: $bestStreak)", 36f + colW1 + colW2 + 8f, y + 14f, cellTextPaint)
+        y += rowH + 12f
 
         // 3. Circadian Time-of-Day Breakdown
         canvas1.drawRect(36f, y, 559f, y + 20f, tealHeaderPaint)
@@ -442,17 +462,17 @@ object PdfExportHelper {
             canvas1.drawText("${item.third}%", 480f, y + 13f, cellTextPaint)
             y += 18f
         }
-        y += 14f
+        y += 12f
 
-        // 4. Subject Equilibrium & Recall Matrix
+        // 4. Subject Equilibrium & Ebbinghaus Scientific Recall Matrix
         canvas1.drawRect(36f, y, 559f, y + 24f, goldHeaderPaint)
-        canvas1.drawText("SUBJECT EQUILIBRIUM & RECALL", 44f, y + 10f, headerTextPaint)
+        canvas1.drawText("SUBJECT EQUILIBRIUM & EBBINGHAUS SCIENTIFIC RECALL", 44f, y + 10f, headerTextPaint)
         canvas1.drawText("MATRIX", 44f, y + 19f, headerTextPaint)
-        canvas1.drawText("HOURS", 240f, y + 15f, headerTextPaint)
-        canvas1.drawText("MINUTES", 295f, y + 15f, headerTextPaint)
-        canvas1.drawText("SHARE", 360f, y + 15f, headerTextPaint)
-        canvas1.drawText("LAST STUDIED", 415f, y + 15f, headerTextPaint)
-        canvas1.drawText("STATUS", 485f, y + 15f, headerTextPaint)
+        canvas1.drawText("TOTAL TIME", 205f, y + 15f, headerTextPaint)
+        canvas1.drawText("SHARE", 270f, y + 15f, headerTextPaint)
+        canvas1.drawText("LAST STUDIED", 315f, y + 15f, headerTextPaint)
+        canvas1.drawText("RETENTION (R)", 380f, y + 15f, headerTextPaint)
+        canvas1.drawText("SCIENTIFIC RECALL STATUS", 455f, y + 15f, headerTextPaint)
         y += 24f
 
         val eqList = report.subjectEquilibrium.take(8)
@@ -467,16 +487,20 @@ object PdfExportHelper {
                 canvas1.drawRect(36f, y, 559f, y + 19f, bg)
                 canvas1.drawRect(36f, y, 559f, y + 19f, gridPaint)
 
-                val cleanSubj = if (s.subjectName.length > 28) s.subjectName.take(26) + "..." else s.subjectName
-                val lastStr = if (s.daysAgo == 0) "Today" else if (s.daysAgo == 1) "Yesterday" else "${s.daysAgo} days ago"
-                val statusStr = if (s.isNeglected) "ATTENTION: Neglected (>= 3d)" else "Balanced"
+                val cleanSubj = if (s.subjectName.length > 22) s.subjectName.take(20) + ".." else s.subjectName
+                val lastStr = if (s.daysAgo == 0) "Today" else if (s.daysAgo == 1) "Yesterday" else "${s.daysAgo}d ago"
+                val (recallStr, recallPaint) = when {
+                    s.retentionPct < 60 -> "CRITICAL DUE (${s.retentionPct}%)" to attentionTextPaint
+                    s.retentionPct < 80 -> "REVIEW REC (${s.retentionPct}%)" to warningStatusPaint
+                    else -> "OPTIMAL (${s.retentionPct}%)" to successStatusPaint
+                }
 
                 canvas1.drawText(cleanSubj, 44f, y + 13f, cellTextPaint)
-                canvas1.drawText("${String.format(Locale.US, "%.1f", s.hours)} hrs", 240f, y + 13f, cellTextPaint)
-                canvas1.drawText("${s.minutes} mins", 295f, y + 13f, cellTextPaint)
-                canvas1.drawText("${s.percentage}%", 360f, y + 13f, cellTextPaint)
-                canvas1.drawText(lastStr, 415f, y + 13f, cellTextPaint)
-                canvas1.drawText(statusStr, 485f, y + 13f, if (s.isNeglected) attentionTextPaint else successStatusPaint)
+                canvas1.drawText("${String.format(Locale.US, "%.1f", s.hours)}h (${s.minutes}m)", 205f, y + 13f, cellTextPaint)
+                canvas1.drawText("${s.percentage}%", 270f, y + 13f, cellTextPaint)
+                canvas1.drawText(lastStr, 315f, y + 13f, cellTextPaint)
+                canvas1.drawText("${s.retentionPct}% (S=${s.stabilityDays}d)", 380f, y + 13f, cellTextPaint)
+                canvas1.drawText(recallStr, 455f, y + 13f, recallPaint)
                 y += 19f
             }
         }
@@ -526,26 +550,20 @@ object PdfExportHelper {
         }
         y += 14f
 
-        // 6. AI Diagnostic Observations & Actionable Recommendations
+        // 6. Deterministic Cognitive Insights & Actionable Recommendations
         canvas2.drawRect(36f, y, 559f, y + 20f, emeraldHeaderPaint)
-        canvas2.drawText("AI DIAGNOSTIC OBSERVATIONS & ACTIONABLE RECOMMENDATIONS", 44f, y + 14f, headerTextPaint)
+        canvas2.drawText("DETERMINISTIC COGNITIVE INSIGHTS & ACTIONABLE RECOMMENDATIONS", 44f, y + 14f, headerTextPaint)
         y += 20f
 
         val obsItems = mutableListOf<String>()
-        val topWindow = report.circadianBuckets.maxByOrNull { it.minutes }
-        val topPct = topWindow?.percentageOfTotal ?: 0
-        obsItems.add("[Morning] Circadian Prime: Your peak focus window is ${report.peakFocusWindow} ($topPct% of study). Prioritize challenging analytical concepts during this period.")
-        obsItems.add("[Deep Work] Deep Work Stamina: ${report.deepWorkRatio}% of your focus occurs in sustained sessions (>=45m). Excellent cognitive endurance!")
-
-        val neglectedList = report.subjectEquilibrium.filter { it.isNeglected }
-        if (neglectedList.isNotEmpty()) {
-            val namesStr = neglectedList.take(2).joinToString(", ") { "${it.subjectName} (${it.daysAgo}d ago)" }
-            obsItems.add("[Warning] Subject Neglect Warning: $namesStr untouched recently. Schedule a recall session to prevent forgetting curve decay.")
-        } else {
-            obsItems.add("[Equilibrium] Balanced Subject Mastery: Subject allocation is well balanced across your curriculum.")
+        report.smartInsights.forEach { insight ->
+            obsItems.add("[${insight.title}] ${insight.description}")
+        }
+        if (obsItems.isEmpty()) {
+            obsItems.add("[Consistency] Maintain structured daily study routines to build sustained focus momentum.")
         }
 
-        obsItems.forEachIndexed { i, obs ->
+        obsItems.take(5).forEachIndexed { i, obs ->
             val bg = if (i % 2 == 0) rowBgPaint else altRowBgPaint
             canvas2.drawRect(36f, y, 559f, y + 24f, bg)
             canvas2.drawRect(36f, y, 559f, y + 24f, gridPaint)

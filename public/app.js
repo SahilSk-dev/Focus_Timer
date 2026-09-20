@@ -1542,10 +1542,58 @@ function computeAnalyticsReport(period) {
     return `${hr}:00 ${ampm}`;
   };
   const peakFocusWindow = max2Hour > 0 
-    ? `${formatHour(peakStartHour)} - ${formatHour(peakStartHour + 2)}` 
     : 'N/A (No study in period)';
 
-  // Subject Equilibrium & Neglect Matrix
+  // Deterministic Algorithmic Pillars for Focus Quality Score (FQS / Cognitive Quality Index: 0-100)
+  // 1. Consistency Percentage (C)
+  let daysInPeriod = 7;
+  if (period === '7') {
+    daysInPeriod = 7;
+  } else if (period === '30') {
+    daysInPeriod = 30;
+  } else {
+    // all
+    if (allStudy.length > 0) {
+      const allDates = allStudy.map(s => s.date).sort();
+      const firstDate = new Date(allDates[0]);
+      const lastDate = new Date(allDates[allDates.length - 1]);
+      const spanDays = Math.max(1, Math.round((lastDate - firstDate) / 86400000) + 1);
+      daysInPeriod = spanDays;
+    } else {
+      daysInPeriod = 1;
+    }
+  }
+  const consistencyPct = Math.min(100, Math.round((activeDaysCount / daysInPeriod) * 100));
+
+  // 2. Daily Goal Hit Rate (G)
+  const targetMins = (typeof prefs !== 'undefined' && prefs.dailyTarget) ? prefs.dailyTarget : 120;
+  const dayTotals = {};
+  filtered.forEach(s => {
+    dayTotals[s.date] = (dayTotals[s.date] || 0) + s.minutes;
+  });
+  const daysMetTarget = Object.values(dayTotals).filter(m => m >= targetMins).length;
+  const goalHitRate = activeDaysCount > 0 ? Math.min(100, Math.round((daysMetTarget / activeDaysCount) * 100)) : 0;
+
+  // 3. Session Pacing Stability (P: benchmark 50 mins)
+  const pacingStability = Math.min(100, Math.round((avgSessionMin / 50) * 100));
+
+  // 4. Focus Quality Score (FQS): 0.35*DeepWork + 0.25*Consistency + 0.25*GoalHit + 0.15*Pacing
+  const focusQualityScore = totalMinutes > 0
+    ? Math.min(100, Math.max(0, Math.round(0.35 * deepWorkRatio + 0.25 * consistencyPct + 0.25 * goalHitRate + 0.15 * pacingStability)))
+    : 0;
+
+  let focusQualityTier = 'Fragmented Focus';
+  if (focusQualityScore >= 85) {
+    focusQualityTier = 'Elite Cognitive Focus';
+  } else if (focusQualityScore >= 70) {
+    focusQualityTier = 'Optimal Focus Stamina';
+  } else if (focusQualityScore >= 50) {
+    focusQualityTier = 'Moderate Pacing';
+  } else {
+    focusQualityTier = 'Fragmented Focus';
+  }
+
+  // Subject Equilibrium & Ebbinghaus Scientific Recall Matrix
   const subjMap = {};
   filtered.forEach(s => {
     let m = s.subject;
@@ -1554,9 +1602,11 @@ function computeAnalyticsReport(period) {
   });
 
   const lastStudiedDateMap = {};
+  const subjectSessionCountMap = {};
   allStudy.forEach(s => {
     let m = s.subject;
     if (m && m.includes(' - ')) m = m.split(' - ')[0];
+    subjectSessionCountMap[m] = (subjectSessionCountMap[m] || 0) + 1;
     if (!lastStudiedDateMap[m] || s.date > lastStudiedDateMap[m]) {
       lastStudiedDateMap[m] = s.date;
     }
@@ -1572,8 +1622,33 @@ function computeAnalyticsReport(period) {
       const lDate = new Date(parts[0], parts[1] - 1, parts[2]);
       daysAgo = Math.max(0, Math.round((curDate - lDate) / 86400000));
     }
+    const sessionCount = subjectSessionCountMap[name] || 1;
+    // Hermann Ebbinghaus Spaced Repetition Stability Factor (S):
+    // 1 review -> S=2.5 days, 2 reviews -> S=5.0 days, 3+ reviews -> S=9.0 days
+    const stabilityDays = sessionCount <= 1 ? 2.5 : (sessionCount === 2 ? 5.0 : 9.0);
+    // Retention Curve: R = round(100 * exp(-t / S))
+    const retentionPct = daysAgo === 0 ? 100 : Math.min(100, Math.max(0, Math.round(100 * Math.exp(-daysAgo / stabilityDays))));
+    
+    let recallStatus = 'Optimal Retention';
+    if (retentionPct < 60) {
+      recallStatus = 'Critical Recall Due';
+    } else if (retentionPct < 80) {
+      recallStatus = 'Review Recommended';
+    }
+
     const isNeglected = daysAgo >= 3;
-    return { name, mins, hours: (mins / 60).toFixed(1), pct, daysAgo, isNeglected };
+    return { 
+      name, 
+      mins, 
+      hours: (mins / 60).toFixed(1), 
+      pct, 
+      daysAgo, 
+      isNeglected,
+      sessionCount,
+      stabilityDays,
+      retentionPct,
+      recallStatus
+    };
   }).sort((a, b) => b.mins - a.mins);
 
   // Cognitive Work-Type Distribution
@@ -1587,7 +1662,7 @@ function computeAnalyticsReport(period) {
     return { name, mins, pct };
   }).sort((a, b) => b.mins - a.mins);
 
-  // Automated Smart Diagnostic Insights
+  // Deterministic Cognitive Diagnostic Insights (100% Deterministic Algorithmic Logic)
   const smartInsights = [];
   if (totalMinutes > 0) {
     let peakBucket = Object.values(circadianBuckets).sort((a, b) => b.mins - a.mins)[0];
@@ -1595,6 +1670,11 @@ function computeAnalyticsReport(period) {
     smartInsights.push({
       icon: '🌅',
       text: `<strong>Circadian Prime:</strong> Your peak focus window is <strong>${peakFocusWindow}</strong> (${bucketPct}% of study). Prioritize challenging analytical concepts during this period.`
+    });
+
+    smartInsights.push({
+      icon: '🎯',
+      text: `<strong>Focus Quality Score (${focusQualityScore}/100):</strong> Tier: <strong>${focusQualityTier}</strong>. Consistency: ${consistencyPct}%, Goal Hit: ${goalHitRate}%, Deep Work: ${deepWorkRatio}%.`
     });
 
     if (deepWorkRatio >= 60) {
@@ -1609,18 +1689,27 @@ function computeAnalyticsReport(period) {
       });
     }
 
-    const neglectedSubjects = subjectEquilibrium.filter(s => s.isNeglected);
-    if (neglectedSubjects.length > 0) {
-      const names = neglectedSubjects.slice(0, 2).map(s => `${s.name} (${s.daysAgo}d ago)`).join(', ');
+    const criticalRecall = subjectEquilibrium.filter(s => s.retentionPct < 60);
+    if (criticalRecall.length > 0) {
+      const names = criticalRecall.slice(0, 2).map(s => `${s.name} (R=${s.retentionPct}%, ${s.daysAgo}d ago)`).join(', ');
       smartInsights.push({
         icon: '⚠️',
-        text: `<strong>Subject Neglect Warning:</strong> ${names} untouched recently. Schedule a recall session to prevent forgetting curve decay.`
+        text: `<strong>Ebbinghaus Memory Decay Warning:</strong> ${names} fallen below 60% retention. Priority 1 active recall session required today to restore memory stability.`
       });
-    } else if (subjectEquilibrium.length > 1) {
-      smartInsights.push({
-        icon: '⚖️',
-        text: `<strong>Subject Equilibrium:</strong> All active subjects were studied within the last 48 hours. Well-balanced curriculum distribution.`
-      });
+    } else {
+      const neglectedSubjects = subjectEquilibrium.filter(s => s.isNeglected);
+      if (neglectedSubjects.length > 0) {
+        const names = neglectedSubjects.slice(0, 2).map(s => `${s.name} (${s.daysAgo}d ago)`).join(', ');
+        smartInsights.push({
+          icon: '⚠️',
+          text: `<strong>Subject Neglect Warning:</strong> ${names} untouched recently. Schedule a recall session to prevent forgetting curve decay.`
+        });
+      } else if (subjectEquilibrium.length > 1) {
+        smartInsights.push({
+          icon: '⚖️',
+          text: `<strong>Curriculum Equilibrium:</strong> All active subjects were studied within the last 48 hours. Well-balanced curriculum distribution.`
+        });
+      }
     }
 
     if (period !== 'all' && (totalMinutes > 0 || priorMinutes > 0)) {
@@ -1667,7 +1756,12 @@ function computeAnalyticsReport(period) {
     smartInsights,
     filteredSessions: filtered,
     allStudyTotalCount: allStudy.length,
-    allStudyTotalMinutes: allStudy.reduce((a, s) => a + s.minutes, 0)
+    allStudyTotalMinutes: allStudy.reduce((a, s) => a + s.minutes, 0),
+    focusQualityScore,
+    focusQualityTier,
+    consistencyPct,
+    goalHitRate,
+    pacingStability
   };
 }
 
@@ -1707,6 +1801,27 @@ function renderDeepAnalytics() {
       noticeContainer.innerHTML = '';
     }
   }
+
+  // Focus Quality Score (FQS) Card
+  const fqsVal = document.getElementById('fqsScoreVal');
+  if (fqsVal) fqsVal.textContent = report.focusQualityScore;
+  const fqsTier = document.getElementById('fqsTierBadge');
+  if (fqsTier) {
+    fqsTier.textContent = report.totalMinutes > 0 ? report.focusQualityTier : 'No Study Data';
+    fqsTier.className = 'fqs-tier-badge';
+    if (report.focusQualityScore >= 85) fqsTier.classList.add('elite');
+    else if (report.focusQualityScore >= 70) fqsTier.classList.add('optimal');
+    else if (report.focusQualityScore >= 50) fqsTier.classList.add('moderate');
+    else if (report.totalMinutes > 0) fqsTier.classList.add('fragmented');
+  }
+  const fqsFill = document.getElementById('fqsFill');
+  if (fqsFill) fqsFill.style.width = `${report.focusQualityScore}%`;
+  const fqsCons = document.getElementById('fqsConsistencyVal');
+  if (fqsCons) fqsCons.textContent = `${report.consistencyPct}%`;
+  const fqsGoal = document.getElementById('fqsGoalHitVal');
+  if (fqsGoal) fqsGoal.textContent = `${report.goalHitRate}%`;
+  const fqsPace = document.getElementById('fqsPacingVal');
+  if (fqsPace) fqsPace.textContent = `${report.pacingStability}%`;
 
   // Peak focus badge
   const peakBadge = document.getElementById('peakFocusBadge');
@@ -1759,30 +1874,41 @@ function renderDeepAnalytics() {
     dwSubtext.textContent = `${report.deepWorkMinutes} of ${report.totalMinutes} mins in sustained (≥45m) blocks`;
   }
 
-  // Subject Equilibrium & Neglect Matrix
+  // Subject Equilibrium & Ebbinghaus Scientific Recall Matrix
   const eqList = document.getElementById('subjectEquilibriumList');
   if (eqList) {
     if (report.subjectEquilibrium.length === 0) {
       eqList.innerHTML = `<div style="text-align:center; padding:12px; color:var(--text-dim); font-size:0.8rem;">No subjects studied in this timeframe.</div>`;
     } else {
       eqList.innerHTML = report.subjectEquilibrium.map(s => {
-        const badgeClass = s.isNeglected ? 'warning' : 'good';
         const badgeText = s.daysAgo === 0 ? 'Active today' : (s.daysAgo === 1 ? 'Yesterday' : `${s.daysAgo}d ago`);
         const safeName = escapeHTML(s.name);
+        const tagClass = s.retentionPct < 60 ? 'critical' : (s.retentionPct < 80 ? 'review' : 'optimal');
+        const retentionColor = s.retentionPct < 60 ? '#ef4444' : (s.retentionPct < 80 ? '#fbbf24' : '#34d399');
+
         return `
           <div class="equilibrium-item">
             <div class="equilibrium-left">
               <div class="equilibrium-name">
                 <span>${safeName}</span>
-                <span style="font-size:0.7rem; color:var(--text-dim);">(${s.pct}%)</span>
+                <span style="font-size:0.7rem; color:var(--text-dim);">(${s.pct}% share)</span>
               </div>
               <div class="equilibrium-bar-wrap">
                 <div class="equilibrium-bar-fill" style="width:${s.pct}%"></div>
               </div>
+              <div style="display:flex; align-items:center; gap:8px; margin-top:6px;">
+                <span style="font-size:0.68rem; color:var(--text-dim);">Retention (R):</span>
+                <span style="font-size:0.72rem; font-weight:700; color:${retentionColor};">${s.retentionPct}%</span>
+                <div style="flex:1; height:4px; background:rgba(255,255,255,0.08); border-radius:2px; overflow:hidden;">
+                  <div class="retention-bar-fill ${tagClass}" style="width:${s.retentionPct}%; height:100%; border-radius:2px;"></div>
+                </div>
+                <span style="font-size:0.65rem; color:var(--text-dim); font-style:italic;">S=${s.stabilityDays}d (${s.sessionCount} sess)</span>
+              </div>
             </div>
             <div class="equilibrium-right">
               <div class="equilibrium-time">${s.hours} hrs</div>
-              <div class="equilibrium-neglect-badge ${badgeClass}">${badgeText}</div>
+              <div class="recall-status-tag ${tagClass}">${s.recallStatus}</div>
+              <div style="font-size:0.65rem; color:var(--text-dim); margin-top:3px;">${badgeText}</div>
             </div>
           </div>
         `;
@@ -1889,14 +2015,19 @@ async function exportAnalysisPdf() {
         cleanPdfText(`Active Days: ${effectiveReport.activeDaysCount}`)
       ],
       [
+        cleanPdfText(`Focus Quality Score (FQS): ${effectiveReport.focusQualityScore}/100`),
+        cleanPdfText(`Cognitive Tier: ${effectiveReport.focusQualityTier}`),
+        cleanPdfText(`FQS Formula: 0.35*D + 0.25*C + 0.25*G + 0.15*P`)
+      ],
+      [
         cleanPdfText(`Deep Work Ratio: ${effectiveReport.deepWorkRatio}% (>= 45m blocks)`),
         cleanPdfText(`Avg Session Length: ${effectiveReport.avgSessionMin} mins`),
         cleanPdfText(`Study Velocity: ${velText}`)
       ],
       [
-        cleanPdfText(`Circadian Peak Focus Window: ${effectiveReport.peakFocusWindow}`),
-        cleanPdfText(`Streak Status: ${currentStreakVal} days current (Best: ${bestStreakVal})`),
-        cleanPdfText(`Data Integrity: Verified Local/Cloud`)
+        cleanPdfText(`Circadian Peak Window: ${effectiveReport.peakFocusWindow}`),
+        cleanPdfText(`Consistency: ${effectiveReport.consistencyPct}% | Goal Hit: ${effectiveReport.goalHitRate}%`),
+        cleanPdfText(`Streak Status: ${currentStreakVal} days current (Best: ${bestStreakVal})`)
       ]
     ];
 
@@ -1939,20 +2070,29 @@ async function exportAnalysisPdf() {
 
     currentY = doc.lastAutoTable.finalY + 8;
 
-    // 4. Subject Equilibrium Table
+    // 4. Subject Equilibrium & Ebbinghaus Scientific Recall Matrix Table
     const subjRows = effectiveReport.subjectEquilibrium.map(s => {
-      const statusText = s.daysAgo === 0 ? 'Active Today' : (s.daysAgo === 1 ? 'Yesterday' : `${s.daysAgo} days ago`);
-      const alert = s.isNeglected ? 'ATTENTION: Neglected (>= 3d)' : 'Balanced';
-      return [cleanPdfText(s.name), `${s.hours} hrs`, `${s.mins} mins`, `${s.pct}%`, statusText, alert];
+      const statusText = s.daysAgo === 0 ? 'Today' : (s.daysAgo === 1 ? 'Yesterday' : `${s.daysAgo} days ago`);
+      const recallText = s.retentionPct < 60 
+        ? `CRITICAL RECALL DUE (${s.retentionPct}%)` 
+        : (s.retentionPct < 80 ? `REVIEW RECOMMENDED (${s.retentionPct}%)` : `OPTIMAL RETENTION (${s.retentionPct}%)`);
+      return [
+        cleanPdfText(s.name), 
+        `${s.hours} hrs (${s.mins}m)`, 
+        `${s.pct}%`, 
+        statusText, 
+        `${s.retentionPct}% (S=${s.stabilityDays}d)`, 
+        recallText
+      ];
     });
 
     doc.autoTable({
       startY: currentY,
-      head: [['SUBJECT EQUILIBRIUM & RECALL MATRIX', 'HOURS', 'MINUTES', 'SHARE', 'LAST STUDIED', 'STATUS']],
+      head: [['SUBJECT EQUILIBRIUM & EBBINGHAUS SCIENTIFIC RECALL MATRIX', 'TOTAL TIME', 'SHARE', 'LAST STUDIED', 'RETENTION (R)', 'SCIENTIFIC RECALL STATUS']],
       body: subjRows.length > 0 ? subjRows : [['No subjects recorded in this period', '-', '-', '-', '-', '-']],
       theme: 'striped',
-      headStyles: { fillColor: [201, 150, 47], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 9 },
-      styles: { fontSize: 8, cellPadding: 2.5 },
+      headStyles: { fillColor: [201, 150, 47], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8.5 },
+      styles: { fontSize: 7.5, cellPadding: 2.5 },
       margin: { left: 14, right: 14 }
     });
 
@@ -1981,7 +2121,7 @@ async function exportAnalysisPdf() {
 
     currentY = doc.lastAutoTable.finalY + 8;
 
-    // 6. Diagnostic Insights Box
+    // 6. Deterministic Cognitive Insights Box
     if (currentY > 225) {
       doc.addPage();
       currentY = 20;
@@ -1993,7 +2133,7 @@ async function exportAnalysisPdf() {
 
     doc.autoTable({
       startY: currentY,
-      head: [['AI DIAGNOSTIC OBSERVATIONS & ACTIONABLE RECOMMENDATIONS']],
+      head: [['DETERMINISTIC COGNITIVE INSIGHTS & ACTIONABLE RECOMMENDATIONS']],
       body: insightRows.length > 0 ? insightRows : [['[Insight] Maintain consistent daily study routines to build momentum.']],
       theme: 'grid',
       headStyles: { fillColor: [16, 185, 129], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 9 },

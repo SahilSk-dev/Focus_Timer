@@ -1879,6 +1879,44 @@ button.primary:not(:disabled):hover {
   color: var(--text);
   letter-spacing: -0.2px;
 }
+.fqs-score-val {
+  font-family: var(--font-display);
+  font-size: 1.75rem;
+  font-weight: 800;
+  color: var(--accent-bright);
+  line-height: 1;
+}
+.fqs-tier-badge {
+  display: inline-block;
+  background: rgba(16, 185, 129, 0.14);
+  border: 1px solid var(--accent);
+  color: var(--accent-bright);
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 6px;
+  letter-spacing: 0.01em;
+}
+.fqs-tier-badge.elite {
+  background: rgba(16, 185, 129, 0.2);
+  border-color: #10b981;
+  color: #34d399;
+}
+.fqs-tier-badge.optimal {
+  background: rgba(59, 130, 246, 0.18);
+  border-color: #3b82f6;
+  color: #60a5fa;
+}
+.fqs-tier-badge.moderate {
+  background: rgba(245, 158, 11, 0.18);
+  border-color: #f59e0b;
+  color: #fbbf24;
+}
+.fqs-tier-badge.fragmented {
+  background: rgba(239, 68, 68, 0.18);
+  border-color: #ef4444;
+  color: #f87171;
+}
 .peak-focus-badge {
   display: inline-block;
   background: rgba(16, 185, 129, 0.12);
@@ -2011,6 +2049,38 @@ button.primary:not(:disabled):hover {
 .equilibrium-neglect-badge.good {
   background: rgba(16, 185, 129, 0.12);
   color: var(--accent-bright);
+}
+.recall-status-tag {
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 4px;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+.recall-status-tag.critical {
+  background: rgba(239, 68, 68, 0.2);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.5);
+}
+.recall-status-tag.review {
+  background: rgba(245, 158, 11, 0.2);
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.5);
+}
+.recall-status-tag.optimal {
+  background: rgba(16, 185, 129, 0.15);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.4);
+}
+.retention-bar-fill.critical {
+  background: #ef4444 !important;
+}
+.retention-bar-fill.review {
+  background: #f59e0b !important;
+}
+.retention-bar-fill.optimal {
+  background: #10b981 !important;
 }
 .worktype-breakdown-list {
   display: flex;

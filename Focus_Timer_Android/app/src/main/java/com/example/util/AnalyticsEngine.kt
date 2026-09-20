@@ -25,7 +25,11 @@ data class SubjectEquilibriumItem(
     val hours: Double,
     val percentage: Int,
     val daysAgo: Int,
-    val isNeglected: Boolean
+    val isNeglected: Boolean,
+    val sessionCount: Int = 1,
+    val stabilityDays: Double = 2.5,
+    val retentionPct: Int = 100,
+    val recallStatus: String = "Optimal Retention"
 )
 
 data class CognitiveWorkTypeItem(
@@ -55,7 +59,12 @@ data class AnalyticsReport(
     val subjectEquilibrium: List<SubjectEquilibriumItem>,
     val cognitiveWorkTypes: List<CognitiveWorkTypeItem>,
     val smartInsights: List<SmartInsight>,
-    val filteredSessions: List<StudySessionEntity>
+    val filteredSessions: List<StudySessionEntity>,
+    val focusQualityScore: Int = 0,
+    val focusQualityTier: String = "Fragmented Focus",
+    val consistencyPct: Int = 0,
+    val goalHitRate: Int = 0,
+    val pacingStability: Int = 0
 ) {
     companion object {
         fun empty(timeframe: AnalyticsTimeframe = AnalyticsTimeframe.LAST_7_DAYS) = AnalyticsReport(
@@ -73,7 +82,12 @@ data class AnalyticsReport(
             subjectEquilibrium = emptyList(),
             cognitiveWorkTypes = emptyList(),
             smartInsights = emptyList(),
-            filteredSessions = emptyList()
+            filteredSessions = emptyList(),
+            focusQualityScore = 0,
+            focusQualityTier = "Fragmented Focus",
+            consistencyPct = 0,
+            goalHitRate = 0,
+            pacingStability = 0
         )
     }
 }
@@ -116,6 +130,51 @@ object AnalyticsEngine {
         // Deep Work: sessions >= 45m
         val deepWorkMinutes = filteredSessions.filter { it.minutes >= 45 }.sumOf { it.minutes }
         val deepWorkRatio = if (totalMinutes > 0) ((deepWorkMinutes.toFloat() / totalMinutes) * 100).toInt() else 0
+
+        // Deterministic Algorithmic Pillars for Focus Quality Score (FQS / Cognitive Quality Index: 0-100)
+        // 1. Consistency Percentage (C)
+        val daysInPeriod = when (timeframe) {
+            AnalyticsTimeframe.LAST_7_DAYS -> 7
+            AnalyticsTimeframe.LAST_30_DAYS -> 30
+            AnalyticsTimeframe.ALL_TIME -> {
+                if (studySessions.isNotEmpty()) {
+                    val sortedDates = studySessions.map { it.date }.sorted()
+                    val dFirst = DateFormatterCache.parseIsoDate(sortedDates.first())
+                    val dLast = DateFormatterCache.parseIsoDate(sortedDates.last())
+                    if (dFirst != null && dLast != null) {
+                        max(1, (((dLast.time - dFirst.time) / (24 * 3600 * 1000)).toInt() + 1))
+                    } else 1
+                } else 1
+            }
+        }
+        val consistencyPct = if (daysInPeriod > 0) {
+            ((activeDaysCount.toFloat() / daysInPeriod) * 100).toInt().coerceIn(0, 100)
+        } else 0
+
+        // 2. Daily Goal Hit Rate (G, standard target 120m)
+        val dailyMinsMap = mutableMapOf<String, Int>()
+        filteredSessions.forEach { s ->
+            dailyMinsMap[s.date] = (dailyMinsMap[s.date] ?: 0) + s.minutes
+        }
+        val daysMetTarget = dailyMinsMap.values.count { it >= 120 }
+        val goalHitRate = if (activeDaysCount > 0) {
+            ((daysMetTarget.toFloat() / activeDaysCount) * 100).toInt().coerceIn(0, 100)
+        } else 0
+
+        // 3. Session Pacing Stability (P, benchmark 50m)
+        val pacingStability = ((avgSessionMinutes.toFloat() / 50f) * 100).toInt().coerceIn(0, 100)
+
+        // 4. Focus Quality Score (FQS): 0.35*DeepWork + 0.25*Consistency + 0.25*GoalHit + 0.15*Pacing
+        val focusQualityScore = if (totalMinutes > 0) {
+            (0.35f * deepWorkRatio + 0.25f * consistencyPct + 0.25f * goalHitRate + 0.15f * pacingStability).toInt().coerceIn(0, 100)
+        } else 0
+
+        val focusQualityTier = when {
+            focusQualityScore >= 85 -> "Elite Cognitive Focus"
+            focusQualityScore >= 70 -> "Optimal Focus Stamina"
+            focusQualityScore >= 50 -> "Moderate Pacing"
+            else -> "Fragmented Focus"
+        }
 
         // Velocity
         val priorMinutes = priorSessions.sumOf { it.minutes }
@@ -181,10 +240,12 @@ object AnalyticsEngine {
             "N/A (No study in period)"
         }
 
-        // Subject Equilibrium & Neglect Matrix
+        // Subject Equilibrium & Ebbinghaus Scientific Recall Matrix
         val lastDatePerSubject = mutableMapOf<String, String>()
+        val subjectTotalCountMap = mutableMapOf<String, Int>()
         studySessions.forEach { s ->
             val mainSub = s.subject.split(" - ").firstOrNull() ?: s.subject
+            subjectTotalCountMap[mainSub] = (subjectTotalCountMap[mainSub] ?: 0) + 1
             val curr = lastDatePerSubject[mainSub]
             if (curr == null || s.date > curr) {
                 lastDatePerSubject[mainSub] = s.date
@@ -208,13 +269,35 @@ object AnalyticsEngine {
                     daysAgo = max(0, ((todayTime - d.time) / (24 * 3600 * 1000)).toInt())
                 }
             }
+            val count = subjectTotalCountMap[name] ?: 1
+            // Hermann Ebbinghaus Spaced Repetition Stability Factor (S):
+            // 1 review -> S=2.5 days, 2 reviews -> S=5.0 days, 3+ reviews -> S=9.0 days
+            val stabilityDays = when {
+                count <= 1 -> 2.5
+                count == 2 -> 5.0
+                else -> 9.0
+            }
+            // Retention Curve: R = round(100 * exp(-t / S))
+            val retentionPct = if (daysAgo == 0) 100 else {
+                (100.0 * kotlin.math.exp(-daysAgo.toDouble() / stabilityDays)).toInt().coerceIn(0, 100)
+            }
+            val recallStatus = when {
+                retentionPct < 60 -> "Critical Recall Due"
+                retentionPct < 80 -> "Review Recommended"
+                else -> "Optimal Retention"
+            }
+
             SubjectEquilibriumItem(
                 subjectName = name,
                 minutes = mins,
                 hours = mins / 60.0,
                 percentage = pct,
                 daysAgo = daysAgo,
-                isNeglected = daysAgo >= 3
+                isNeglected = daysAgo >= 3,
+                sessionCount = count,
+                stabilityDays = stabilityDays,
+                retentionPct = retentionPct,
+                recallStatus = recallStatus
             )
         }
 
@@ -227,7 +310,7 @@ object AnalyticsEngine {
             CognitiveWorkTypeItem(type, mins, toPct(mins))
         }
 
-        // Smart Diagnostic Insights
+        // Deterministic Cognitive Diagnostic Insights (100% Deterministic Algorithmic Logic)
         val smartInsights = mutableListOf<SmartInsight>()
         if (totalMinutes > 0) {
             val topBucket = circadianBuckets.maxByOrNull { it.minutes }
@@ -240,6 +323,14 @@ object AnalyticsEngine {
                     )
                 )
             }
+
+            smartInsights.add(
+                SmartInsight(
+                    icon = "🎯",
+                    title = "Focus Quality Score ($focusQualityScore/100)",
+                    description = "Tier: $focusQualityTier. Consistency: $consistencyPct%, Goal Hit: $goalHitRate%, Deep Work: $deepWorkRatio%."
+                )
+            )
 
             if (deepWorkRatio >= 60) {
                 smartInsights.add(
@@ -259,24 +350,36 @@ object AnalyticsEngine {
                 )
             }
 
-            val neglected = subjectEquilibrium.filter { it.isNeglected }
-            if (neglected.isNotEmpty()) {
-                val names = neglected.take(2).joinToString(", ") { "${it.subjectName} (${it.daysAgo}d ago)" }
+            val criticalRecall = subjectEquilibrium.filter { it.retentionPct < 60 }
+            if (criticalRecall.isNotEmpty()) {
+                val names = criticalRecall.take(2).joinToString(", ") { "${it.subjectName} (R=${it.retentionPct}%, ${it.daysAgo}d ago)" }
                 smartInsights.add(
                     SmartInsight(
                         icon = "⚠️",
-                        title = "Neglect Warning",
-                        description = "$names untouched recently. Schedule a recall session to preserve memory retention."
+                        title = "Ebbinghaus Memory Decay",
+                        description = "$names fallen below 60% retention. Critical active recall session required today to restore memory stability."
                     )
                 )
-            } else if (subjectEquilibrium.size > 1) {
-                smartInsights.add(
-                    SmartInsight(
-                        icon = "⚖️",
-                        title = "Curriculum Equilibrium",
-                        description = "All active subjects were reviewed within the last 48 hours. Excellent syllabus balance."
+            } else {
+                val neglected = subjectEquilibrium.filter { it.isNeglected }
+                if (neglected.isNotEmpty()) {
+                    val names = neglected.take(2).joinToString(", ") { "${it.subjectName} (${it.daysAgo}d ago)" }
+                    smartInsights.add(
+                        SmartInsight(
+                            icon = "⚠️",
+                            title = "Neglect Warning",
+                            description = "$names untouched recently. Schedule a recall session to preserve memory retention."
+                        )
                     )
-                )
+                } else if (subjectEquilibrium.size > 1) {
+                    smartInsights.add(
+                        SmartInsight(
+                            icon = "⚖️",
+                            title = "Curriculum Equilibrium",
+                            description = "All active subjects were reviewed within the last 48 hours. Excellent syllabus balance."
+                        )
+                    )
+                }
             }
 
             if (daysLimit != null && (totalMinutes > 0 || priorMinutes > 0)) {
@@ -330,7 +433,12 @@ object AnalyticsEngine {
             subjectEquilibrium = subjectEquilibrium,
             cognitiveWorkTypes = cognitiveWorkTypes,
             smartInsights = smartInsights,
-            filteredSessions = filteredSessions
+            filteredSessions = filteredSessions,
+            focusQualityScore = focusQualityScore,
+            focusQualityTier = focusQualityTier,
+            consistencyPct = consistencyPct,
+            goalHitRate = goalHitRate,
+            pacingStability = pacingStability
         )
     }
 }

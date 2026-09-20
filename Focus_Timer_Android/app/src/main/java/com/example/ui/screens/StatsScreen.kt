@@ -1517,6 +1517,132 @@ private fun DeepAnalysisEngineSection(
 
             Spacer(modifier = Modifier.height(14.dp))
 
+            // 0. Focus Quality Score (FQS / Cognitive Quality Index)
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                color = PanelElevated,
+                shape = RoundedCornerShape(12.dp),
+                border = BorderStroke(1.dp, LineBorder)
+            ) {
+                Column(modifier = Modifier.padding(14.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "🎯 Focus Quality Score (FQS)",
+                            color = TextPrimary,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+
+                        Surface(
+                            shape = RoundedCornerShape(6.dp),
+                            color = when (report.focusQualityTier) {
+                                "Elite Cognitive Focus" -> Color(0xFF064E3B)
+                                "Optimal Focus Stamina" -> Color(0xFF1E3A8A)
+                                "Moderate Pacing" -> Color(0xFF78350F)
+                                else -> Color(0xFF450A0A)
+                            },
+                            border = BorderStroke(1.dp, when (report.focusQualityTier) {
+                                "Elite Cognitive Focus" -> SuccessGreen
+                                "Optimal Focus Stamina" -> Color(0xFF3B82F6)
+                                "Moderate Pacing" -> Color(0xFFF59E0B)
+                                else -> Color(0xFFEF4444)
+                            })
+                        ) {
+                            Text(
+                                text = if (report.totalMinutes > 0) report.focusQualityTier else "No Study Data",
+                                color = when (report.focusQualityTier) {
+                                    "Elite Cognitive Focus" -> SuccessGreen
+                                    "Optimal Focus Stamina" -> Color(0xFF60A5FA)
+                                    "Moderate Pacing" -> Color(0xFFFBBF24)
+                                    else -> Color(0xFFF87171)
+                                },
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.Bottom
+                    ) {
+                        Text(
+                            text = "${report.focusQualityScore}",
+                            color = GoldBright,
+                            fontSize = 28.sp,
+                            fontWeight = FontWeight.ExtraBold
+                        )
+                        Text(
+                            text = " / 100",
+                            color = TextDim,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.padding(bottom = 4.dp, start = 2.dp)
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(5.dp)
+                            .clip(RoundedCornerShape(2.5.dp))
+                            .background(Color.White.copy(alpha = 0.08f))
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth((report.focusQualityScore.toFloat() / 100f).coerceIn(0f, 1f))
+                                .height(5.dp)
+                                .clip(RoundedCornerShape(2.5.dp))
+                                .background(SuccessGreen)
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
+                            Text(text = "${report.consistencyPct}%", color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                            Text(text = "Consistency", color = TextDim, fontSize = 9.sp)
+                        }
+                        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
+                            Text(text = "${report.goalHitRate}%", color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                            Text(text = "Goal Hit", color = TextDim, fontSize = 9.sp)
+                        }
+                        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
+                            Text(text = "${report.pacingStability}%", color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                            Text(text = "Pacing", color = TextDim, fontSize = 9.sp)
+                        }
+                        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
+                            Text(text = "${report.deepWorkRatio}%", color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                            Text(text = "Deep Work", color = TextDim, fontSize = 9.sp)
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = "Formula: 0.35·DeepWork + 0.25·Consistency + 0.25·GoalHit + 0.15·Pacing",
+                        color = TextDim,
+                        fontSize = 9.sp,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
             // 1. Circadian Peak Focus Card
             Surface(
                 modifier = Modifier.fillMaxWidth(),
@@ -1663,7 +1789,7 @@ private fun DeepAnalysisEngineSection(
 
             Spacer(modifier = Modifier.height(10.dp))
 
-            // 3. Subject Equilibrium & Neglect Matrix Card
+            // 3. Subject Equilibrium & Ebbinghaus Recall Matrix Card
             Surface(
                 modifier = Modifier.fillMaxWidth(),
                 color = PanelElevated,
@@ -1672,7 +1798,7 @@ private fun DeepAnalysisEngineSection(
             ) {
                 Column(modifier = Modifier.padding(12.dp)) {
                     Text(
-                        text = "⚖️ Subject Equilibrium & Neglect Matrix",
+                        text = "⚖️ Subject Equilibrium & Ebbinghaus Recall Matrix",
                         color = TextPrimary,
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Bold
@@ -1683,6 +1809,12 @@ private fun DeepAnalysisEngineSection(
                         Text(text = "No subjects recorded in this period.", color = TextDim, fontSize = 11.sp)
                     } else {
                         report.subjectEquilibrium.take(6).forEach { subj ->
+                            val statusColor = when {
+                                subj.retentionPct < 60 -> Color(0xFFEF4444)
+                                subj.retentionPct < 80 -> Color(0xFFF59E0B)
+                                else -> SuccessGreen
+                            }
+
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -1694,12 +1826,12 @@ private fun DeepAnalysisEngineSection(
                                     Row(verticalAlignment = Alignment.CenterVertically) {
                                         Text(text = subj.subjectName, color = TextPrimary, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                                         Spacer(modifier = Modifier.width(4.dp))
-                                        Text(text = "(${subj.percentage}%)", color = TextDim, fontSize = 10.sp)
+                                        Text(text = "(${subj.percentage}% share)", color = TextDim, fontSize = 10.sp)
                                     }
                                     Spacer(modifier = Modifier.height(2.dp))
                                     Box(
                                         modifier = Modifier
-                                            .fillMaxWidth(0.85f)
+                                            .fillMaxWidth(0.9f)
                                             .height(3.dp)
                                             .clip(RoundedCornerShape(1.5.dp))
                                             .background(Color.White.copy(alpha = 0.08f))
@@ -1712,6 +1844,31 @@ private fun DeepAnalysisEngineSection(
                                                 .background(GoldAccent)
                                         )
                                     }
+                                    Spacer(modifier = Modifier.height(3.dp))
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Text(
+                                            text = "R: ${subj.retentionPct}% (S=${subj.stabilityDays}d)",
+                                            color = statusColor,
+                                            fontSize = 9.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Box(
+                                            modifier = Modifier
+                                                .width(60.dp)
+                                                .height(3.dp)
+                                                .clip(RoundedCornerShape(1.5.dp))
+                                                .background(Color.White.copy(alpha = 0.08f))
+                                        ) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .fillMaxWidth((subj.retentionPct.toFloat() / 100f).coerceIn(0f, 1f))
+                                                    .height(3.dp)
+                                                    .clip(RoundedCornerShape(1.5.dp))
+                                                    .background(statusColor)
+                                            )
+                                        }
+                                    }
                                 }
 
                                 Column(horizontalAlignment = Alignment.End) {
@@ -1722,12 +1879,16 @@ private fun DeepAnalysisEngineSection(
                                         fontWeight = FontWeight.Bold
                                     )
                                     val statusText = if (subj.daysAgo == 0) "Today" else if (subj.daysAgo == 1) "Yesterday" else "${subj.daysAgo}d ago"
-                                    val statusColor = if (subj.isNeglected) Color(0xFFEF4444) else SuccessGreen
                                     Text(
-                                        text = if (subj.isNeglected) "⚠️ $statusText" else statusText,
+                                        text = subj.recallStatus,
                                         color = statusColor,
-                                        fontSize = 10.sp,
-                                        fontWeight = FontWeight.Medium
+                                        fontSize = 9.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Text(
+                                        text = statusText,
+                                        color = TextDim,
+                                        fontSize = 9.sp
                                     )
                                 }
                             }
