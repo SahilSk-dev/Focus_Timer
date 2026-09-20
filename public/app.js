@@ -2741,16 +2741,53 @@ function renderDeepAnalytics() {
 }
 
 /* ============================================================
+   📑 ON-DEMAND LAZY LOADING FOR JSPDF & AUTOTABLE
+   ============================================================ */
+let jsPdfPromise = null;
+function loadJsPdf() {
+  if (window.jspdf && window.jspdf.jsPDF && window.jspdf.jsPDF.API && window.jspdf.jsPDF.API.autoTable) {
+    return Promise.resolve(window.jspdf);
+  }
+  if (!jsPdfPromise) {
+    jsPdfPromise = new Promise((resolve, reject) => {
+      const s1 = document.createElement('script');
+      s1.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+      s1.onload = () => {
+        const s2 = document.createElement('script');
+        s2.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js';
+        s2.onload = () => resolve(window.jspdf);
+        s2.onerror = (e) => { jsPdfPromise = null; reject(e); };
+        document.head.appendChild(s2);
+      };
+      s1.onerror = (e) => { jsPdfPromise = null; reject(e); };
+      document.head.appendChild(s1);
+    });
+  }
+  return jsPdfPromise;
+}
+
+/* ============================================================
    📑 FULL EXECUTIVE ANALYSIS PDF EXPORT (100% PARITY & VECTORS)
    ============================================================ */
 async function exportAnalysisPdf() {
-  if (!window.jspdf || !window.jspdf.jsPDF) {
-    showToast('jsPDF library not loaded');
-    return;
-  }
   const btn = document.getElementById('downloadAnalysisPdfBtn');
   if (btn) {
     btn.disabled = true;
+    btn.innerHTML = '<span>⏳</span> Loading PDF Engine...';
+  }
+
+  try {
+    await loadJsPdf();
+  } catch (e) {
+    showToast('Failed to load PDF library. Please check network connection.');
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = '<span>📑</span> Full Analysis PDF';
+    }
+    return;
+  }
+
+  if (btn) {
     btn.innerHTML = '<span>⏳</span> Generating PDF...';
   }
 
@@ -3270,6 +3307,15 @@ document.getElementById('exportPdfBtn').addEventListener('click', async ()=>{
   btn.disabled = true;
 
   try {
+    await loadJsPdf();
+  } catch(e) {
+    showToast('Failed to load PDF library. Please check your network connection.');
+    btn.disabled = false;
+    btn.textContent = 'PDF Export';
+    return;
+  }
+
+  try {
     const uniqueStrings = new Set();
     data.forEach(s => {
       if (s.subject && !b2eSubject[s.subject]) uniqueStrings.add(s.subject);
@@ -3475,23 +3521,52 @@ document.getElementById('restoreFileInput').addEventListener('change', (e)=>{
   e.target.value = ''; 
 });
 
-/* ---------- refresh everything (debounced via requestAnimationFrame for 60fps performance) ---------- */
+/* ---------- On-demand / Lazy View Rendering for 60-120fps Mobile Performance ---------- */
 let refreshRafId = null;
-function refreshEverything(){
+let statsDirty = true;
+let historyDirty = true;
+
+function refreshTimerView() {
+  renderTarget();
+  renderLevel();
+  renderStreak();
+}
+
+function refreshStatsView() {
+  renderCompare();
+  renderStats();
+  renderMilestoneBadges();
+  renderDeepAnalytics();
+  renderHeatmap();
+  renderSubjectAnalytics();
+  statsDirty = false;
+}
+
+function refreshHistoryView() {
+  renderHistory();
+  historyDirty = false;
+}
+
+function refreshEverything(forceAll = false) {
+  statsDirty = true;
+  historyDirty = true;
   if (refreshRafId) cancelAnimationFrame(refreshRafId);
   return new Promise(resolve => {
     refreshRafId = requestAnimationFrame(() => {
       refreshRafId = null;
-      renderTarget();
-      renderLevel();
-      renderCompare();
-      renderStats();
-      renderStreak();
-      renderMilestoneBadges();
-      renderDeepAnalytics();
-      renderHeatmap();
-      renderHistory();
-      renderSubjectAnalytics();
+      // Always update primary timer stats
+      refreshTimerView();
+
+      // Only calculate heavy off-screen sections if that view is currently active or forceAll is true
+      const activeSection = document.querySelector('.view-section.active');
+      const activeId = activeSection ? activeSection.id : 'view-timer';
+
+      if (forceAll || activeId === 'view-stats') {
+        refreshStatsView();
+      }
+      if (forceAll || activeId === 'view-history') {
+        refreshHistoryView();
+      }
       resolve();
     });
   });
@@ -3641,10 +3716,15 @@ function switchView(targetId) {
     appSidebar.classList.remove('mobile-open');
   }
 
-  // Refresh charts and badges when entering stats
+  // Lazy render when entering stats or history tabs
   if (targetId === 'view-stats') {
-    renderCharts();
-    renderMilestoneBadges();
+    if (statsDirty) {
+      refreshStatsView();
+    }
+  } else if (targetId === 'view-history') {
+    if (historyDirty) {
+      refreshHistoryView();
+    }
   }
 }
 

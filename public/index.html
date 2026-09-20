@@ -2,8 +2,13 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="theme-color" content="#09090b">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
+<meta name="theme-color" content="#000000">
+<meta name="description" content="High-performance Focus Study Timer, Pomodoro, and Cognitive Analytics. Track study hours, circadian focus windows, and export clean PDF reports.">
+<meta name="keywords" content="focus timer, study timer, pomodoro timer, study tracker, circadian rhythm focus, productivity, study analytics">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
 <link rel="manifest" href="./manifest.json">
 <title>Focus Study Timer</title>
 <link rel="icon" type="image/png" href="./icon.png?v=5">
@@ -13,8 +18,6 @@
 <link rel="preconnect" href="https://firestore.googleapis.com">
 <link rel="dns-prefetch" href="https://cdnjs.cloudflare.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Outfit:wght@500;600;700;800&display=swap">
-<script defer src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script defer src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
 <link rel="stylesheet" href="./style.css">
 </head>
 <body data-theme="dark">
@@ -74,8 +77,8 @@
       </div>
 
       <div class="stage-header-right">
-        <button id="muteBtn" class="audio-btn" title="Mute/Unmute Audio">🔊</button>
-        <button id="fullscreenBtn" class="fs-btn" title="Full Screen">
+        <button id="muteBtn" class="audio-btn" title="Mute/Unmute Audio" aria-label="Mute or Unmute Audio">🔊</button>
+        <button id="fullscreenBtn" class="fs-btn" title="Full Screen" aria-label="Toggle Full Screen">
           <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
             <path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/>
           </svg>
@@ -116,7 +119,7 @@
               <div class="subject-section" id="subjectSelectionArea">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
                   <label class="field-label" style="margin-bottom:0;">Subject</label>
-                  <button id="editModeToggle" class="edit-mode-btn" title="Edit Mode">✏️ Edit</button>
+                  <button id="editModeToggle" class="edit-mode-btn" title="Edit Mode" aria-label="Toggle Subject Edit Mode">✏️ Edit</button>
                 </div>
                 <div class="sel-chips" id="subjSelectChips"></div>
                 <div class="sel-chips" id="subMenuChips" style="display:none; margin-top:-4px; padding-left:12px;"></div>

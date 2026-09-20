@@ -7,11 +7,11 @@
   --font-main: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --font-display: 'Outfit', var(--font-main);
 
-  /* Deep High-End Dark Palette */
-  --bg: #09090b;
-  --bg-gradient: radial-gradient(circle at 50% 10%, rgba(16, 185, 129, 0.15) 0%, rgba(9, 9, 11, 0.98) 65%, #050507 100%);
-  --panel: #141418;
-  --panel-elevated: #1e1e24;
+  /* Deep High-End Dark Palette — Pure Black */
+  --bg: #000000;
+  --bg-gradient: none;
+  --panel: #0e0e11;
+  --panel-elevated: #18181c;
   --line: rgba(255, 255, 255, 0.08);
   --line-bright: rgba(52, 211, 153, 0.45);
   --text: #f4f4f5;
@@ -31,11 +31,13 @@
 
 /* Base Styles */
 * { box-sizing: border-box; }
-html, body { margin: 0; padding: 0; }
+html, body {
+  margin: 0;
+  padding: 0;
+  background: #000000;
+}
 body {
-  background: var(--bg);
-  background-image: var(--bg-gradient);
-  background-attachment: fixed;
+  background: #000000 !important;
   color: var(--text);
   font-family: var(--font-main);
   min-height: 100vh;
@@ -43,7 +45,10 @@ body {
   padding: 0;
   display: block;
   overflow-x: hidden;
-  transition: background 0.4s ease, color 0.3s ease;
+  -webkit-font-smoothing: antialiased;
+}
+button, .btn, .sel-chip, .nav-item, input, select {
+  touch-action: manipulation;
 }
 
 /* Headings with Sleek Gradient */
@@ -196,12 +201,7 @@ input:focus {
   position: relative;
 }
 
-/* Core Subject Highlighting (Subtle Energy Pulse, No Muddy Gold) */
-@keyframes themeGlowPulse {
-  0% { box-shadow: 0 0 4px var(--accent); }
-  50% { box-shadow: 0 0 12px var(--accent-glow); }
-  100% { box-shadow: 0 0 4px var(--accent); }
-}
+/* Core Subject Highlighting (Clean Static Accent Glow, No CPU Animation) */
 .core-chip {
   border-color: var(--accent-bright);
   color: var(--text);
@@ -209,8 +209,7 @@ input:focus {
   position: relative;
 }
 .sel-chip.core-chip.active {
-  animation: themeGlowPulse 3s ease-in-out infinite;
-  box-shadow: 0 0 12px var(--accent-glow);
+  box-shadow: 0 0 10px rgba(52, 211, 153, 0.4);
 }
 
 /* Subject Manage */
@@ -1298,6 +1297,10 @@ button.primary:not(:disabled):hover {
 @media (max-width: 768px) {
   .mobile-menu-btn {
     display: flex;
+    min-width: 44px;
+    min-height: 44px;
+    align-items: center;
+    justify-content: center;
   }
   .app-sidebar {
     position: fixed;
@@ -1305,6 +1308,7 @@ button.primary:not(:disabled):hover {
     top: 0;
     width: 260px !important;
     height: 100vh;
+    height: 100dvh;
     z-index: 1000;
     transition: left 0.3s ease;
   }
@@ -1323,10 +1327,26 @@ button.primary:not(:disabled):hover {
     display: none;
   }
   .stage-header {
-    padding: 14px 20px;
+    padding: 12px 16px;
   }
   .desktop-content-wrap {
-    padding: 20px 16px 40px;
+    padding: 16px 12px max(48px, env(safe-area-inset-bottom));
+  }
+  /* Mobile touch target sizing (44px+) & fast response */
+  .sel-chip {
+    min-height: 44px;
+    padding: 10px 16px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.92rem;
+  }
+  .audio-btn, .fs-btn {
+    min-width: 44px;
+    min-height: 44px;
+  }
+  .modal-btn, .auth-btn, .gbtn {
+    min-height: 44px;
   }
 }
 
