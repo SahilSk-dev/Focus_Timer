@@ -102,10 +102,17 @@ class FocusViewModel(application: Application) : AndroidViewModel(application) {
     private val db = AppDatabase.getInstance(application)
     val repository = FocusRepository(db.studyDao(), application)
 
-    // Pre-populate data if needed
+    private val _isStartupReady = MutableStateFlow(false)
+    val isStartupReady: StateFlow<Boolean> = _isStartupReady.asStateFlow()
+
+    // Pre-populate data off the main thread so cold launch never blocks frame 1
     init {
-        viewModelScope.launch {
-            AppDatabase.prepopulateData(db.studyDao())
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                AppDatabase.prepopulateData(db.studyDao())
+            } finally {
+                _isStartupReady.value = true
+            }
         }
     }
 
@@ -246,12 +253,15 @@ class FocusViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    @Volatile
     private var toneGenerator: ToneGenerator? = null
 
     init {
-        try {
-            toneGenerator = ToneGenerator(AudioManager.STREAM_NOTIFICATION, 80)
-        } catch (_: Exception) {}
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                toneGenerator = ToneGenerator(AudioManager.STREAM_NOTIFICATION, 80)
+            } catch (_: Exception) {}
+        }
 
         restoreSavedTimerState()
     }

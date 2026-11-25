@@ -1,6 +1,16 @@
 package com.example.ui
 
 import android.widget.Toast
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -10,7 +20,9 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BarChart
@@ -22,15 +34,14 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CheckboxDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -42,13 +53,17 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.BuildConfig
 import com.example.ui.components.ConfettiEffect
+import com.example.ui.components.SmoothTabHost
 import com.example.ui.screens.HistorySettingsScreen
 import com.example.ui.screens.StatsScreen
 import com.example.ui.screens.TimerScreen
@@ -59,6 +74,7 @@ import com.example.ui.theme.GoldBright
 import com.example.ui.theme.GoldDark
 import com.example.ui.theme.LineBorder
 import com.example.ui.theme.PanelDark
+import com.example.ui.theme.PanelElevated
 import com.example.ui.theme.TextDim
 import com.example.ui.theme.TextPrimary
 import com.example.viewmodel.FocusViewModel
@@ -69,6 +85,22 @@ fun FocusTimerApp(
 ) {
     val context = LocalContext.current
     var currentNavIndex by remember { mutableStateOf(0) }
+
+    val isStartupReady by viewModel.isStartupReady.collectAsState()
+    var prewarmTabs by remember { mutableStateOf(false) }
+    var showStartupSplash by remember { mutableStateOf(true) }
+
+    LaunchedEffect(Unit) {
+        delay(16)
+        prewarmTabs = true
+    }
+
+    LaunchedEffect(isStartupReady, prewarmTabs) {
+        if (isStartupReady && prewarmTabs) {
+            delay(360)
+            showStartupSplash = false
+        }
+    }
 
     val toastMsg by viewModel.toastMessage.collectAsState()
     val showConfetti by viewModel.showConfetti.collectAsState()
@@ -132,68 +164,84 @@ fun FocusTimerApp(
         Scaffold(
             bottomBar = {
                 if (!isFullscreen) {
-                    NavigationBar(
-                        containerColor = PanelDark,
-                        contentColor = TextPrimary,
-                        tonalElevation = 4.dp
+                    Surface(
+                        color = BgDark,
+                        modifier = Modifier.fillMaxWidth()
                     ) {
-                        NavigationBarItem(
-                            selected = currentNavIndex == 0,
-                            onClick = { currentNavIndex = 0 },
-                            icon = {
-                                Icon(
-                                    imageVector = Icons.Default.Timer,
-                                    contentDescription = "Timer"
+                        Surface(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .navigationBarsPadding()
+                                .padding(horizontal = 14.dp, vertical = 10.dp),
+                            shape = RoundedCornerShape(22.dp),
+                            color = PanelDark,
+                            border = BorderStroke(1.dp, LineBorder),
+                            shadowElevation = 8.dp
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(6.dp),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                val navItems = listOf(
+                                    Triple(0, "Timer", Icons.Default.Timer) to "nav_timer",
+                                    Triple(1, "Analytics", Icons.Default.BarChart) to "nav_stats",
+                                    Triple(2, "History", Icons.Default.History) to "nav_history"
                                 )
-                            },
-                            label = { Text("Timer", fontWeight = if (currentNavIndex == 0) FontWeight.Bold else FontWeight.Normal) },
-                            colors = NavigationBarItemDefaults.colors(
-                                selectedIconColor = BgDark,
-                                selectedTextColor = TextPrimary,
-                                unselectedIconColor = TextDim,
-                                unselectedTextColor = TextDim,
-                                indicatorColor = TextPrimary
-                            ),
-                            modifier = Modifier.testTag("nav_timer")
-                        )
-                        NavigationBarItem(
-                            selected = currentNavIndex == 1,
-                            onClick = { currentNavIndex = 1 },
-                            icon = {
-                                Icon(
-                                    imageVector = Icons.Default.BarChart,
-                                    contentDescription = "Analytics"
-                                )
-                            },
-                            label = { Text("Analytics", maxLines = 1, fontWeight = if (currentNavIndex == 1) FontWeight.Bold else FontWeight.Normal) },
-                            colors = NavigationBarItemDefaults.colors(
-                                selectedIconColor = BgDark,
-                                selectedTextColor = TextPrimary,
-                                unselectedIconColor = TextDim,
-                                unselectedTextColor = TextDim,
-                                indicatorColor = TextPrimary
-                            ),
-                            modifier = Modifier.testTag("nav_stats")
-                        )
-                        NavigationBarItem(
-                            selected = currentNavIndex == 2,
-                            onClick = { currentNavIndex = 2 },
-                            icon = {
-                                Icon(
-                                    imageVector = Icons.Default.History,
-                                    contentDescription = "History & Data"
-                                )
-                            },
-                            label = { Text("History & Data", maxLines = 1, fontSize = 11.sp, fontWeight = if (currentNavIndex == 2) FontWeight.Bold else FontWeight.Normal) },
-                            colors = NavigationBarItemDefaults.colors(
-                                selectedIconColor = BgDark,
-                                selectedTextColor = TextPrimary,
-                                unselectedIconColor = TextDim,
-                                unselectedTextColor = TextDim,
-                                indicatorColor = TextPrimary
-                            ),
-                            modifier = Modifier.testTag("nav_history")
-                        )
+                                navItems.forEach { (item, tag) ->
+                                    val (index, label, icon) = item
+                                    val isSelected = currentNavIndex == index
+                                    val containerColor by animateColorAsState(
+                                        targetValue = if (isSelected) GoldBright else PanelElevated,
+                                        animationSpec = tween(durationMillis = 180, easing = FastOutSlowInEasing),
+                                        label = "nav_bg_$index"
+                                    )
+                                    val contentColor by animateColorAsState(
+                                        targetValue = if (isSelected) BgDark else TextDim,
+                                        animationSpec = tween(durationMillis = 180, easing = FastOutSlowInEasing),
+                                        label = "nav_fg_$index"
+                                    )
+                                    Surface(
+                                        onClick = { currentNavIndex = index },
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .height(54.dp)
+                                            .testTag(tag),
+                                        shape = RoundedCornerShape(16.dp),
+                                        color = containerColor,
+                                        border = if (isSelected) null else BorderStroke(1.dp, LineBorder),
+                                        shadowElevation = if (isSelected) 4.dp else 0.dp
+                                    ) {
+                                        Column(
+                                            modifier = Modifier
+                                                .fillMaxSize()
+                                                .padding(horizontal = 6.dp),
+                                            horizontalAlignment = Alignment.CenterHorizontally,
+                                            verticalArrangement = Arrangement.Center
+                                        ) {
+                                            Icon(
+                                                imageVector = icon,
+                                                contentDescription = label,
+                                                tint = contentColor,
+                                                modifier = Modifier.size(19.dp)
+                                            )
+                                            Spacer(modifier = Modifier.height(3.dp))
+                                            Text(
+                                                text = label,
+                                                color = contentColor,
+                                                fontSize = 11.sp,
+                                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                                maxLines = 1,
+                                                softWrap = false,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -203,16 +251,23 @@ fun FocusTimerApp(
                     .fillMaxSize()
                     .padding(if (isFullscreen) androidx.compose.foundation.layout.PaddingValues(0.dp) else innerPadding)
             ) {
-                when (currentNavIndex) {
-                    0 -> TimerScreen(
-                        viewModel = viewModel,
-                        onOpenAddSubject = { showAddSubjectDialog = true },
-                        onOpenAddSubSubject = { parent -> subSubjectTargetSubject = parent },
-                        onOpenAddWorkType = { showAddWorkTypeDialog = true },
-                        onEditSubject = { name, id -> editSubjectTarget = name to id }
-                    )
-                    1 -> StatsScreen(viewModel = viewModel)
-                    2 -> HistorySettingsScreen(viewModel = viewModel)
+                SmoothTabHost(
+                    selectedIndex = currentNavIndex,
+                    tabCount = 3,
+                    modifier = Modifier.fillMaxSize(),
+                    prewarmAll = prewarmTabs
+                ) { tabIndex ->
+                    when (tabIndex) {
+                        0 -> TimerScreen(
+                            viewModel = viewModel,
+                            onOpenAddSubject = { showAddSubjectDialog = true },
+                            onOpenAddSubSubject = { parent -> subSubjectTargetSubject = parent },
+                            onOpenAddWorkType = { showAddWorkTypeDialog = true },
+                            onEditSubject = { name, id -> editSubjectTarget = name to id }
+                        )
+                        1 -> StatsScreen(viewModel = viewModel)
+                        2 -> HistorySettingsScreen(viewModel = viewModel)
+                    }
                 }
             }
         }
@@ -224,6 +279,8 @@ fun FocusTimerApp(
                 onFinished = { viewModel.dismissConfetti() }
             )
         }
+
+        StartupLoadingOverlay(visible = showStartupSplash)
     }
 
     // Add Subject Dialog
@@ -525,5 +582,82 @@ fun FocusTimerApp(
             },
             containerColor = PanelDark
         )
+    }
+}
+
+@Composable
+private fun StartupLoadingOverlay(visible: Boolean) {
+    AnimatedVisibility(
+        visible = visible,
+        exit = fadeOut(animationSpec = tween(durationMillis = 260, easing = FastOutSlowInEasing))
+    ) {
+        val infiniteTransition = rememberInfiniteTransition(label = "startup_pulse")
+        val badgeScale by infiniteTransition.animateFloat(
+            initialValue = 0.96f,
+            targetValue = 1.04f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(durationMillis = 750, easing = FastOutSlowInEasing),
+                repeatMode = RepeatMode.Reverse
+            ),
+            label = "startup_badge_scale"
+        )
+
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(BgDark),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(18.dp)
+            ) {
+                Surface(
+                    modifier = Modifier
+                        .size(72.dp)
+                        .graphicsLayer {
+                            scaleX = badgeScale
+                            scaleY = badgeScale
+                        },
+                    shape = RoundedCornerShape(18.dp),
+                    color = PanelDark,
+                    border = BorderStroke(1.dp, LineBorder)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = Icons.Default.Timer,
+                            contentDescription = null,
+                            tint = GoldBright,
+                            modifier = Modifier.size(34.dp)
+                        )
+                    }
+                }
+
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Text(
+                        text = "Focus Timer",
+                        color = TextPrimary,
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        letterSpacing = 0.5.sp
+                    )
+                    Text(
+                        text = "v${BuildConfig.VERSION_NAME}",
+                        color = TextDim,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+
+                CircularProgressIndicator(
+                    modifier = Modifier.size(22.dp),
+                    color = GoldBright,
+                    strokeWidth = 2.dp
+                )
+            }
+        }
     }
 }

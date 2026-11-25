@@ -62,13 +62,12 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
-import androidx.compose.material3.Tab
-import androidx.compose.material3.TabRow
-import androidx.compose.material3.TabRowDefaults
-import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -88,8 +87,11 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.BuildConfig
 import com.example.alarm.AlarmToneOption
 import com.example.data.model.StudySessionEntity
 import com.example.data.model.SubjectEntity
@@ -97,7 +99,9 @@ import com.example.data.model.WorkTypeEntity
 import com.example.data.repository.FocusRepository
 import com.example.util.PdfExportHelper
 import com.example.util.WebPortalHelper
+import com.example.ui.components.SmoothTabHost
 import com.example.ui.theme.ActiveTheme
+import com.example.ui.theme.PanelElevated
 import com.example.ui.theme.AppTheme
 import com.example.ui.theme.BgDark
 import com.example.ui.theme.DangerRed
@@ -199,44 +203,91 @@ fun HistorySettingsScreen(
             .background(BgDark)
             .padding(horizontal = 16.dp, vertical = 12.dp)
     ) {
-        Text(
-            text = "History & Data",
-            style = TextStyle(
-                brush = GoldGradientBrush,
-                fontSize = 22.sp,
-                fontWeight = FontWeight.Bold
-            ),
-            modifier = Modifier.padding(bottom = 12.dp, top = 4.dp)
-        )
-
-        // Tabs
-        TabRow(
-            selectedTabIndex = selectedTab,
-            containerColor = PanelDark,
-            contentColor = GoldBright,
-            indicator = { tabPositions ->
-                TabRowDefaults.SecondaryIndicator(
-                    modifier = Modifier.tabIndicatorOffset(tabPositions[selectedTab]),
-                    color = GoldAccent
-                )
-            },
-            divider = {}
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 12.dp, top = 4.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            listOf("Sessions", "Backup & Sync", "Subjects & Types").forEachIndexed { idx, title ->
-                val isSelected = selectedTab == idx
-                Tab(
-                    selected = isSelected,
-                    onClick = { selectedTab = idx },
-                    text = {
-                        Text(
-                            text = title,
-                            color = if (isSelected) GoldBright else TextDim,
-                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                            fontSize = 13.sp,
-                            
-                        )
-                    }
+            Text(
+                text = "History & Data",
+                style = TextStyle(
+                    brush = GoldGradientBrush,
+                    fontSize = 22.sp,
+                    fontWeight = FontWeight.Bold
                 )
+            )
+            Surface(
+                shape = RoundedCornerShape(999.dp),
+                color = PanelDark,
+                border = BorderStroke(1.dp, LineBorder)
+            ) {
+                Text(
+                    text = "v${BuildConfig.VERSION_NAME}",
+                    color = TextDim,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                )
+            }
+        }
+
+        // Equal-width pill button tabs
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(16.dp),
+            color = PanelDark,
+            border = BorderStroke(1.dp, LineBorder)
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(5.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                listOf("Sessions", "Backup & Sync", "Subjects & Types").forEachIndexed { idx, title ->
+                    val isSelected = selectedTab == idx
+                    val btnContainerColor by animateColorAsState(
+                        targetValue = if (isSelected) GoldBright else PanelElevated,
+                        animationSpec = tween(durationMillis = 180, easing = FastOutSlowInEasing),
+                        label = "history_tab_bg_$idx"
+                    )
+                    val btnContentColor by animateColorAsState(
+                        targetValue = if (isSelected) BgDark else TextDim,
+                        animationSpec = tween(durationMillis = 180, easing = FastOutSlowInEasing),
+                        label = "history_tab_fg_$idx"
+                    )
+                    Surface(
+                        onClick = { selectedTab = idx },
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(42.dp),
+                        shape = RoundedCornerShape(11.dp),
+                        color = btnContainerColor,
+                        border = if (isSelected) null else BorderStroke(1.dp, LineBorder)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(horizontal = 4.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = title,
+                                color = btnContentColor,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                fontSize = 11.sp,
+                                letterSpacing = (-0.2).sp,
+                                maxLines = 1,
+                                softWrap = false,
+                                overflow = TextOverflow.Ellipsis,
+                                textAlign = TextAlign.Center
+                            )
+                        }
+                    }
+                }
             }
         }
 
@@ -288,8 +339,16 @@ fun HistorySettingsScreen(
             }
         }
 
-        when (selectedTab) {
-            0 -> {
+        SmoothTabHost(
+            selectedIndex = selectedTab,
+            tabCount = 3,
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth(),
+            prewarmAll = true
+        ) { tabIndex ->
+            when (tabIndex) {
+                0 -> {
                 // SESSION HISTORY LIST
                 if (allSessions.isEmpty()) {
                     Box(
@@ -981,6 +1040,33 @@ fun HistorySettingsScreen(
                         }
                     }
 
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        color = PanelDark,
+                        shape = RoundedCornerShape(12.dp),
+                        border = BorderStroke(1.dp, LineBorder)
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 12.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Focus Timer Android",
+                                color = TextPrimary,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                            Text(
+                                text = "v${BuildConfig.VERSION_NAME} (Build ${BuildConfig.VERSION_CODE})",
+                                color = TextDim,
+                                fontSize = 12.sp
+                            )
+                        }
+                    }
+
                     Spacer(modifier = Modifier.height(30.dp))
                 }
             }
@@ -1147,6 +1233,7 @@ fun HistorySettingsScreen(
 
                     Spacer(modifier = Modifier.height(30.dp))
                 }
+            }
             }
         }
     }
