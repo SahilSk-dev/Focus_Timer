@@ -376,6 +376,28 @@
           <div class="authbar" id="authbarMobile"></div>
         </div>
 
+        <!-- Native Android app download -->
+        <section class="android-app-card" aria-labelledby="androidAppTitle">
+          <div class="android-app-info">
+            <span class="android-app-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="2" width="12" height="20" rx="3"/><path d="M12 7v6"/><path d="m9.5 10.5 2.5 2.5 2.5-2.5"/><path d="M11 18h2"/></svg>
+            </span>
+            <div class="android-app-copy">
+              <div class="android-app-eyebrow">Android app</div>
+              <div class="android-app-title" id="androidAppTitle">Focus Timer for Android</div>
+              <p class="android-app-sub">Native APK build with offline tracking, background alarms and Google sync.</p>
+              <p class="android-app-meta">Version 1.0 &middot; Debug build &middot; Android 7.0+</p>
+            </div>
+          </div>
+          <div class="android-app-actions">
+            <a class="android-download-btn" id="androidDownloadBtn" href="https://github.com/SahilSk-dev/Focus_Timer/releases/download/android-latest/focus-timer-debug.apk" download>
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>
+              Download APK
+            </a>
+            <button type="button" class="android-guide-btn" data-android-guide-open aria-haspopup="dialog" aria-controls="androidGuideModal">Installation guide</button>
+          </div>
+        </section>
+
         <div class="history-desktop-workspace">
 
           <!-- Session History Audit Log -->
@@ -512,6 +534,58 @@
     <div class="modal-btn-row" style="justify-content:flex-end;">
       <button class="modal-btn cancel" id="examGoalCancelBtn">Cancel</button>
       <button class="modal-btn primary" id="examGoalSaveBtn">Save Goal</button>
+    </div>
+  </div>
+</div>
+
+<!-- Android App Installation Guide -->
+<div class="modal-overlay" id="androidGuideModal" role="dialog" aria-modal="true" aria-labelledby="androidGuideTitle">
+  <div class="modal-box guide-modal-box">
+    <div class="modal-title" id="androidGuideTitle">Install on Android</div>
+    <div class="modal-desc">Sideload the Focus Timer APK in about a minute. It runs next to the web app and syncs with the same Google account.</div>
+
+    <ol class="guide-steps">
+      <li>
+        <span class="guide-step-num" aria-hidden="true">1</span>
+        <div class="guide-step-body">
+          <div class="guide-step-title">Download the APK</div>
+          <p class="guide-step-text">Tap <strong>Download APK</strong>. If Chrome warns that this file type can harm your device, choose <strong>Download anyway</strong>.</p>
+        </div>
+      </li>
+      <li>
+        <span class="guide-step-num" aria-hidden="true">2</span>
+        <div class="guide-step-body">
+          <div class="guide-step-title">Open the downloaded file</div>
+          <p class="guide-step-text">Open <strong>Downloads</strong> and tap <strong>focus-timer-debug.apk</strong>. Android may ask which app should handle it &mdash; choose your browser or file manager.</p>
+        </div>
+      </li>
+      <li>
+        <span class="guide-step-num" aria-hidden="true">3</span>
+        <div class="guide-step-body">
+          <div class="guide-step-title">Allow installs from this source</div>
+          <p class="guide-step-text">If prompted, enable <strong>Install unknown apps</strong> for the browser or file manager, then return to the installer.</p>
+        </div>
+      </li>
+      <li>
+        <span class="guide-step-num" aria-hidden="true">4</span>
+        <div class="guide-step-body">
+          <div class="guide-step-title">Install and open</div>
+          <p class="guide-step-text">Tap <strong>Install</strong>. When it finishes, open <strong>Focus Timer</strong> and sign in to sync your sessions.</p>
+        </div>
+      </li>
+    </ol>
+
+    <div class="guide-note">
+      <strong>Updating:</strong> download the latest APK and install it over the old version. Your history and preferences are kept. Browse <a href="https://github.com/SahilSk-dev/Focus_Timer/releases/tag/android-latest" target="_blank" rel="noopener noreferrer">all Android releases</a>.
+    </div>
+
+    <div class="guide-note">
+      <strong>Install blocked?</strong> Check <em>Settings &rarr; Apps &rarr; Special access &rarr; Install unknown apps</em>, allow your browser, then try again.
+    </div>
+
+    <div class="modal-btn-row">
+      <button class="modal-btn cancel" id="androidGuideCloseBtn" type="button">Close</button>
+      <a class="modal-btn primary guide-download-link" href="https://github.com/SahilSk-dev/Focus_Timer/releases/download/android-latest/focus-timer-debug.apk" download>Download APK</a>
     </div>
   </div>
 </div>

@@ -730,6 +730,41 @@ document.getElementById('modalSave').addEventListener('click', async () => {
   closeEditModal();
 });
 
+/* ---------- Android install guide modal ---------- */
+const androidGuideModal = document.getElementById('androidGuideModal');
+const androidGuideCloseBtn = document.getElementById('androidGuideCloseBtn');
+
+function openAndroidGuide() {
+  if (!androidGuideModal) return;
+  androidGuideModal.classList.add('show');
+  if (androidGuideCloseBtn) androidGuideCloseBtn.focus();
+}
+
+function closeAndroidGuide() {
+  if (!androidGuideModal) return;
+  androidGuideModal.classList.remove('show');
+}
+
+document.querySelectorAll('[data-android-guide-open]').forEach(btn => {
+  btn.addEventListener('click', openAndroidGuide);
+});
+
+if (androidGuideCloseBtn) {
+  androidGuideCloseBtn.addEventListener('click', closeAndroidGuide);
+}
+
+if (androidGuideModal) {
+  androidGuideModal.addEventListener('click', (e) => {
+    if (e.target === androidGuideModal) closeAndroidGuide();
+  });
+}
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && androidGuideModal && androidGuideModal.classList.contains('show')) {
+    closeAndroidGuide();
+  }
+});
+
 const addModal = document.getElementById('addModal');
 const addModalTitle = document.getElementById('addModalTitle');
 const addModalInput = document.getElementById('addModalInput');

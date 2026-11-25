@@ -16,7 +16,7 @@
   --line-bright: rgba(255, 255, 255, 0.35);
   --text: #ffffff;
   --text-dim: #a1a1aa;
-  --text-muted: #71717a;
+  --text-muted: #8b8b94;
   --accent: #ffffff;
   --accent-bright: #ffffff;
   --accent-glow: rgba(255, 255, 255, 0.18);
@@ -1308,6 +1308,12 @@ button.primary:not(:disabled):hover {
   align-items: start;
 }
 
+.history-tools-col {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
 .history-audit-col,
 .tools-card {
   background: var(--panel);
@@ -1315,6 +1321,179 @@ button.primary:not(:disabled):hover {
   border-radius: 14px;
   padding: 24px;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+}
+
+/* 📱 Android APK download card */
+.android-app-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 20px;
+  margin-bottom: 22px;
+  padding: 20px 22px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background:
+    radial-gradient(120% 160% at 0% 0%, var(--accent-glow) 0%, transparent 55%),
+    var(--panel);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+}
+.android-app-info {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex: 1 1 300px;
+  min-width: 0;
+}
+.android-app-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 44px;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--panel-elevated);
+  color: var(--text);
+}
+.android-app-copy { min-width: 0; }
+.android-app-eyebrow {
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.android-app-title {
+  margin-top: 2px;
+  font-family: var(--font-display);
+  font-size: 1.02rem;
+  font-weight: 700;
+  color: var(--text);
+}
+.android-app-sub {
+  margin: 3px 0 0;
+  font-size: 0.8rem;
+  line-height: 1.45;
+  color: var(--text-dim);
+}
+.android-app-meta {
+  margin: 4px 0 0;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+.android-app-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.android-download-btn,
+.android-guide-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 42px;
+  padding: 0 16px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--text);
+  font-family: var(--font-main);
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s, color 0.2s;
+}
+.android-download-btn {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--btn-text);
+}
+.android-download-btn:hover {
+  background: var(--btn-hover);
+  border-color: var(--btn-hover);
+  color: var(--btn-text);
+}
+.android-guide-btn:hover {
+  background: var(--panel-elevated);
+  border-color: var(--line-bright);
+}
+
+/* Android install guide modal */
+.guide-modal-box {
+  width: 92%;
+  max-width: 460px;
+}
+.guide-steps {
+  display: grid;
+  gap: 14px;
+  margin: 0 0 16px;
+  padding: 0;
+  list-style: none;
+  text-align: left;
+}
+.guide-steps li {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+.guide-step-body { min-width: 0; }
+.guide-step-num {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 24px;
+  width: 24px;
+  height: 24px;
+  margin-top: 1px;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: var(--panel-elevated);
+  color: var(--text);
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1;
+}
+.guide-step-title {
+  font-size: 0.86rem;
+  font-weight: 600;
+  color: var(--text);
+}
+.guide-step-text {
+  margin: 2px 0 0;
+  font-size: 0.78rem;
+  line-height: 1.5;
+  color: var(--text-dim);
+}
+.guide-step-text strong,
+.guide-note strong { color: var(--text); font-weight: 600; }
+.guide-note {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel-elevated);
+  font-size: 0.75rem;
+  line-height: 1.5;
+  color: var(--text-muted);
+  text-align: left;
+}
+.guide-note a {
+  color: var(--text);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.guide-download-link {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
 }
 
 /* 📱 Responsive Adaptations */
@@ -2858,9 +3037,12 @@ html:has(body[data-theme="light"]) { background-color: #f8fafc; }
   .timer-desktop-workspace {
     display: flex;
     flex-direction: column;
+    align-items: stretch;
     gap: 12px;
   }
   .timer-hero-stage {
+    width: 100%;
+    box-sizing: border-box;
     min-height: 0;
     padding: 24px 16px 20px;
     border-radius: 24px;
@@ -2937,14 +3119,10 @@ html:has(body[data-theme="light"]) { background-color: #f8fafc; }
     border-color: var(--text);
     color: var(--bg);
   }
-  .glowing-timer-active { animation: mobileClockPulse 3.6s ease-in-out infinite; }
-  @keyframes mobileClockPulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.88; }
-  }
+  .glowing-timer-active { animation: none; }
 
   /* ---------- Timer configuration ---------- */
-  .timer-config-panel { gap: 12px; }
+  .timer-config-panel { width: 100%; gap: 12px; }
   .config-card {
     padding: 18px 16px;
     border-radius: 20px;
@@ -3233,11 +3411,12 @@ html:has(body[data-theme="light"]) { background-color: #f8fafc; }
   .stats-desktop-row {
     display: flex;
     flex-direction: column;
+    align-items: stretch;
     gap: 12px;
     margin-top: 0;
   }
-  .stats-desktop-col { padding: 18px 16px; border-radius: 20px; }
-  .stats-header { margin-bottom: 14px; align-items: center; }
+  .stats-desktop-col { width: 100%; box-sizing: border-box; padding: 18px 16px; border-radius: 20px; }
+  .stats-header { margin-bottom: 14px; align-items: center; gap: 12px; }
   .stats-title { font-size: 1rem; text-align: left; }
   .history-title,
   .tools-title,
@@ -3320,7 +3499,42 @@ html:has(body[data-theme="light"]) { background-color: #f8fafc; }
   }
   .mobile-account-card .signout { min-height: 40px; border-radius: 10px; }
 
+  .android-app-card {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 14px;
+    margin-bottom: 12px;
+    padding: 16px;
+    border-radius: 20px;
+  }
+  .android-app-info { flex: 0 0 auto; }
+  .android-app-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 8px;
+    width: 100%;
+  }
+  .android-download-btn,
+  .android-guide-btn {
+    min-height: 46px;
+    border-radius: 12px;
+    font-size: 0.9rem;
+  }
+  .guide-modal-box { max-width: none; }
+  .guide-steps { gap: 15px; }
+
   #view-history .history-desktop-workspace {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+  .history-audit-col,
+  .history-tools-col {
+    width: 100%;
+    box-sizing: border-box;
+  }
+  .history-tools-col {
     display: flex;
     flex-direction: column;
     gap: 12px;
@@ -3431,6 +3645,10 @@ html:has(body[data-theme="light"]) { background-color: #f8fafc; }
     align-items: flex-end;
     justify-content: center;
     padding: 0;
+    background: rgba(0, 0, 0, 0.78);
+    /* Blurring the backdrop can composite the fixed tab bar above the sheet. */
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
   }
   .modal-box {
     width: 100%;
