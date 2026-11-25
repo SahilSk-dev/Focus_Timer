@@ -754,17 +754,28 @@ class FocusViewModel(application: Application) : AndroidViewModel(application) {
 
     fun updateSubject(subject: SubjectEntity) {
         viewModelScope.launch {
+            val previous = allSubjects.value.find { it.id == subject.id }
             repository.updateSubject(subject)
-            if (_selectedSubject.value.equals(subject.name, ignoreCase = true)) {
+            if (previous != null && _selectedSubject.value.equals(previous.name, ignoreCase = true)) {
+                _selectedSubject.value = subject.name
+                val currentSub = _selectedSubSubject.value
+                if (currentSub != null && subject.subSubjects.none { it.equals(currentSub, ignoreCase = true) }) {
+                    _selectedSubSubject.value = subject.subSubjects.firstOrNull()
+                }
+            } else if (_selectedSubject.value.equals(subject.name, ignoreCase = true)) {
                 _selectedSubject.value = subject.name
             }
-            showToast("Subject '${subject.name}' updated & synced")
+            showToast("Subject '${subject.name}' updated")
         }
     }
 
     fun addSubSubject(subjectName: String, subName: String) {
         viewModelScope.launch {
             val subj = allSubjects.value.find { it.name.equals(subjectName, ignoreCase = true) } ?: return@launch
+            if (subj.subSubjects.any { it.equals(subName, ignoreCase = true) }) {
+                _selectedSubSubject.value = subj.subSubjects.first { it.equals(subName, ignoreCase = true) }
+                return@launch
+            }
             val updatedSubs = subj.subSubjects + subName
             repository.updateSubject(subj.copy(subSubjects = updatedSubs))
             _selectedSubSubject.value = subName
@@ -773,13 +784,20 @@ class FocusViewModel(application: Application) : AndroidViewModel(application) {
 
     fun deleteSubject(id: Long) {
         viewModelScope.launch {
-            val subj = allSubjects.value.find { it.id == id }
+            val currentList = allSubjects.value
+            if (currentList.size <= 1) {
+                showToast("Keep at least one subject")
+                return@launch
+            }
+            val subj = currentList.find { it.id == id }
             repository.deleteSubject(id)
             if (subj?.name == _selectedSubject.value) {
-                val remaining = allSubjects.value.filter { it.id != id }
-                _selectedSubject.value = remaining.firstOrNull()?.name ?: "General"
-                _selectedSubSubject.value = null
+                val remaining = currentList.filter { it.id != id }
+                val next = remaining.firstOrNull()
+                _selectedSubject.value = next?.name ?: "General"
+                _selectedSubSubject.value = next?.subSubjects?.firstOrNull()
             }
+            showToast("Subject '${subj?.name ?: ""}' deleted")
         }
     }
 
@@ -792,17 +810,31 @@ class FocusViewModel(application: Application) : AndroidViewModel(application) {
 
     fun updateWorkType(id: Long, name: String) {
         viewModelScope.launch {
+            val previous = allWorkTypes.value.find { it.id == id }
             repository.updateWorkType(id, name)
-            if (_selectedWorkType.value.equals(name, ignoreCase = true)) {
+            if (previous != null && _selectedWorkType.value.equals(previous.name, ignoreCase = true)) {
+                _selectedWorkType.value = name
+            } else if (_selectedWorkType.value.equals(name, ignoreCase = true)) {
                 _selectedWorkType.value = name
             }
-            showToast("Work type updated & synced")
+            showToast("Work type updated")
         }
     }
 
     fun deleteWorkType(id: Long) {
         viewModelScope.launch {
+            val currentList = allWorkTypes.value
+            if (currentList.size <= 1) {
+                showToast("Keep at least one work type")
+                return@launch
+            }
+            val wt = currentList.find { it.id == id }
             repository.deleteWorkType(id)
+            if (wt?.name.equals(_selectedWorkType.value, ignoreCase = true)) {
+                val remaining = currentList.filter { it.id != id }
+                _selectedWorkType.value = remaining.firstOrNull()?.name ?: "Revision"
+            }
+            showToast("Work type '${wt?.name ?: ""}' deleted")
         }
     }
 

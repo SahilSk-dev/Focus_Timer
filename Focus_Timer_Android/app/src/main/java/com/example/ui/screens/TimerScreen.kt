@@ -81,6 +81,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.data.model.WorkTypeEntity
 import com.example.ui.theme.ActiveTheme
 import com.example.ui.theme.AppTheme
 import com.example.ui.theme.BgDark
@@ -115,6 +116,7 @@ fun TimerScreen(
     onOpenAddSubSubject: (String) -> Unit,
     onOpenAddWorkType: () -> Unit,
     onEditSubject: (String, Long) -> Unit,
+    onEditWorkType: (WorkTypeEntity) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val isTimerActive by viewModel.isTimerActive.collectAsState()
@@ -448,7 +450,7 @@ fun TimerScreen(
                             modifier = Modifier.size(14.dp)
                         )
                         Text(
-                            text = "Edit Mode: Tap any subject to edit/rename, or + to add.",
+                            text = "Edit Mode: Tap any Subject, Sub-subject, or Work Type to edit or delete.",
                             color = GoldBright,
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Medium
@@ -502,8 +504,13 @@ fun TimerScreen(
                         SubChip(
                             name = sub,
                             isSelected = isSubSelected,
-                            isTimerActive = isTimerActive,
-                            onClick = { viewModel.selectSubSubject(sub) }
+                            isEditMode = isEditMode,
+                            onClick = { viewModel.selectSubSubject(sub) },
+                            onEdit = {
+                                if (currentSubjObj != null) {
+                                    onEditSubject(currentSubjObj.name, currentSubjObj.id)
+                                }
+                            }
                         )
                     }
                     if (!isTimerActive && isEditMode && currentSubjObj != null) {
@@ -538,8 +545,9 @@ fun TimerScreen(
                     WorkTypeChip(
                         name = wt.name,
                         isSelected = isSelected,
-                        isTimerActive = isTimerActive,
-                        onClick = { viewModel.selectWorkType(wt.name) }
+                        isEditMode = isEditMode,
+                        onClick = { viewModel.selectWorkType(wt.name) },
+                        onEdit = { onEditWorkType(wt) }
                     )
                 }
                 if (!isTimerActive && isEditMode) {
@@ -789,9 +797,13 @@ private fun SubjectChip(
 private fun SubChip(
     name: String,
     isSelected: Boolean,
-    isTimerActive: Boolean,
-    onClick: () -> Unit
+    isEditMode: Boolean,
+    onClick: () -> Unit,
+    onEdit: () -> Unit
 ) {
+    val activeInk = if (ActiveTheme.isLight) ActiveTheme.primary else GoldBright
+    val textColor = if (isSelected) activeInk else TextDim
+
     Box(
         contentAlignment = Alignment.Center,
         modifier = Modifier
@@ -799,22 +811,39 @@ private fun SubChip(
             .clip(RoundedCornerShape(20.dp))
             .background(if (isSelected) GoldAccent.copy(alpha = 0.22f) else PanelDark)
             .border(
-                width = 1.dp,
-                color = if (isSelected) GoldBright else LineBorder,
+                width = if (isSelected || isEditMode) 1.5.dp else 1.dp,
+                color = when {
+                    isEditMode -> GoldAccent
+                    isSelected -> GoldBright
+                    else -> LineBorder
+                },
                 shape = RoundedCornerShape(20.dp)
             )
             .semantics {
                 this.role = Role.RadioButton
                 this.selected = isSelected
             }
-            .clickable { onClick() }
+            .clickable { if (isEditMode) onEdit() else onClick() }
             .padding(horizontal = 12.dp, vertical = 8.dp)
     ) {
-        Text(
-            text = "↳ $name",
-            color = if (isSelected) (if (ActiveTheme.isLight) ActiveTheme.primary else GoldBright) else TextDim,
-            fontSize = 12.sp,
-        )
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            if (isEditMode) {
+                Icon(
+                    imageVector = Icons.Default.Edit,
+                    contentDescription = null,
+                    tint = textColor,
+                    modifier = Modifier.size(11.dp)
+                )
+            }
+            Text(
+                text = "↳ $name",
+                color = textColor,
+                fontSize = 12.sp,
+            )
+        }
     }
 }
 
@@ -822,9 +851,13 @@ private fun SubChip(
 private fun WorkTypeChip(
     name: String,
     isSelected: Boolean,
-    isTimerActive: Boolean,
-    onClick: () -> Unit
+    isEditMode: Boolean,
+    onClick: () -> Unit,
+    onEdit: () -> Unit
 ) {
+    val activeInk = if (ActiveTheme.isLight) ActiveTheme.primary else GoldBright
+    val textColor = if (isSelected) activeInk else TextDim
+
     Box(
         contentAlignment = Alignment.Center,
         modifier = Modifier
@@ -832,22 +865,39 @@ private fun WorkTypeChip(
             .clip(RoundedCornerShape(20.dp))
             .background(if (isSelected) GoldAccent.copy(alpha = 0.22f) else PanelDark)
             .border(
-                width = 1.dp,
-                color = if (isSelected) GoldBright else LineBorder,
+                width = if (isSelected || isEditMode) 1.5.dp else 1.dp,
+                color = when {
+                    isEditMode -> GoldAccent
+                    isSelected -> GoldBright
+                    else -> LineBorder
+                },
                 shape = RoundedCornerShape(20.dp)
             )
             .semantics {
                 this.role = Role.RadioButton
                 this.selected = isSelected
             }
-            .clickable { onClick() }
+            .clickable { if (isEditMode) onEdit() else onClick() }
             .padding(horizontal = 12.dp, vertical = 8.dp)
     ) {
-        Text(
-            text = name,
-            color = if (isSelected) (if (ActiveTheme.isLight) ActiveTheme.primary else GoldBright) else TextDim,
-            fontSize = 12.sp,
-        )
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            if (isEditMode) {
+                Icon(
+                    imageVector = Icons.Default.Edit,
+                    contentDescription = null,
+                    tint = textColor,
+                    modifier = Modifier.size(11.dp)
+                )
+            }
+            Text(
+                text = name,
+                color = textColor,
+                fontSize = 12.sp,
+            )
+        }
     }
 }
 

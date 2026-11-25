@@ -99,6 +99,10 @@ import com.example.data.model.WorkTypeEntity
 import com.example.data.repository.FocusRepository
 import com.example.util.PdfExportHelper
 import com.example.util.WebPortalHelper
+import com.example.ui.components.AddSubjectDialog
+import com.example.ui.components.AddWorkTypeDialog
+import com.example.ui.components.EditSubjectDialog
+import com.example.ui.components.EditWorkTypeDialog
 import com.example.ui.components.SmoothTabHost
 import com.example.ui.theme.ActiveTheme
 import com.example.ui.theme.AppTheme
@@ -141,6 +145,8 @@ fun HistorySettingsScreen(
     var sessionToEdit by remember { mutableStateOf<StudySessionEntity?>(null) }
     var subjectToEdit by remember { mutableStateOf<SubjectEntity?>(null) }
     var workTypeToEdit by remember { mutableStateOf<WorkTypeEntity?>(null) }
+    var showAddSubjectDialog by remember { mutableStateOf(false) }
+    var showAddWorkTypeDialog by remember { mutableStateOf(false) }
     var recentlyDeletedSession by remember { mutableStateOf<StudySessionEntity?>(null) }
     var showBulkDeleteDialog by remember { mutableStateOf(false) }
 
@@ -202,35 +208,15 @@ fun HistorySettingsScreen(
             .background(BgDark)
             .padding(horizontal = 16.dp, vertical = 12.dp)
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 12.dp, top = 4.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = "History & Data",
-                style = TextStyle(
-                    brush = GoldGradientBrush,
-                    fontSize = 22.sp,
-                    fontWeight = FontWeight.Bold
-                )
-            )
-            Surface(
-                shape = RoundedCornerShape(999.dp),
-                color = PanelDark,
-                border = BorderStroke(1.dp, LineBorder)
-            ) {
-                Text(
-                    text = "v${BuildConfig.VERSION_NAME}",
-                    color = TextDim,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
-                )
-            }
-        }
+        Text(
+            text = "History & Data",
+            style = TextStyle(
+                brush = GoldGradientBrush,
+                fontSize = 22.sp,
+                fontWeight = FontWeight.Bold
+            ),
+            modifier = Modifier.padding(bottom = 12.dp, top = 4.dp)
+        )
 
         // Equal-width pill button tabs
         Surface(
@@ -1040,34 +1026,19 @@ fun HistorySettingsScreen(
                         }
                     }
 
-                    Surface(
-                        modifier = Modifier.fillMaxWidth(),
-                        color = PanelDark,
-                        shape = RoundedCornerShape(12.dp),
-                        border = BorderStroke(1.dp, LineBorder)
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 4.dp, bottom = 20.dp),
+                        contentAlignment = Alignment.Center
                     ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 16.dp, vertical = 12.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = "Focus Timer Android",
-                                color = TextPrimary,
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Medium
-                            )
-                            Text(
-                                text = "v${BuildConfig.VERSION_NAME} (Build ${BuildConfig.VERSION_CODE})",
-                                color = TextDim,
-                                fontSize = 12.sp
-                            )
-                        }
+                        Text(
+                            text = "v${BuildConfig.VERSION_NAME}",
+                            color = TextDim.copy(alpha = 0.7f),
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium
+                        )
                     }
-
-                    Spacer(modifier = Modifier.height(30.dp))
                 }
             }
 
@@ -1087,22 +1058,37 @@ fun HistorySettingsScreen(
                         border = BorderStroke(1.dp, LineBorder)
                     ) {
                         Column(modifier = Modifier.padding(16.dp)) {
-                            Text(
-                                text = "Managed Subjects",
-                                style = TextStyle(
-                                    brush = GoldGradientBrush,
-                                    fontSize = 16.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "Managed Subjects",
+                                    style = TextStyle(
+                                        brush = GoldGradientBrush,
+                                        fontSize = 16.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
                                 )
-                            )
+                                OutlinedButton(
+                                    onClick = { showAddSubjectDialog = true },
+                                    shape = RoundedCornerShape(999.dp),
+                                    border = BorderStroke(1.dp, LineBorder),
+                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                                    modifier = Modifier.height(32.dp)
+                                ) {
+                                    Text("+ Add", color = GoldBright, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                                }
+                            }
                             Spacer(modifier = Modifier.height(10.dp))
 
                             subjects.forEach { subj ->
                                 Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .padding(vertical = 6.dp),
+                                        .clickable { subjectToEdit = subj }
+                                        .padding(vertical = 8.dp),
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
@@ -1117,7 +1103,7 @@ fun HistorySettingsScreen(
                                             if (subj.isCore) {
                                                 Spacer(modifier = Modifier.width(6.dp))
                                                 Text(
-                                                    text = "CORE",
+                                                    text = "PINNED",
                                                     color = GoldAccent,
                                                     fontSize = 10.sp,
                                                     fontWeight = FontWeight.Bold
@@ -1134,7 +1120,7 @@ fun HistorySettingsScreen(
                                         }
                                         if (subj.subSubjects.isNotEmpty()) {
                                             Text(
-                                                text = "Subs: " + subj.subSubjects.joinToString(", "),
+                                                text = "Sub-subjects: " + subj.subSubjects.joinToString(", "),
                                                 color = TextDim,
                                                 fontSize = 11.sp
                                             )
@@ -1144,31 +1130,29 @@ fun HistorySettingsScreen(
                                     Row(verticalAlignment = Alignment.CenterVertically) {
                                         IconButton(
                                             onClick = { subjectToEdit = subj },
-                                            modifier = Modifier.size(32.dp)
+                                            modifier = Modifier.size(40.dp)
                                         ) {
                                             Icon(
                                                 Icons.Default.Edit,
                                                 contentDescription = "Edit Subject",
                                                 tint = GoldAccent,
-                                                modifier = Modifier.size(16.dp)
+                                                modifier = Modifier.size(18.dp)
                                             )
                                         }
-                                        if (!subj.isCore) {
-                                            IconButton(
-                                                onClick = { viewModel.deleteSubject(subj.id) },
-                                                modifier = Modifier.size(32.dp)
-                                            ) {
-                                                Icon(
-                                                    Icons.Default.Delete,
-                                                    contentDescription = "Delete Subject",
-                                                    tint = DangerRed,
-                                                    modifier = Modifier.size(16.dp)
-                                                )
-                                            }
+                                        IconButton(
+                                            onClick = { viewModel.deleteSubject(subj.id) },
+                                            modifier = Modifier.size(40.dp)
+                                        ) {
+                                            Icon(
+                                                Icons.Default.Delete,
+                                                contentDescription = "Delete Subject",
+                                                tint = if (subjects.size > 1) DangerRed else TextDim.copy(alpha = 0.4f),
+                                                modifier = Modifier.size(18.dp)
+                                            )
                                         }
                                     }
                                 }
-                                HorizontalDivider(color = LineBorder, modifier = Modifier.padding(vertical = 4.dp))
+                                HorizontalDivider(color = LineBorder, modifier = Modifier.padding(vertical = 2.dp))
                             }
                         }
                     }
@@ -1181,52 +1165,67 @@ fun HistorySettingsScreen(
                         border = BorderStroke(1.dp, LineBorder)
                     ) {
                         Column(modifier = Modifier.padding(16.dp)) {
-                            Text(
-                                text = "Managed Work Types",
-                                style = TextStyle(
-                                    brush = GoldGradientBrush,
-                                    fontSize = 16.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "Managed Work Types",
+                                    style = TextStyle(
+                                        brush = GoldGradientBrush,
+                                        fontSize = 16.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
                                 )
-                            )
+                                OutlinedButton(
+                                    onClick = { showAddWorkTypeDialog = true },
+                                    shape = RoundedCornerShape(999.dp),
+                                    border = BorderStroke(1.dp, LineBorder),
+                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                                    modifier = Modifier.height(32.dp)
+                                ) {
+                                    Text("+ Add", color = GoldBright, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                                }
+                            }
                             Spacer(modifier = Modifier.height(10.dp))
 
                             workTypes.forEach { wt ->
                                 Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .padding(vertical = 6.dp),
+                                        .clickable { workTypeToEdit = wt }
+                                        .padding(vertical = 8.dp),
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Text(text = wt.name, color = TextPrimary, fontSize = 14.sp)
+                                    Text(text = wt.name, color = TextPrimary, fontSize = 14.sp, modifier = Modifier.weight(1f))
                                     Row(verticalAlignment = Alignment.CenterVertically) {
                                         IconButton(
                                             onClick = { workTypeToEdit = wt },
-                                            modifier = Modifier.size(32.dp)
+                                            modifier = Modifier.size(40.dp)
                                         ) {
                                             Icon(
                                                 Icons.Default.Edit,
                                                 contentDescription = "Edit Work Type",
                                                 tint = GoldAccent,
-                                                modifier = Modifier.size(16.dp)
+                                                modifier = Modifier.size(18.dp)
                                             )
                                         }
                                         IconButton(
                                             onClick = { viewModel.deleteWorkType(wt.id) },
-                                            modifier = Modifier.size(32.dp)
+                                            modifier = Modifier.size(40.dp)
                                         ) {
                                             Icon(
                                                 Icons.Default.Delete,
                                                 contentDescription = "Delete Work Type",
-                                                tint = DangerRed,
-                                                modifier = Modifier.size(16.dp)
+                                                tint = if (workTypes.size > 1) DangerRed else TextDim.copy(alpha = 0.4f),
+                                                modifier = Modifier.size(18.dp)
                                             )
                                         }
                                     }
                                 }
-                                HorizontalDivider(color = LineBorder, modifier = Modifier.padding(vertical = 4.dp))
+                                HorizontalDivider(color = LineBorder, modifier = Modifier.padding(vertical = 2.dp))
                             }
                         }
                     }
@@ -1466,223 +1465,58 @@ fun HistorySettingsScreen(
         )
     }
 
-    // Edit Subject Dialog
-    if (subjectToEdit != null) {
-        val subj = subjectToEdit!!
-        var editName by remember(subj) { mutableStateOf(subj.name) }
-        var editIsCore by remember(subj) { mutableStateOf(subj.isCore) }
-        var editIsNonStudy by remember(subj) { mutableStateOf(subj.isNonStudy) }
-        var subList by remember(subj) { mutableStateOf(subj.subSubjects) }
-        var newSubInput by remember(subj) { mutableStateOf("") }
-
-        AlertDialog(
-            onDismissRequest = { subjectToEdit = null },
-            title = { Text("Edit Subject", color = GoldBright) },
-            text = {
-                Column(
-                    modifier = Modifier.verticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    OutlinedTextField(
-                        value = editName,
-                        onValueChange = { editName = it },
-                        label = { Text("Subject Name", color = TextDim) },
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = GoldAccent,
-                            unfocusedBorderColor = LineBorder,
-                            focusedTextColor = TextPrimary,
-                            unfocusedTextColor = TextPrimary
-                        )
-                    )
-
-                    // Core Subject toggle
-                    Surface(
-                        shape = RoundedCornerShape(8.dp),
-                        color = PanelElevated,
-                        border = BorderStroke(1.dp, LineBorder),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { editIsCore = !editIsCore }
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text("Core Subject", color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.Medium)
-                                Text("Pinned permanently to the main subject bar", color = TextDim, fontSize = 11.sp)
-                            }
-                            Checkbox(
-                                checked = editIsCore,
-                                onCheckedChange = { editIsCore = it },
-                                colors = CheckboxDefaults.colors(checkedColor = GoldAccent)
-                            )
-                        }
-                    }
-
-                    // Non-Study toggle
-                    Surface(
-                        shape = RoundedCornerShape(8.dp),
-                        color = PanelElevated,
-                        border = BorderStroke(1.dp, LineBorder),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { editIsNonStudy = !editIsNonStudy }
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text("Non-Study Subject", color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.Medium)
-                                Text("Tags all new sessions as non-study/personal", color = TextDim, fontSize = 11.sp)
-                            }
-                            Checkbox(
-                                checked = editIsNonStudy,
-                                onCheckedChange = { editIsNonStudy = it },
-                                colors = CheckboxDefaults.colors(checkedColor = GoldAccent)
-                            )
-                        }
-                    }
-
-                    Text("Sub-Subjects", color = GoldLight, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-
-                    if (subList.isNotEmpty()) {
-                        FlowRow(
-                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                            verticalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            subList.forEach { sub ->
-                                Surface(
-                                    shape = RoundedCornerShape(12.dp),
-                                    color = PanelElevated,
-                                    border = BorderStroke(1.dp, LineBorder)
-                                ) {
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        modifier = Modifier.padding(start = 8.dp, end = 4.dp, top = 2.dp, bottom = 2.dp)
-                                    ) {
-                                        Text(sub, color = TextPrimary, fontSize = 12.sp)
-                                        IconButton(
-                                            onClick = { subList = subList.filter { it != sub } },
-                                            modifier = Modifier.size(20.dp)
-                                        ) {
-                                            Icon(
-                                                imageVector = Icons.Default.Close,
-                                                contentDescription = "Remove sub-subject",
-                                                tint = DangerRed,
-                                                modifier = Modifier.size(12.dp)
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        OutlinedTextField(
-                            value = newSubInput,
-                            onValueChange = { newSubInput = it },
-                            label = { Text("Add Sub-Subject", color = TextDim) },
-                            modifier = Modifier.weight(1f),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = GoldAccent,
-                                unfocusedBorderColor = LineBorder,
-                                focusedTextColor = TextPrimary,
-                                unfocusedTextColor = TextPrimary
-                            )
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Button(
-                            onClick = {
-                                if (newSubInput.isNotBlank() && !subList.contains(newSubInput.trim())) {
-                                    subList = subList + newSubInput.trim()
-                                    newSubInput = ""
-                                }
-                            },
-                            colors = ButtonDefaults.buttonColors(containerColor = GoldAccent, contentColor = BgDark)
-                        ) {
-                            Text("+")
-                        }
-                    }
-                }
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        if (editName.isNotBlank()) {
-                            val updatedSubj = subj.copy(
-                                name = editName.trim(),
-                                isCore = editIsCore,
-                                isNonStudy = editIsNonStudy,
-                                subSubjects = subList
-                            )
-                            viewModel.updateSubject(updatedSubj)
-                            subjectToEdit = null
-                        }
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = GoldAccent, contentColor = BgDark)
-                ) {
-                    Text("Save & Sync")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { subjectToEdit = null }) {
-                    Text("Cancel", color = TextDim)
-                }
-            },
-            containerColor = PanelDark
+    // Add / Edit Subject & Work Type Dialogs (shared unified dialogs)
+    if (showAddSubjectDialog) {
+        AddSubjectDialog(
+            onDismiss = { showAddSubjectDialog = false },
+            onAdd = { name, isCore, isNonStudy ->
+                viewModel.addSubject(name, isCore, isNonStudy)
+                showAddSubjectDialog = false
+            }
         )
     }
 
-    // Edit Work Type Dialog
-    if (workTypeToEdit != null) {
-        val wt = workTypeToEdit!!
-        var editName by remember(wt) { mutableStateOf(wt.name) }
+    if (showAddWorkTypeDialog) {
+        AddWorkTypeDialog(
+            onDismiss = { showAddWorkTypeDialog = false },
+            onAdd = { name ->
+                viewModel.addWorkType(name)
+                showAddWorkTypeDialog = false
+            }
+        )
+    }
 
-        AlertDialog(
-            onDismissRequest = { workTypeToEdit = null },
-            title = { Text("Edit Work Type", color = GoldBright) },
-            text = {
-                OutlinedTextField(
-                    value = editName,
-                    onValueChange = { editName = it },
-                    label = { Text("Work Type Name", color = TextDim) },
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = GoldAccent,
-                        unfocusedBorderColor = LineBorder,
-                        focusedTextColor = TextPrimary,
-                        unfocusedTextColor = TextPrimary
-                    )
-                )
+    if (subjectToEdit != null) {
+        val subj = subjects.find { it.id == subjectToEdit!!.id } ?: subjectToEdit!!
+        EditSubjectDialog(
+            subject = subj,
+            canDelete = subjects.size > 1,
+            onDismiss = { subjectToEdit = null },
+            onSave = { updated ->
+                viewModel.updateSubject(updated)
+                subjectToEdit = null
             },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        if (editName.isNotBlank()) {
-                            viewModel.updateWorkType(wt.id, editName.trim())
-                            workTypeToEdit = null
-                        }
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = GoldAccent, contentColor = BgDark)
-                ) {
-                    Text("Save & Sync")
-                }
+            onDelete = {
+                viewModel.deleteSubject(subj.id)
+                subjectToEdit = null
+            }
+        )
+    }
+
+    if (workTypeToEdit != null) {
+        val wt = workTypes.find { it.id == workTypeToEdit!!.id } ?: workTypeToEdit!!
+        EditWorkTypeDialog(
+            workType = wt,
+            canDelete = workTypes.size > 1,
+            onDismiss = { workTypeToEdit = null },
+            onSave = { newName ->
+                viewModel.updateWorkType(wt.id, newName)
+                workTypeToEdit = null
             },
-            dismissButton = {
-                TextButton(onClick = { workTypeToEdit = null }) {
-                    Text("Cancel", color = TextDim)
-                }
-            },
-            containerColor = PanelDark
+            onDelete = {
+                viewModel.deleteWorkType(wt.id)
+                workTypeToEdit = null
+            }
         )
     }
 

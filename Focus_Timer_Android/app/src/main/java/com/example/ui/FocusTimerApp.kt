@@ -62,7 +62,12 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.BuildConfig
+import com.example.data.model.WorkTypeEntity
+import com.example.ui.components.AddSubjectDialog
+import com.example.ui.components.AddWorkTypeDialog
 import com.example.ui.components.ConfettiEffect
+import com.example.ui.components.EditSubjectDialog
+import com.example.ui.components.EditWorkTypeDialog
 import com.example.ui.components.SmoothTabHost
 import com.example.ui.screens.HistorySettingsScreen
 import com.example.ui.screens.StatsScreen
@@ -111,17 +116,17 @@ fun FocusTimerApp(
 
     // Dialog states
     var showAddSubjectDialog by remember { mutableStateOf(false) }
-    var newSubjectName by remember { mutableStateOf("") }
-    var isNewSubjectCore by remember { mutableStateOf(false) }
-    var isNewSubjectNonStudy by remember { mutableStateOf(false) }
 
     var subSubjectTargetSubject by remember { mutableStateOf<String?>(null) }
     var newSubSubjectName by remember { mutableStateOf("") }
 
     var showAddWorkTypeDialog by remember { mutableStateOf(false) }
-    var newWorkTypeName by remember { mutableStateOf("") }
 
     var editSubjectTarget by remember { mutableStateOf<Pair<String, Long>?>(null) }
+    var editWorkTypeTarget by remember { mutableStateOf<WorkTypeEntity?>(null) }
+
+    val allSubjects by viewModel.allSubjects.collectAsState()
+    val allWorkTypes by viewModel.allWorkTypes.collectAsState()
 
     val notifPermissionLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
         contract = androidx.activity.result.contract.ActivityResultContracts.RequestPermission()
@@ -264,7 +269,8 @@ fun FocusTimerApp(
                             onOpenAddSubject = { showAddSubjectDialog = true },
                             onOpenAddSubSubject = { parent -> subSubjectTargetSubject = parent },
                             onOpenAddWorkType = { showAddWorkTypeDialog = true },
-                            onEditSubject = { name, id -> editSubjectTarget = name to id }
+                            onEditSubject = { name, id -> editSubjectTarget = name to id },
+                            onEditWorkType = { wt -> editWorkTypeTarget = wt }
                         )
                         1 -> StatsScreen(viewModel = viewModel)
                         2 -> HistorySettingsScreen(viewModel = viewModel)
@@ -286,70 +292,12 @@ fun FocusTimerApp(
 
     // Add Subject Dialog
     if (showAddSubjectDialog) {
-        AlertDialog(
-            onDismissRequest = {
+        AddSubjectDialog(
+            onDismiss = { showAddSubjectDialog = false },
+            onAdd = { name, isCore, isNonStudy ->
+                viewModel.addSubject(name, isCore, isNonStudy)
                 showAddSubjectDialog = false
-                newSubjectName = ""
-            },
-            title = { Text("Add New Subject", color = GoldBright, ) },
-            text = {
-                Column {
-                    OutlinedTextField(
-                        value = newSubjectName,
-                        onValueChange = { newSubjectName = it },
-                        label = { Text("Subject Name", color = TextDim) },
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = GoldAccent,
-                            unfocusedBorderColor = LineBorder,
-                            focusedTextColor = TextPrimary,
-                            unfocusedTextColor = TextPrimary
-                        ),
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    Spacer(modifier = Modifier.height(10.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Checkbox(
-                            checked = isNewSubjectCore,
-                            onCheckedChange = { isNewSubjectCore = it },
-                            colors = CheckboxDefaults.colors(checkedColor = GoldAccent)
-                        )
-                        Text("Core Subject (Highlight Effect)", color = TextPrimary, fontSize = 13.sp)
-                    }
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Checkbox(
-                            checked = isNewSubjectNonStudy,
-                            onCheckedChange = { isNewSubjectNonStudy = it },
-                            colors = CheckboxDefaults.colors(checkedColor = GoldAccent)
-                        )
-                        Text("Non-Study (Separate category)", color = TextPrimary, fontSize = 13.sp)
-                    }
-                }
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        if (newSubjectName.isNotBlank()) {
-                            viewModel.addSubject(newSubjectName.trim(), isNewSubjectCore, isNewSubjectNonStudy)
-                            showAddSubjectDialog = false
-                            newSubjectName = ""
-                            isNewSubjectCore = false
-                            isNewSubjectNonStudy = false
-                        }
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = GoldAccent, contentColor = BgDark)
-                ) {
-                    Text("Add")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = {
-                    showAddSubjectDialog = false
-                    newSubjectName = ""
-                }) {
-                    Text("Cancel", color = TextDim)
-                }
-            },
-            containerColor = PanelDark
+            }
         )
     }
 
@@ -361,12 +309,13 @@ fun FocusTimerApp(
                 subSubjectTargetSubject = null
                 newSubSubjectName = ""
             },
-            title = { Text("Add Sub-Subject for $parent", color = GoldBright, ) },
+            title = { Text("Add Sub-Subject for $parent", color = GoldBright) },
             text = {
                 OutlinedTextField(
                     value = newSubSubjectName,
                     onValueChange = { newSubSubjectName = it },
                     label = { Text("Sub-Subject Name (e.g. Text, Grammar)", color = TextDim) },
+                    singleLine = true,
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = GoldAccent,
                         unfocusedBorderColor = LineBorder,
@@ -404,134 +353,51 @@ fun FocusTimerApp(
 
     // Add Work Type Dialog
     if (showAddWorkTypeDialog) {
-        AlertDialog(
-            onDismissRequest = {
+        AddWorkTypeDialog(
+            onDismiss = { showAddWorkTypeDialog = false },
+            onAdd = { name ->
+                viewModel.addWorkType(name)
                 showAddWorkTypeDialog = false
-                newWorkTypeName = ""
-            },
-            title = { Text("Add Work Type", color = GoldBright, ) },
-            text = {
-                OutlinedTextField(
-                    value = newWorkTypeName,
-                    onValueChange = { newWorkTypeName = it },
-                    label = { Text("Work Type (e.g. Solving Papers)", color = TextDim) },
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = GoldAccent,
-                        unfocusedBorderColor = LineBorder,
-                        focusedTextColor = TextPrimary,
-                        unfocusedTextColor = TextPrimary
-                    ),
-                    modifier = Modifier.fillMaxWidth()
-                )
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        if (newWorkTypeName.isNotBlank()) {
-                            viewModel.addWorkType(newWorkTypeName.trim())
-                            showAddWorkTypeDialog = false
-                            newWorkTypeName = ""
-                        }
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = GoldAccent, contentColor = BgDark)
-                ) {
-                    Text("Add")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = {
-                    showAddWorkTypeDialog = false
-                    newWorkTypeName = ""
-                }) {
-                    Text("Cancel", color = TextDim)
-                }
-            },
-            containerColor = PanelDark
+            }
         )
     }
 
-    // Edit/Delete Subject Dialog
+    // Unified Edit/Delete Subject Dialog (includes Sub-Subjects)
     if (editSubjectTarget != null) {
-        val (name, id) = editSubjectTarget!!
-        val allSubjs by viewModel.allSubjects.collectAsState()
-        val currentSubj = allSubjs.find { it.id == id }
-        var editName by remember(editSubjectTarget) { mutableStateOf(currentSubj?.name ?: name) }
-        var editIsCore by remember(editSubjectTarget) { mutableStateOf(currentSubj?.isCore ?: false) }
-        var editIsNonStudy by remember(editSubjectTarget) { mutableStateOf(currentSubj?.isNonStudy ?: false) }
+        val (_, id) = editSubjectTarget!!
+        val currentSubj = allSubjects.find { it.id == id }
+        if (currentSubj != null) {
+            EditSubjectDialog(
+                subject = currentSubj,
+                canDelete = allSubjects.size > 1,
+                onDismiss = { editSubjectTarget = null },
+                onSave = { updated ->
+                    viewModel.updateSubject(updated)
+                    editSubjectTarget = null
+                },
+                onDelete = {
+                    viewModel.deleteSubject(currentSubj.id)
+                    editSubjectTarget = null
+                }
+            )
+        }
+    }
 
-        AlertDialog(
-            onDismissRequest = { editSubjectTarget = null },
-            title = { Text("Edit Subject", color = GoldBright) },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    OutlinedTextField(
-                        value = editName,
-                        onValueChange = { editName = it },
-                        label = { Text("Subject Name", color = TextDim) },
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = GoldAccent,
-                            unfocusedBorderColor = LineBorder,
-                            focusedTextColor = TextPrimary,
-                            unfocusedTextColor = TextPrimary
-                        ),
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Checkbox(
-                            checked = editIsCore,
-                            onCheckedChange = { editIsCore = it },
-                            colors = CheckboxDefaults.colors(checkedColor = GoldAccent)
-                        )
-                        Text("Core Subject", color = TextPrimary, fontSize = 13.sp)
-                    }
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Checkbox(
-                            checked = editIsNonStudy,
-                            onCheckedChange = { editIsNonStudy = it },
-                            colors = CheckboxDefaults.colors(checkedColor = GoldAccent)
-                        )
-                        Text("Non-Study (Personal/Excluded from Goals)", color = TextPrimary, fontSize = 13.sp)
-                    }
-                }
+    // Unified Edit/Delete Work Type Dialog
+    if (editWorkTypeTarget != null) {
+        val targetWt = allWorkTypes.find { it.id == editWorkTypeTarget!!.id } ?: editWorkTypeTarget!!
+        EditWorkTypeDialog(
+            workType = targetWt,
+            canDelete = allWorkTypes.size > 1,
+            onDismiss = { editWorkTypeTarget = null },
+            onSave = { newName ->
+                viewModel.updateWorkType(targetWt.id, newName)
+                editWorkTypeTarget = null
             },
-            confirmButton = {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    if (currentSubj?.isCore == false) {
-                        Button(
-                            onClick = {
-                                viewModel.deleteSubject(id)
-                                editSubjectTarget = null
-                            },
-                            colors = ButtonDefaults.buttonColors(containerColor = DangerRed)
-                        ) {
-                            Text("Delete")
-                        }
-                    }
-                    Button(
-                        onClick = {
-                            if (editName.isNotBlank() && currentSubj != null) {
-                                viewModel.updateSubject(
-                                    currentSubj.copy(
-                                        name = editName.trim(),
-                                        isCore = editIsCore,
-                                        isNonStudy = editIsNonStudy
-                                    )
-                                )
-                            }
-                            editSubjectTarget = null
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = GoldAccent, contentColor = BgDark)
-                    ) {
-                        Text("Save")
-                    }
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { editSubjectTarget = null }) {
-                    Text("Cancel", color = TextDim)
-                }
-            },
-            containerColor = PanelDark
+            onDelete = {
+                viewModel.deleteWorkType(targetWt.id)
+                editWorkTypeTarget = null
+            }
         )
     }
 
