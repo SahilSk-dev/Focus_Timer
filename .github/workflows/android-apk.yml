@@ -45,8 +45,10 @@ jobs:
             cp .env.example .env
           fi
           if [ -n "${{ secrets.DEBUG_KEYSTORE_BASE64 }}" ]; then
+            echo "Using DEBUG_KEYSTORE_BASE64 secret: YES"
             echo "${{ secrets.DEBUG_KEYSTORE_BASE64 }}" | base64 -d > debug.keystore
           elif [ ! -f debug.keystore ]; then
+            echo "Using DEBUG_KEYSTORE_BASE64 secret: NO (generating ephemeral keystore)"
             keytool -genkey -v \
               -keystore debug.keystore \
               -storepass android \

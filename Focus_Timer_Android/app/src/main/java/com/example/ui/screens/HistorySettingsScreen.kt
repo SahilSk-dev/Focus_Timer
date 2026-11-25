@@ -35,6 +35,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Cloud
+import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Edit
@@ -54,8 +55,12 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CheckboxDefaults
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDefaults
+import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -70,6 +75,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -123,8 +129,9 @@ import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
+import java.util.TimeZone
 
-@OptIn(ExperimentalLayoutApi::class)
+@OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun HistorySettingsScreen(
     viewModel: FocusViewModel,
@@ -149,6 +156,8 @@ fun HistorySettingsScreen(
     var showAddWorkTypeDialog by remember { mutableStateOf(false) }
     var recentlyDeletedSession by remember { mutableStateOf<StudySessionEntity?>(null) }
     var showBulkDeleteDialog by remember { mutableStateOf(false) }
+    var showSignOutConfirmDialog by remember { mutableStateOf(false) }
+    var pickingDateFor by remember { mutableStateOf<String?>(null) }
 
     // Backup & Export & Alarm state
     var exportRange by remember { mutableStateOf("Last 30 Days") }
@@ -480,7 +489,7 @@ fun HistorySettingsScreen(
                                     }
 
                                     OutlinedButton(
-                                        onClick = { viewModel.signOut() },
+                                        onClick = { showSignOutConfirmDialog = true },
                                         border = BorderStroke(1.dp, DangerRed),
                                         shape = RoundedCornerShape(8.dp)
                                     ) {
@@ -965,7 +974,7 @@ fun HistorySettingsScreen(
                             )
                             Spacer(modifier = Modifier.height(6.dp))
                             Text(
-                                text = "Permanently remove sessions within the selected start and end dates.",
+                                text = "Choose a preset or tap From / To dates to remove sessions.",
                                 color = TextDim,
                                 fontSize = 12.sp
                             )
@@ -973,30 +982,58 @@ fun HistorySettingsScreen(
 
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                listOf(
+                                    "Today" to 0,
+                                    "Last 7 Days" to -6,
+                                    "Last 30 Days" to -29
+                                ).forEach { (label, offset) ->
+                                    val targetFrom = shiftIsoDate(todayStr, offset)
+                                    val isActive = fromDateStr == targetFrom && toDateStr == todayStr
+                                    Surface(
+                                        onClick = {
+                                            fromDateStr = targetFrom
+                                            toDateStr = todayStr
+                                        },
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .height(34.dp),
+                                        shape = RoundedCornerShape(8.dp),
+                                        color = if (isActive) GoldAccent.copy(alpha = 0.2f) else PanelElevated,
+                                        border = BorderStroke(1.dp, if (isActive) GoldBright else LineBorder)
+                                    ) {
+                                        Box(contentAlignment = Alignment.Center) {
+                                            Text(
+                                                text = label,
+                                                color = if (isActive) GoldBright else TextDim,
+                                                fontSize = 11.sp,
+                                                fontWeight = if (isActive) FontWeight.Bold else FontWeight.Medium,
+                                                maxLines = 1,
+                                                softWrap = false,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(10.dp))
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.spacedBy(10.dp)
                             ) {
-                                OutlinedTextField(
-                                    value = fromDateStr,
-                                    onValueChange = { fromDateStr = it },
-                                    label = { Text("From (YYYY-MM-DD)", color = TextDim, fontSize = 11.sp) },
-                                    colors = OutlinedTextFieldDefaults.colors(
-                                        focusedBorderColor = GoldAccent,
-                                        unfocusedBorderColor = LineBorder,
-                                        focusedTextColor = TextPrimary,
-                                        unfocusedTextColor = TextPrimary
-                                    ),
+                                DateSelectorCard(
+                                    label = "FROM",
+                                    dateStr = fromDateStr,
+                                    onClick = { pickingDateFor = "from" },
                                     modifier = Modifier.weight(1f)
                                 )
-                                OutlinedTextField(
-                                    value = toDateStr,
-                                    onValueChange = { toDateStr = it },
-                                    label = { Text("To (YYYY-MM-DD)", color = TextDim, fontSize = 11.sp) },
-                                    colors = OutlinedTextFieldDefaults.colors(
-                                        focusedBorderColor = GoldAccent,
-                                        unfocusedBorderColor = LineBorder,
-                                        focusedTextColor = TextPrimary,
-                                        unfocusedTextColor = TextPrimary
-                                    ),
+                                DateSelectorCard(
+                                    label = "TO",
+                                    dateStr = toDateStr,
+                                    onClick = { pickingDateFor = "to" },
                                     modifier = Modifier.weight(1f)
                                 )
                             }
@@ -1520,12 +1557,115 @@ fun HistorySettingsScreen(
         )
     }
 
+    // Sign out confirmation dialog
+    if (showSignOutConfirmDialog) {
+        val emailHint = currentUser?.email?.let { " ($it)" } ?: ""
+        AlertDialog(
+            onDismissRequest = { showSignOutConfirmDialog = false },
+            title = { Text("Sign out of Google?", color = GoldBright) },
+            text = {
+                Text(
+                    "Your local study sessions stay safe on this device. Cloud sync will pause until you sign back in$emailHint.",
+                    color = TextPrimary
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        viewModel.signOut()
+                        showSignOutConfirmDialog = false
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = DangerRed)
+                ) {
+                    Text("Sign Out")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showSignOutConfirmDialog = false }) {
+                    Text("Cancel", color = TextDim)
+                }
+            },
+            containerColor = PanelDark
+        )
+    }
+
+    // Calendar DatePickerDialog for Bulk Delete From / To
+    if (pickingDateFor != null) {
+        val isFrom = pickingDateFor == "from"
+        val initialMillis = remember(pickingDateFor, fromDateStr, toDateStr) {
+            dateStrToUtcMillis(if (isFrom) fromDateStr else toDateStr) ?: System.currentTimeMillis()
+        }
+        val datePickerState = rememberDatePickerState(initialSelectedDateMillis = initialMillis)
+
+        DatePickerDialog(
+            onDismissRequest = { pickingDateFor = null },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val millis = datePickerState.selectedDateMillis
+                        if (millis != null) {
+                            val chosen = utcMillisToDateStr(millis)
+                            if (isFrom) {
+                                fromDateStr = chosen
+                                if (toDateStr < chosen) toDateStr = chosen
+                            } else {
+                                toDateStr = chosen
+                                if (fromDateStr > chosen) fromDateStr = chosen
+                            }
+                        }
+                        pickingDateFor = null
+                    }
+                ) {
+                    Text("Select", color = GoldBright, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { pickingDateFor = null }) {
+                    Text("Cancel", color = TextDim)
+                }
+            },
+            colors = DatePickerDefaults.colors(containerColor = PanelDark)
+        ) {
+            DatePicker(
+                state = datePickerState,
+                title = {
+                    Text(
+                        text = if (isFrom) "Select Start Date" else "Select End Date",
+                        color = GoldBright,
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.padding(start = 24.dp, top = 16.dp)
+                    )
+                },
+                colors = DatePickerDefaults.colors(
+                    containerColor = PanelDark,
+                    titleContentColor = GoldBright,
+                    headlineContentColor = TextPrimary,
+                    weekdayContentColor = TextDim,
+                    subheadContentColor = TextPrimary,
+                    navigationContentColor = TextPrimary,
+                    yearContentColor = TextPrimary,
+                    currentYearContentColor = GoldBright,
+                    selectedYearContentColor = BgDark,
+                    selectedYearContainerColor = GoldBright,
+                    dayContentColor = TextPrimary,
+                    selectedDayContentColor = BgDark,
+                    selectedDayContainerColor = GoldBright,
+                    todayContentColor = GoldBright,
+                    todayDateBorderColor = GoldAccent
+                )
+            )
+        }
+    }
+
     // Bulk delete confirmation dialog
     if (showBulkDeleteDialog) {
+        val fromPretty = com.example.util.DateFormatterCache.formatReadableDate(fromDateStr)
+        val toPretty = com.example.util.DateFormatterCache.formatReadableDate(toDateStr)
         AlertDialog(
             onDismissRequest = { showBulkDeleteDialog = false },
             title = { Text("Confirm Bulk Delete", color = DangerRed) },
-            text = { Text("Permanently delete all sessions between $fromDateStr and $toDateStr? This cannot be undone.", color = TextPrimary) },
+            text = { Text("Permanently delete all sessions from $fromPretty to $toPretty? This cannot be undone.", color = TextPrimary) },
             confirmButton = {
                 Button(
                     onClick = {
@@ -1757,4 +1897,81 @@ private fun generateReportText(sessions: List<StudySessionEntity>, range: String
     }
     sb.appendLine("\nKeep studying with consistency!")
     return sb.toString()
+}
+
+@Composable
+private fun DateSelectorCard(
+    label: String,
+    dateStr: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        onClick = onClick,
+        modifier = modifier,
+        shape = RoundedCornerShape(10.dp),
+        color = PanelElevated,
+        border = BorderStroke(1.dp, LineBorder)
+    ) {
+        Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)) {
+            Text(
+                text = label,
+                color = TextDim,
+                fontSize = 10.sp,
+                fontWeight = FontWeight.SemiBold,
+                letterSpacing = 0.6.sp
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.DateRange,
+                    contentDescription = null,
+                    tint = GoldBright,
+                    modifier = Modifier.size(16.dp)
+                )
+                Text(
+                    text = com.example.util.DateFormatterCache.formatReadableDate(dateStr),
+                    color = TextPrimary,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+    }
+}
+
+private fun dateStrToUtcMillis(dateStr: String): Long? {
+    return try {
+        val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.US).apply {
+            timeZone = TimeZone.getTimeZone("UTC")
+        }
+        sdf.parse(dateStr)?.time
+    } catch (_: Exception) {
+        null
+    }
+}
+
+private fun utcMillisToDateStr(millis: Long): String {
+    val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.US).apply {
+        timeZone = TimeZone.getTimeZone("UTC")
+    }
+    return sdf.format(Date(millis))
+}
+
+private fun shiftIsoDate(baseDateStr: String, deltaDays: Int): String {
+    return try {
+        val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.US)
+        val cal = Calendar.getInstance()
+        val parsed = sdf.parse(baseDateStr)
+        if (parsed != null) cal.time = parsed
+        cal.add(Calendar.DAY_OF_YEAR, deltaDays)
+        sdf.format(cal.time)
+    } catch (_: Exception) {
+        baseDateStr
+    }
 }

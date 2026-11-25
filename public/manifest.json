@@ -1,7 +1,7 @@
 {
   "name": "Focus Study Timer",
   "short_name": "Focus Timer",
-  "version": "1.1.0",
+  "version": "1.1.4",
   "description": "A progressive web app to track study and non-study time effectively.",
   "start_url": "./index.html",
   "display": "standalone",

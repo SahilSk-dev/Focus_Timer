@@ -393,7 +393,7 @@ function renderAuthBar(){
         avatarImg.addEventListener('error', () => { avatarImg.style.display = 'none'; });
       }
       const signOutBtn = bar.querySelector('.signout');
-      if (signOutBtn) signOutBtn.addEventListener('click', ()=> signOut(auth));
+      if (signOutBtn) signOutBtn.addEventListener('click', openSignOutModal);
     } else {
       bar.innerHTML = `<button class="gbtn">Sign in with Google</button>`;
       const googleBtnEl = bar.querySelector('.gbtn');
@@ -729,6 +729,44 @@ document.getElementById('modalSave').addEventListener('click', async () => {
   renderSelectionChips();
   closeEditModal();
 });
+
+/* ---------- Sign Out confirmation modal ---------- */
+const signOutModal = document.getElementById('signOutModal');
+const signOutCancelBtn = document.getElementById('signOutCancelBtn');
+const signOutConfirmBtn = document.getElementById('signOutConfirmBtn');
+
+function openSignOutModal() {
+  if (!signOutModal) return;
+  const desc = document.getElementById('signOutModalDesc');
+  if (desc) {
+    const email = currentUser?.email ? ` (${currentUser.email})` : '';
+    desc.textContent = `Your local study history stays safe on this device. Cloud sync will pause until you sign back in${email}.`;
+  }
+  signOutModal.classList.add('show');
+}
+
+function closeSignOutModal() {
+  if (!signOutModal) return;
+  signOutModal.classList.remove('show');
+}
+
+if (signOutCancelBtn) signOutCancelBtn.addEventListener('click', closeSignOutModal);
+if (signOutModal) {
+  signOutModal.addEventListener('click', (e) => {
+    if (e.target === signOutModal) closeSignOutModal();
+  });
+}
+if (signOutConfirmBtn) {
+  signOutConfirmBtn.addEventListener('click', async () => {
+    closeSignOutModal();
+    try {
+      await signOut(auth);
+      showToast('Signed out');
+    } catch (e) {
+      showToast('Sign out failed');
+    }
+  });
+}
 
 /* ---------- Android install guide modal ---------- */
 const androidGuideModal = document.getElementById('androidGuideModal');
