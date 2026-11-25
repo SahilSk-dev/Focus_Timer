@@ -202,9 +202,9 @@ class FirebaseSyncManager(
         val credentialAttempt = tryCredentialSignIn(activity, credentialManager, googleIdOption, fbAuth)
         if (credentialAttempt.isSuccess) return credentialAttempt
         val firstErr = credentialAttempt.exceptionOrNull()
-        if (firstErr is GetCredentialCancellationException) {
+        if (isUserExplicitCancel(firstErr)) {
             _syncStatus.value = "Sign-in cancelled"
-            return Result.failure(firstErr)
+            return Result.failure(firstErr!!)
         }
 
         // Second native attempt: explicit Sign in with Google bottom sheet option
@@ -212,14 +212,29 @@ class FirebaseSyncManager(
         val sheetAttempt = tryCredentialSignIn(activity, credentialManager, signInWithGoogleOption, fbAuth)
         if (sheetAttempt.isSuccess) return sheetAttempt
         val secondErr = sheetAttempt.exceptionOrNull()
-        if (secondErr is GetCredentialCancellationException) {
+        if (isUserExplicitCancel(secondErr)) {
             _syncStatus.value = "Sign-in cancelled"
-            return Result.failure(secondErr)
+            return Result.failure(secondErr!!)
         }
 
         // Fallback when Credential Manager has no matching SHA-1 OAuth client on this APK build
+        // (including Play Services "[16] Account reauth failed." mapped to GetCredentialCancellationException)
         Log.w(TAG, "Credential Manager unavailable (${secondErr?.message}); falling back to Firebase OAuthProvider")
         return signInWithWebOAuthFallback(activity, fbAuth)
+    }
+
+    private fun isUserExplicitCancel(err: Throwable?): Boolean {
+        if (err !is GetCredentialCancellationException) return false
+        val msg = err.message ?: return true
+        // Play Services throws "[16] Account reauth failed." inside GetCredentialCancellationException
+        // when the APK's SHA-1 is not registered in Firebase Console; fall back to OAuthProvider instead of aborting.
+        if (msg.contains("reauth", ignoreCase = true) ||
+            msg.contains("[16]") ||
+            msg.contains("failed", ignoreCase = true)
+        ) {
+            return false
+        }
+        return true
     }
 
     private suspend fun tryCredentialSignIn(
