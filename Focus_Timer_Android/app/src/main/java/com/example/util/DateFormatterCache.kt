@@ -6,15 +6,15 @@ import java.util.Locale
 
 object DateFormatterCache {
     private val isoDateFormatter = ThreadLocal.withInitial {
-        SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+        SimpleDateFormat("yyyy-MM-dd", Locale.US)
     }
 
     private val readableDateFormatter = ThreadLocal.withInitial {
-        SimpleDateFormat("MMM d, yyyy", Locale.getDefault())
+        SimpleDateFormat("MMM d, yyyy", Locale.US)
     }
 
     private val timeFormatter = ThreadLocal.withInitial {
-        SimpleDateFormat("h:mm a", Locale.getDefault())
+        SimpleDateFormat("h:mm a", Locale.US)
     }
 
     @Volatile

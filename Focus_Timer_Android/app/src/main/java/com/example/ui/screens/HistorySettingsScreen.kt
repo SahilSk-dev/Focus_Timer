@@ -1776,11 +1776,10 @@ private fun SessionHistoryItem(
         val endStr = com.example.util.DateFormatterCache.formatTime(endTs)
         "$startStr - $endStr"
     }
-    val dateStr = remember(endTs) {
+    val dateStr = remember(endTs, session.date) {
         com.example.util.DateFormatterCache.formatReadableDate(session.date)
     }
-    val workTypeStr = if (session.workType.isBlank()) "N/A" else session.workType
-    val subtitleText = "[$workTypeStr] $timeRangeStr, $dateStr"
+    val workTypeStr = if (session.workType.isBlank()) "Other" else session.workType
 
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -1788,81 +1787,112 @@ private fun SessionHistoryItem(
         shape = RoundedCornerShape(10.dp),
         border = BorderStroke(1.dp, LineBorder)
     ) {
-        Row(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 14.dp, vertical = 12.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+                .padding(horizontal = 14.dp, vertical = 10.dp)
         ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = session.subject,
-                    color = GoldBright,
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.SemiBold
-                )
+            // Line 1: Subject (left) + Duration & Actions (right)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    modifier = Modifier.weight(1f, fill = false),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        text = session.subject,
+                        color = GoldBright,
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
 
-                if (session.isNonStudy) {
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Surface(
-                        color = PanelElevated,
-                        shape = RoundedCornerShape(4.dp),
-                        border = BorderStroke(1.dp, LineBorder)
-                    ) {
-                        Text(
-                            text = "Non-Study",
-                            color = TextDim,
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Medium,
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                        )
+                    if (session.isNonStudy) {
+                        Surface(
+                            color = PanelElevated,
+                            shape = RoundedCornerShape(4.dp),
+                            border = BorderStroke(1.dp, LineBorder)
+                        ) {
+                            Text(
+                                text = "Non-Study",
+                                color = TextDim,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Medium,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
                     }
                 }
 
-                Spacer(modifier = Modifier.height(3.dp))
-                Text(
-                    text = subtitleText,
-                    color = TextDim,
-                    fontSize = 11.sp
-                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(2.dp)
+                ) {
+                    Text(
+                        text = "${session.minutes} min",
+                        color = GoldLight,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(end = 4.dp)
+                    )
+
+                    IconButton(
+                        onClick = onEdit,
+                        modifier = Modifier.size(32.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Edit,
+                            contentDescription = "Edit Session",
+                            tint = GoldAccent,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+
+                    IconButton(
+                        onClick = onDelete,
+                        modifier = Modifier.size(32.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Delete,
+                            contentDescription = "Delete Session",
+                            tint = DangerRed.copy(alpha = 0.85f),
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                }
             }
 
+            Spacer(modifier = Modifier.height(6.dp))
+
+            // Line 2: [Work Type] Time Range (left) + Date (right, pinned)
             Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "${session.minutes} min",
-                    color = GoldLight,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(end = 4.dp)
+                    text = "[$workTypeStr]  $timeRangeStr",
+                    color = TextDim,
+                    fontSize = 11.5.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false)
                 )
 
-                IconButton(
-                    onClick = onEdit,
-                    modifier = Modifier.size(44.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Edit,
-                        contentDescription = "Edit Session",
-                        tint = GoldAccent,
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
+                Spacer(modifier = Modifier.width(8.dp))
 
-                IconButton(
-                    onClick = onDelete,
-                    modifier = Modifier.size(44.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Delete,
-                        contentDescription = "Delete Session",
-                        tint = DangerRed.copy(alpha = 0.85f),
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
+                Text(
+                    text = dateStr,
+                    color = TextDim,
+                    fontSize = 11.5.sp,
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 1
+                )
             }
         }
     }

@@ -452,6 +452,21 @@ function formatTimeRangeOnlyTime(endTs, minutes) {
   const endStr = formatTimeOnly(endTs);
   return `${startStr} - ${endStr}`;
 }
+function formatReadableDateWeb(ts, dateStr) {
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  if (ts) {
+    const d = new Date(ts);
+    return `${months[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
+  }
+  if (dateStr) {
+    const parts = String(dateStr).split('-');
+    if (parts.length === 3) {
+      const mIdx = parseInt(parts[1], 10) - 1;
+      return `${months[mIdx] || parts[1]} ${parseInt(parts[2], 10)}, ${parts[0]}`;
+    }
+  }
+  return dateStr || '';
+}
 const bnDayShort = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 
 /* ---------- audio + vibration + notify ---------- */
@@ -3286,14 +3301,24 @@ function renderHistory(){
     const safeSubject = escapeHTML(s.subject);
     const safeWorkType = escapeHTML(s.workType || 'Other');
     const safeId = escapeHTML(s.id);
-    const timeStr = s.ts ? formatTimeRange(s.ts, s.minutes) : escapeHTML(s.date);
+    const timeOnlyStr = s.ts ? formatTimeRangeOnlyTime(s.ts, s.minutes) : '';
+    const readableDate = formatReadableDateWeb(s.ts, s.date);
     return `
     <div class="hist-row">
-      <div class="hist-left">
-        ${safeSubject} ${badge}
-        <span class="hist-meta">[${safeWorkType}] &nbsp; ${timeStr}</span>
+      <div class="hist-top-line">
+        <div class="hist-subject-wrap">
+          <span class="hist-subject-title">${safeSubject}</span>
+          ${badge}
+        </div>
+        <div class="hist-actions-wrap">
+          <span class="hist-min">${Number(s.minutes) || 0} min</span>
+          <button class="del-btn" data-id="${safeId}" title="Delete session">&times;</button>
+        </div>
       </div>
-      <div class="hist-right"><span class="hist-min">${Number(s.minutes) || 0} min</span><button class="del-btn" data-id="${safeId}">&times;</button></div>
+      <div class="hist-bottom-line">
+        <span class="hist-meta-left">[${safeWorkType}] &nbsp; ${timeOnlyStr}</span>
+        <span class="hist-meta-date">${readableDate}</span>
+      </div>
     </div>`;
   }).join('');
   list.querySelectorAll('.del-btn').forEach(b=>{
