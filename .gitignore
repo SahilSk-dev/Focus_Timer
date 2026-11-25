@@ -16,3 +16,4 @@ focus-timer-report.json
 .hintrc
 .vercel
 .env*
+*.zip
