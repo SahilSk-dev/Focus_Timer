@@ -24,12 +24,12 @@ enum class AlarmToneOption(
     val icon: String,
     val description: String
 ) {
-    ULTRA_LOUD_SIREN("ultra_siren", "Ultra Loud Siren", "🚨", "High-intensity dual frequency alarm (Maximum volume)"),
-    DIGITAL_BEEP("digital_beep", "Digital Clock Beep", "⏱️", "Classic rapid electronic alarm beep"),
-    RADAR_ALERT("radar_alert", "Radar Fast Pulse", "⚡", "Urgent pulsing alert chime"),
-    CLASSIC_BELL("classic_bell", "Vibrant Bell Chime", "🔔", "Clean resonant bell chime"),
-    SYSTEM_DEFAULT("system_default", "Phone Default Alarm", "📱", "Your device's default alarm sound"),
-    CUSTOM_PICKER("custom_picker", "Custom Phone Ringtone", "🎵", "Select any audio from phone settings");
+    ULTRA_LOUD_SIREN("ultra_siren", "Ultra Loud Siren", "", "High-intensity dual frequency alarm (Maximum volume)"),
+    DIGITAL_BEEP("digital_beep", "Digital Clock Beep", "", "Classic rapid electronic alarm beep"),
+    RADAR_ALERT("radar_alert", "Radar Fast Pulse", "", "Urgent pulsing alert chime"),
+    CLASSIC_BELL("classic_bell", "Vibrant Bell Chime", "", "Clean resonant bell chime"),
+    SYSTEM_DEFAULT("system_default", "Phone Default Alarm", "", "Your device's default alarm sound"),
+    CUSTOM_PICKER("custom_picker", "Custom Phone Ringtone", "", "Select any audio from phone settings");
 
     companion object {
         fun fromId(id: String): AlarmToneOption {

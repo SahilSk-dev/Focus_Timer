@@ -1,0 +1,156 @@
+rules_version = '2';
+
+// ===============================================================
+// Assumed Data Model
+// ===============================================================
+//
+// This security rules file assumes the following per-user data structures:
+//
+// Collection: users/{userId}/sessions/{sessionId}
+// Fields:
+//   - date: string (required, 1..32 chars, e.g., YYYY-MM-DD)
+//   - subject: string (required, 1..100 chars)
+//   - workType: string (required, 1..100 chars)
+//   - minutes: int (required, > 0 and <= 1440)
+//   - ts: number (required, > 0, epoch milliseconds)
+//   - id: string (optional, 1..128 chars)
+//
+// Collection: users/{userId}/nonStudySessions/{sessionId}
+// Fields:
+//   - date: string (required, 1..32 chars, e.g., YYYY-MM-DD)
+//   - subject: string (required, 1..100 chars)
+//   - workType: string (required, 1..100 chars)
+//   - minutes: int (required, > 0 and <= 1440)
+//   - ts: number (required, > 0, epoch milliseconds)
+//   - id: string (optional, 1..128 chars)
+//   - isNonStudy: bool (optional)
+//
+// Document: users/{userId}/meta/prefs
+// Fields:
+//   - dailyTarget: number (required, > 0 and <= 1440)
+//   - subjects: list (required, max 100 items)
+//   - workTypes: list (required, max 100 items)
+//
+// ===============================================================
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+
+    // Check if the user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Check if the authenticated user owns the path
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // Validate that all required fields are present in the resulting document
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+
+    // Validate that the document contains only allowed fields
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    // Validate a required string field's type and length
+    function validString(data, field, minLen, maxLen) {
+      return data[field] is string &&
+             data[field].size() >= minLen &&
+             data[field].size() <= maxLen;
+    }
+
+    // Validate an optional string field's type and length if present
+    function validOptionalString(data, field, minLen, maxLen) {
+      return !(field in data) ||
+             (data[field] is string &&
+              data[field].size() >= minLen &&
+              data[field].size() <= maxLen);
+    }
+
+    // Validate an optional boolean field if present
+    function validOptionalBool(data, field) {
+      return !(field in data) || data[field] is bool;
+    }
+
+    // ===============================================================
+    // Domain Validators (used in both create and update)
+    // ===============================================================
+
+    // Validate study session document schema, types, and bounds
+    function isValidSession(data) {
+      return hasOnlyAllowedFields(['date', 'subject', 'workType', 'minutes', 'ts', 'id']) &&
+             hasRequiredFields(['date', 'subject', 'workType', 'minutes', 'ts']) &&
+             validString(data, 'date', 1, 32) &&
+             validString(data, 'subject', 1, 100) &&
+             validString(data, 'workType', 1, 100) &&
+             data.minutes is int && data.minutes > 0 && data.minutes <= 1440 &&
+             data.ts is number && data.ts > 0 &&
+             validOptionalString(data, 'id', 1, 128);
+    }
+
+    // Validate non-study session document schema, types, and bounds
+    function isValidNonStudySession(data) {
+      return hasOnlyAllowedFields(['date', 'subject', 'workType', 'minutes', 'ts', 'id', 'isNonStudy']) &&
+             hasRequiredFields(['date', 'subject', 'workType', 'minutes', 'ts']) &&
+             validString(data, 'date', 1, 32) &&
+             validString(data, 'subject', 1, 100) &&
+             validString(data, 'workType', 1, 100) &&
+             data.minutes is int && data.minutes > 0 && data.minutes <= 1440 &&
+             data.ts is number && data.ts > 0 &&
+             validOptionalString(data, 'id', 1, 128) &&
+             validOptionalBool(data, 'isNonStudy');
+    }
+
+    // Validate user preferences document schema, types, and bounds
+    function isValidPrefs(data) {
+      return hasOnlyAllowedFields(['dailyTarget', 'subjects', 'workTypes']) &&
+             hasRequiredFields(['dailyTarget', 'subjects', 'workTypes']) &&
+             data.dailyTarget is number && data.dailyTarget > 0 && data.dailyTarget <= 1440 &&
+             data.subjects is list && data.subjects.size() <= 100 &&
+             data.workTypes is list && data.workTypes.size() <= 100;
+    }
+
+    // ===============================================================
+    // Collection Rules
+    // ===============================================================
+
+    match /users/{userId} {
+      // Study sessions (supports getDocs, onSnapshot, addDoc, setDoc with merge, deleteDoc, writeBatch)
+      match /sessions/{sessionId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidSession(request.resource.data);
+        allow update: if isOwner(userId) && isValidSession(request.resource.data);
+        allow delete: if isOwner(userId);
+      }
+
+      // Non-study sessions (supports getDocs, onSnapshot, addDoc, setDoc with merge, deleteDoc, writeBatch)
+      match /nonStudySessions/{sessionId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidNonStudySession(request.resource.data);
+        allow update: if isOwner(userId) && isValidNonStudySession(request.resource.data);
+        allow delete: if isOwner(userId);
+      }
+
+      // User preferences document
+      match /meta/prefs {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidPrefs(request.resource.data);
+        allow update: if isOwner(userId) && isValidPrefs(request.resource.data);
+        allow delete: if isOwner(userId);
+      }
+    }
+
+    // Default deny all other reads and writes
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

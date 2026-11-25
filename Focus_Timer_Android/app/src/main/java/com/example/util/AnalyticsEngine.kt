@@ -282,10 +282,10 @@ object AnalyticsEngine {
         fun toPct(m: Int) = if (totalMinutes > 0) ((m.toFloat() / totalMinutes) * 100).toInt() else 0
 
         val circadianBuckets = listOf(
-            CircadianBucket("morning", "🌅 Morning (5am - 12pm)", morningMins, toPct(morningMins)),
-            CircadianBucket("afternoon", "☀️ Afternoon (12pm - 5pm)", afternoonMins, toPct(afternoonMins)),
-            CircadianBucket("evening", "🌆 Evening (5pm - 10pm)", eveningMins, toPct(eveningMins)),
-            CircadianBucket("night", "🌙 Night (10pm - 5am)", nightMins, toPct(nightMins))
+            CircadianBucket("morning", "Morning (5am - 12pm)", morningMins, toPct(morningMins)),
+            CircadianBucket("afternoon", "Afternoon (12pm - 5pm)", afternoonMins, toPct(afternoonMins)),
+            CircadianBucket("evening", "Evening (5pm - 10pm)", eveningMins, toPct(eveningMins)),
+            CircadianBucket("night", "Night (10pm - 5am)", nightMins, toPct(nightMins))
         )
 
         // Peak 2-hour window
@@ -439,12 +439,12 @@ object AnalyticsEngine {
         val paceRatio = if (requiredDailyHours > 0.0) currentDailyHours / requiredDailyHours else 1.0
 
         val (status, statusBadgeText, statusDescription) = when {
-            remainingHours <= 0.0 -> Triple("COMPLETE", "GOAL ACHIEVED 🏆", "Congratulations! You have completed 100% of your targeted syllabus hours.")
-            daysRemaining < 0 -> Triple("EXPIRED", "DEADLINE PASSED ⚠️", "The target exam date has passed. Edit the target date in settings to recalibrate.")
-            daysRemaining == 0 -> Triple("DEADLINE_TODAY", "EXAM TODAY ⏳", "Target deadline is today! Focus on high-yield formulas and active recall.")
-            paceRatio >= 1.0 -> Triple("ON_TRACK", "ON TRACK 🎯", "Velocity surplus of +${String.format(Locale.US, "%.1f", paceDeltaHours)}h/day. Syllabus will be completed on schedule.")
-            paceRatio >= 0.8 -> Triple("MINOR_DEFICIT", "MINOR DEFICIT ⚠️", "Velocity lag of ${String.format(Locale.US, "%.1f", kotlin.math.abs(paceDeltaHours))}h/day. Increase study blocks by ~${Math.round(kotlin.math.abs(paceDeltaHours) * 60)} mins/day to regain pace.")
-            else -> Triple("CRITICAL_LAG", "CRITICAL LAG 🚨", "Significant pace deficit of ${String.format(Locale.US, "%.1f", kotlin.math.abs(paceDeltaHours))}h/day. Urgent pace recalibration needed to cover remaining ${String.format(Locale.US, "%.1f", remainingHours)}h.")
+            remainingHours <= 0.0 -> Triple("COMPLETE", "GOAL ACHIEVED", "Congratulations! You have completed 100% of your targeted syllabus hours.")
+            daysRemaining < 0 -> Triple("EXPIRED", "DEADLINE PASSED", "The target exam date has passed. Edit the target date in settings to recalibrate.")
+            daysRemaining == 0 -> Triple("DEADLINE_TODAY", "EXAM TODAY", "Target deadline is today! Focus on high-yield formulas and active recall.")
+            paceRatio >= 1.0 -> Triple("ON_TRACK", "ON TRACK", "Velocity surplus of +${String.format(Locale.US, "%.1f", paceDeltaHours)}h/day. Syllabus will be completed on schedule.")
+            paceRatio >= 0.8 -> Triple("MINOR_DEFICIT", "MINOR DEFICIT", "Velocity lag of ${String.format(Locale.US, "%.1f", kotlin.math.abs(paceDeltaHours))}h/day. Increase study blocks by ~${Math.round(kotlin.math.abs(paceDeltaHours) * 60)} mins/day to regain pace.")
+            else -> Triple("CRITICAL_LAG", "CRITICAL LAG", "Significant pace deficit of ${String.format(Locale.US, "%.1f", kotlin.math.abs(paceDeltaHours))}h/day. Urgent pace recalibration needed to cover remaining ${String.format(Locale.US, "%.1f", remainingHours)}h.")
         }
 
         val projectedDate = when {

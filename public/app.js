@@ -299,12 +299,15 @@ onAuthStateChanged(auth, async (user)=>{
     const fbSess = snap.docs.map(d => ({ id:d.id, ...d.data() }));
     
     if (localSess.length > 0) {
-      for (const s of localSess) {
-        const exists = fbSess.find(fs => fs.ts === s.ts);
-        if(!exists) {
+      const existingTs = new Set(fbSess.map(fs => fs.ts));
+      const toMigrate = localSess.filter(s => !existingTs.has(s.ts));
+      for (let i = 0; i < toMigrate.length; i += 500) {
+        const batch = writeBatch(db);
+        toMigrate.slice(i, i + 500).forEach(s => {
           const rec = { date: s.date, subject: s.subject, minutes: s.minutes, ts: s.ts, workType: s.workType || 'Other' };
-          await addDoc(collection(db,'users',currentUser.uid,'sessions'), rec);
-        }
+          batch.set(doc(collection(db, 'users', currentUser.uid, 'sessions')), rec);
+        });
+        await batch.commit();
       }
       localStorage.removeItem(LS_SESSIONS);
     }
@@ -313,12 +316,15 @@ onAuthStateChanged(auth, async (user)=>{
     const fbNS = snapNS.docs.map(d => ({ id:d.id, ...d.data(), isNonStudy: true }));
     
     if (localNS.length > 0) {
-      for (const s of localNS) {
-        const exists = fbNS.find(fs => fs.ts === s.ts);
-        if(!exists) {
+      const existingNSTs = new Set(fbNS.map(fs => fs.ts));
+      const toMigrateNS = localNS.filter(s => !existingNSTs.has(s.ts));
+      for (let i = 0; i < toMigrateNS.length; i += 500) {
+        const batch = writeBatch(db);
+        toMigrateNS.slice(i, i + 500).forEach(s => {
           const rec = { date: s.date, subject: s.subject, minutes: s.minutes, ts: s.ts, workType: s.workType || 'Other' };
-          await addDoc(collection(db,'users',currentUser.uid,'nonStudySessions'), rec);
-        }
+          batch.set(doc(collection(db, 'users', currentUser.uid, 'nonStudySessions')), rec);
+        });
+        await batch.commit();
       }
       localStorage.removeItem('st_nonstudy_sessions');
     }
@@ -368,21 +374,35 @@ onAuthStateChanged(auth, async (user)=>{
 });
 
 function renderAuthBar(){
-  if(currentUser){
-    authbar.innerHTML = `
-      <div class="userchip">
-        <img src="${currentUser.photoURL || ''}" alt="${currentUser.displayName || 'User'} profile picture" onerror="this.style.display='none'">
-        <span>${currentUser.displayName || currentUser.email || 'User'}</span>
-      </div>
-      <button class="signout" id="signOutBtn">Sign Out</button>`;
-    document.getElementById('signOutBtn').addEventListener('click', ()=> signOut(auth));
-  } else {
-    authbar.innerHTML = `<button class="gbtn" id="googleBtn2">Sign in with Google</button>`;
-    document.getElementById('googleBtn2').addEventListener('click', async ()=>{
-      try{ await signInWithPopup(auth, provider); }
-      catch(e){ showToast('Sign in failed - check if domain is added in Firebase console'); }
-    });
-  }
+  const bars = Array.from(document.querySelectorAll('.authbar'));
+  if (!bars.length) return;
+
+  bars.forEach(bar => {
+    if(currentUser){
+      const safePhoto = escapeHTML(currentUser.photoURL || '');
+      const safeName = escapeHTML(currentUser.displayName || currentUser.email || 'User');
+      const safeAlt = escapeHTML((currentUser.displayName || 'User') + ' profile picture');
+      bar.innerHTML = `
+        <div class="userchip">
+          <img src="${safePhoto}" alt="${safeAlt}">
+          <span>${safeName}</span>
+        </div>
+        <button class="signout">Sign Out</button>`;
+      const avatarImg = bar.querySelector('.userchip img');
+      if (avatarImg) {
+        avatarImg.addEventListener('error', () => { avatarImg.style.display = 'none'; });
+      }
+      const signOutBtn = bar.querySelector('.signout');
+      if (signOutBtn) signOutBtn.addEventListener('click', ()=> signOut(auth));
+    } else {
+      bar.innerHTML = `<button class="gbtn">Sign in with Google</button>`;
+      const googleBtnEl = bar.querySelector('.gbtn');
+      if (googleBtnEl) googleBtnEl.addEventListener('click', async ()=>{
+        try{ await signInWithPopup(auth, provider); }
+        catch(e){ showToast('Sign in failed - check if domain is added in Firebase console'); }
+      });
+    }
+  });
 }
 
 /* ---------- date helpers ---------- */
@@ -438,9 +458,17 @@ const bnDayShort = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 let audioCtx;
 let isMuted = false;
 const muteBtn = document.getElementById('muteBtn');
+const ICON_SVG_VOL_ON = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>';
+const ICON_SVG_VOL_OFF = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="22" y1="9" x2="16" y2="15"/><line x1="16" y1="9" x2="22" y2="15"/></svg>';
+const ICON_SVG_SUN = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>';
+const ICON_SVG_MOON = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>';
+const ICON_SVG_PENCIL = '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px; margin-right:4px;"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>';
+const ICON_SVG_CHECK = '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px; margin-right:4px;"><polyline points="20 6 9 17 4 12"/></svg>';
+const ICON_SVG_DOC = '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>';
+
 muteBtn.addEventListener('click', (e)=>{
   isMuted = !isMuted;
-  muteBtn.textContent = isMuted ? '🔇' : '🔊';
+  muteBtn.innerHTML = isMuted ? ICON_SVG_VOL_OFF : ICON_SVG_VOL_ON;
   muteBtn.className = 'audio-btn ' + (isMuted ? 'muted' : '');
 });
 
@@ -491,10 +519,10 @@ if (editModeToggle) {
     isEditMode = !isEditMode;
     if (isEditMode) {
       editModeToggle.classList.add('active');
-      editModeToggle.innerHTML = '✓ Done';
+      editModeToggle.innerHTML = `${ICON_SVG_CHECK}Done`;
     } else {
       editModeToggle.classList.remove('active');
-      editModeToggle.innerHTML = '✏️ Edit';
+      editModeToggle.innerHTML = `${ICON_SVG_PENCIL}Edit`;
     }
     renderSelectionChips();
   });
@@ -519,8 +547,8 @@ function renderSelectionChips(){
     let visualClass = '';
     if(isTimerActive) visualClass = isA ? 'timer-glow' : 'inactive-dim';
     const safeName = escapeHTML(s.name);
-    return `<div class="sel-chip ${isC} ${isA} ${visualClass}" data-name="${safeName}">${safeName}</div>`;
-  }).join('') + (!isTimerActive && isEditMode ? `<div class="sel-chip add-chip" data-action="add-subject" style="border:1px dashed var(--accent); color:var(--accent); background:transparent;">＋ Subject</div>` : '');
+    return `<div class="sel-chip ${isC} ${isA} ${visualClass}" data-name="${safeName}" role="button" tabindex="0">${safeName}</div>`;
+  }).join('') + (!isTimerActive && isEditMode ? `<div class="sel-chip add-chip" data-action="add-subject" role="button" tabindex="0" style="border:1px dashed var(--accent); color:var(--accent); background:transparent;">＋ Subject</div>` : '');
 
   const subjObj = prefs.subjects.find(s => s.name === selectedSubject);
   if(subjObj && ((subjObj.sub && subjObj.sub.length > 0) || !isTimerActive)) {
@@ -532,11 +560,11 @@ function renderSelectionChips(){
         let visualClass = '';
         if(isTimerActive) visualClass = isA ? 'timer-glow' : 'inactive-dim';
         const safeSub = escapeHTML(sub);
-        return `<div class="sel-chip ${isA} ${visualClass}" data-sub="${safeSub}">↳ ${safeSub}</div>`;
-      }).join('') + (!isTimerActive && isEditMode ? `<div class="sel-chip add-chip" data-action="add-sub" style="border:1px dashed var(--accent); color:var(--accent); background:transparent;">＋ Sub-Subject</div>` : '');
+        return `<div class="sel-chip ${isA} ${visualClass}" data-sub="${safeSub}" role="button" tabindex="0">↳ ${safeSub}</div>`;
+      }).join('') + (!isTimerActive && isEditMode ? `<div class="sel-chip add-chip" data-action="add-sub" role="button" tabindex="0" style="border:1px dashed var(--accent); color:var(--accent); background:transparent;">＋ Sub-Subject</div>` : '');
     } else {
       selectedSubMenu = '';
-      area2.innerHTML = (!isTimerActive && isEditMode ? `<div class="sel-chip add-chip" data-action="add-sub" style="border:1px dashed var(--accent); color:var(--accent); background:transparent;">＋ Sub-Subject</div>` : '');
+      area2.innerHTML = (!isTimerActive && isEditMode ? `<div class="sel-chip add-chip" data-action="add-sub" role="button" tabindex="0" style="border:1px dashed var(--accent); color:var(--accent); background:transparent;">＋ Sub-Subject</div>` : '');
     }
   } else {
     area2.style.display = 'none';
@@ -548,8 +576,8 @@ function renderSelectionChips(){
     let visualClass = '';
     if(isTimerActive) visualClass = isA ? 'timer-glow' : 'inactive-dim';
     const safeW = escapeHTML(w);
-    return `<div class="sel-chip ${isA} ${visualClass}" data-w="${safeW}">${safeW}</div>`;
-  }).join('') + (!isTimerActive && isEditMode ? `<div class="sel-chip add-chip" data-action="add-worktype" style="border:1px dashed var(--accent); color:var(--accent); background:transparent;">＋ Work Type</div>` : '');
+    return `<div class="sel-chip ${isA} ${visualClass}" data-w="${safeW}" role="button" tabindex="0">${safeW}</div>`;
+  }).join('') + (!isTimerActive && isEditMode ? `<div class="sel-chip add-chip" data-action="add-worktype" role="button" tabindex="0" style="border:1px dashed var(--accent); color:var(--accent); background:transparent;">＋ Work Type</div>` : '');
 }
 
 function handleChipInteraction(e, type) {
@@ -590,6 +618,12 @@ const setupDelegation = (areaId, type) => {
   const el = document.getElementById(areaId);
   if (!el) return;
   el.addEventListener('click', (e) => handleChipInteraction(e, type));
+  el.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      handleChipInteraction({ type: 'click', target: e.target }, type);
+    }
+  });
   el.addEventListener('dblclick', (e) => handleChipInteraction(e, type));
   el.addEventListener('contextmenu', (e) => handleChipInteraction(e, type));
   el.addEventListener('touchstart', (e) => {
@@ -778,7 +812,7 @@ pomoToggle.addEventListener('change', ()=>{
   updatePhaseBadge();
 });
 function updatePhaseBadge(){
-  phaseBadge.textContent = pomoPhase === 'work' ? '⏳ Focus Session (25 mins)' : '☕ Break (5 mins)';
+  phaseBadge.textContent = pomoPhase === 'work' ? 'Focus Session (25 mins)' : 'Break (5 mins)';
 }
 
 /* ---------- timer core ---------- */
@@ -851,20 +885,20 @@ async function finish(){
   if(pomodoroMode){
     if(pomoPhase==='work'){
       playChime(); vibrate(); notify('Focus session ended - take a break');
-      showToast('⏳ Focus session ended! Now 5 mins break');
+      showToast('Focus session ended! Now 5 mins break');
       triggerConfetti();
       await addSession(sname, WORK_MIN, selectedWorkType);
       pomoPhase='break';
     } else {
       playChime(); vibrate(); notify('Break ended - back to focus');
-      showToast('☕ Break ended! Start again');
+      showToast('Break ended! Start again');
       pomoPhase='work';
     }
     updatePhaseBadge();
     hintEl.textContent = pomoPhase==='work' ? 'Press Start for next session' : 'Press Start to begin break';
   } else {
     playChime(); vibrate(); notify(sname + ' study time ended');
-    showToast('⏰ ' + sname + " — time's up!");
+    showToast(sname + " — time's up!");
     triggerConfetti();
     const elapsedSec = wasStopwatch
       ? Math.max(0, (Date.now() - startAt) / 1000)
@@ -947,9 +981,15 @@ function pauseTimer(){
   });
 }
 
+let isResetting = false;
 async function resetTimer(){
+  if (isResetting) return;
+  isResetting = true;
+  resetBtn.disabled = true;
+
   const wasRunning = running;
   const wasStopwatch = stopwatchMode;
+  const wasPomoBreak = pomodoroMode && pomoPhase === 'break';
   running=false; clearInterval(tickHandle);
   releaseWakeLock();
 
@@ -961,51 +1001,48 @@ async function resetTimer(){
     finalElapsed = totalSeconds - secLeft;
   }
 
-  if (finalElapsed > 0) {
-    const mins = Math.floor(finalElapsed/60);
-    if (pomodoroMode && pomoPhase === 'break') {
-      showToast('☕ Break cancelled');
-    } else if(mins>=1){
-      const sname = selectedSubMenu ? `${selectedSubject} - ${selectedSubMenu}` : selectedSubject;
-      try {
-        await addSession(sname, mins, selectedWorkType);
-        showToast(`✅ ${mins} mins saved`);
-        await refreshEverything();
-      } catch(e) {
-        showToast('⚠️ Failed to save');
-      }
-    } else {
-      showToast('Not saved as it was less than 1 min');
-    }
-  }
+  const sname = selectedSubMenu ? `${selectedSubject} - ${selectedSubMenu}` : selectedSubject;
+  const workTypeSnapshot = selectedWorkType;
 
   remaining=0; totalSeconds=0; endTime=null; startAt=null; stopwatchMode=false;
   hintEl.textContent='Press Start to begin studying';
   hoursEl.disabled=false; minutesEl.disabled=false;
   startBtn.disabled=false; pauseBtn.disabled=true;
-  
   isTimerActive = false;
+  displayEl.classList.remove('glowing-timer-active');
   renderSelectionChips();
-  
   pomoPhase='work'; updatePhaseBadge();
   localStorage.removeItem(LS_TIMERSTATE);
-  render(); // Return to clock mode
+  render();
+
+  try {
+    if (finalElapsed > 0) {
+      const mins = Math.floor(finalElapsed/60);
+      if (wasPomoBreak) {
+        showToast('Break cancelled');
+      } else if(mins>=1){
+        try {
+          await addSession(sname, mins, workTypeSnapshot);
+          showToast(`${mins} mins saved`);
+          await refreshEverything();
+        } catch(e) {
+          showToast('Failed to save');
+        }
+      } else {
+        showToast('Not saved as it was less than 1 min');
+      }
+    }
+  } finally {
+    isResetting = false;
+    resetBtn.disabled = false;
+  }
 }
 
 startBtn.addEventListener('click', ()=> startTimer(isTimerActive));
 pauseBtn.addEventListener('click', pauseTimer);
 resetBtn.addEventListener('click', resetTimer);
 
-/* ---------- Continuous render loop for idle clock ---------- */
-function clockLoop() {
-  // Dial always shows local time, even while stopwatch/countdown is running
-  updateDial();
-  if (!isTimerActive && !running && totalSeconds === 0 && remaining === 0) {
-    render();
-  }
-  requestAnimationFrame(clockLoop);
-}
-clockLoop();
+render();
 
 /* ---------- fullscreen auto-hide & toggle ---------- */
 const fsContainer = document.getElementById('fsContainer');
@@ -1190,7 +1227,7 @@ function calculateMilestoneBadges() {
       id: "first_step",
       title: "First Step",
       description: "Completed your first study session",
-      icon: "🌟",
+      icon: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>',
       category: "Consistency",
       currentVal: Math.min(totalSessions, 1),
       targetVal: 1,
@@ -1201,7 +1238,7 @@ function calculateMilestoneBadges() {
       id: "streak_3",
       title: "3-Day Streak",
       description: "Maintained study focus for 3 consecutive days",
-      icon: "⚡",
+      icon: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>',
       category: "Streak",
       currentVal: Math.min(streakToUse, 3),
       targetVal: 3,
@@ -1212,7 +1249,7 @@ function calculateMilestoneBadges() {
       id: "streak_7",
       title: "7-Day Warrior",
       description: "Maintained study streak for a full week",
-      icon: "🔥",
+      icon: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></svg>',
       category: "Streak",
       currentVal: Math.min(streakToUse, 7),
       targetVal: 7,
@@ -1223,7 +1260,7 @@ function calculateMilestoneBadges() {
       id: "streak_10",
       title: "10-Day Streak",
       description: "Disciplined focus for 10 days in a row",
-      icon: "🏆",
+      icon: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg>',
       category: "Streak",
       currentVal: Math.min(streakToUse, 10),
       targetVal: 10,
@@ -1234,7 +1271,7 @@ function calculateMilestoneBadges() {
       id: "streak_30",
       title: "30-Day Master",
       description: "Elite consistency: 30-day continuous study habit",
-      icon: "👑",
+      icon: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m2 4 3 12h14l3-12-6 7-4-7-4 7-6-7zm3 16h14"/></svg>',
       category: "Streak",
       currentVal: Math.min(streakToUse, 30),
       targetVal: 30,
@@ -1245,7 +1282,7 @@ function calculateMilestoneBadges() {
       id: "hours_10",
       title: "10 Hours Club",
       description: "Completed 10 hours of focused study",
-      icon: "⏱️",
+      icon: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>',
       category: "Study Hours",
       currentVal: Math.min(totalHours, 10),
       targetVal: 10,
@@ -1256,7 +1293,7 @@ function calculateMilestoneBadges() {
       id: "hours_50",
       title: "50 Hours Studied",
       description: "Scholar milestone: 50 hours of total study time",
-      icon: "🎓",
+      icon: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg>',
       category: "Study Hours",
       currentVal: Math.min(totalHours, 50),
       targetVal: 50,
@@ -1267,7 +1304,7 @@ function calculateMilestoneBadges() {
       id: "hours_100",
       title: "100 Hours Titan",
       description: "Mastery milestone: 100 hours of deep study",
-      icon: "💎",
+      icon: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12l4 6-10 13L2 9Z"/><path d="M11 3 8 9l4 13 4-13-3-6"/><path d="M2 9h20"/></svg>',
       category: "Study Hours",
       currentVal: Math.min(totalHours, 100),
       targetVal: 100,
@@ -1278,7 +1315,7 @@ function calculateMilestoneBadges() {
       id: "deep_focus",
       title: "Deep Focus",
       description: "Completed a continuous session of 60+ mins",
-      icon: "🧘",
+      icon: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>',
       category: "Focus",
       currentVal: maxSessionMin >= 60 ? 1 : 0,
       targetVal: 1,
@@ -1296,7 +1333,7 @@ function renderMilestoneBadges() {
   const badges = calculateMilestoneBadges();
   const unlockedCount = badges.filter(b => b.isUnlocked).length;
   if (counterPill) {
-    counterPill.textContent = `${unlockedCount}/${badges.length} Earned 🏆`;
+    counterPill.textContent = `${unlockedCount}/${badges.length} Earned`;
   }
 
   const filtered = badges.filter(b => {
@@ -1313,32 +1350,34 @@ function renderMilestoneBadges() {
   container.innerHTML = filtered.map(b => {
     const pct = Math.min(100, Math.round((b.currentVal / b.targetVal) * 100));
     const statusClass = b.isUnlocked ? 'unlocked' : 'locked';
-    const statusTag = b.isUnlocked ? 'Earned ✓' : 'Locked 🔒';
+    const statusText = b.isUnlocked ? 'Earned ✓' : `${b.currentVal}/${b.targetVal} ${b.unit} (${pct}%)`;
+    const safeTitle = escapeHTML(b.title);
+    const safeStatus = escapeHTML(statusText);
 
     return `
-      <div class="milestone-badge-card ${statusClass}" data-id="${b.id}">
+      <div class="milestone-badge-card ${statusClass}" data-id="${escapeHTML(b.id)}" role="button" tabindex="0" aria-label="${safeTitle} - ${safeStatus}" title="${safeTitle}: ${safeStatus}">
         <div class="mbadge-icon-wrap">${b.icon}</div>
-        <div class="mbadge-title">${b.title}</div>
-        <div class="mbadge-desc">${b.description}</div>
-        <div class="mbadge-progress-wrap">
-          <div class="mbadge-progress-bar">
-            <div class="mbadge-progress-fill" style="width:${pct}%"></div>
-          </div>
-          <div class="mbadge-progress-text">
-            <span>${b.currentVal}/${b.targetVal} ${b.unit}</span>
-            <span>${pct}%</span>
-          </div>
+        <div class="mbadge-mini-bar"><div class="mbadge-mini-fill" style="width:${pct}%"></div></div>
+        <div class="mbadge-tooltip">
+          <div class="mbadge-tooltip-title">${safeTitle}</div>
+          <div class="mbadge-tooltip-meta">${safeStatus}</div>
         </div>
-        <div class="mbadge-status-tag">${statusTag}</div>
       </div>
     `;
   }).join('');
 
   container.querySelectorAll('.milestone-badge-card').forEach(card => {
-    card.addEventListener('click', () => {
+    const open = () => {
       const bId = card.getAttribute('data-id');
       const badge = badges.find(x => x.id === bId);
       if (badge) openBadgeDetailModal(badge);
+    };
+    card.addEventListener('click', open);
+    card.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        open();
+      }
     });
   });
 }
@@ -1347,7 +1386,7 @@ function openBadgeDetailModal(badge) {
   const modal = document.getElementById('badgeDetailModal');
   if (!modal) return;
   const iconEl = document.getElementById('badgeModalIcon');
-  if (iconEl) iconEl.textContent = badge.icon;
+  if (iconEl) iconEl.innerHTML = badge.icon;
   const titleEl = document.getElementById('badgeModalTitle');
   if (titleEl) titleEl.textContent = badge.title;
   const catEl = document.getElementById('badgeModalCategory');
@@ -1581,38 +1620,38 @@ function computeExamProjection(allStudy, goal, todayDate = new Date()) {
 
   // 5. Feasibility status
   let status = 'ON_TRACK';
-  let statusBadgeText = 'ON TRACK 🎯';
+  let statusBadgeText = 'ON TRACK';
   let statusBadgeClass = 'on-track';
   let statusDescription = 'Current 7-day velocity is on schedule to complete the syllabus before the target deadline.';
 
   if (remainingHours <= 0) {
     status = 'COMPLETE';
-    statusBadgeText = 'GOAL ACHIEVED 🏆';
+    statusBadgeText = 'GOAL ACHIEVED';
     statusBadgeClass = 'complete';
     statusDescription = 'Congratulations! You have completed 100% of your targeted syllabus hours.';
   } else if (daysRemaining < 0) {
     status = 'EXPIRED';
-    statusBadgeText = 'DEADLINE PASSED ⚠️';
+    statusBadgeText = 'DEADLINE PASSED';
     statusBadgeClass = 'critical-lag';
     statusDescription = 'The target exam date has passed. Edit the target date in settings to recalibrate.';
   } else if (daysRemaining === 0) {
     status = 'DEADLINE_TODAY';
-    statusBadgeText = 'EXAM TODAY ⏳';
+    statusBadgeText = 'EXAM TODAY';
     statusBadgeClass = 'minor-deficit';
     statusDescription = 'Target deadline is today! Focus on high-yield formulas and active recall.';
   } else if (paceRatio >= 1.0) {
     status = 'ON_TRACK';
-    statusBadgeText = 'ON TRACK 🎯';
+    statusBadgeText = 'ON TRACK';
     statusBadgeClass = 'on-track';
     statusDescription = `Velocity surplus of +${paceDeltaHours.toFixed(1)}h/day. Syllabus will be completed on schedule.`;
   } else if (paceRatio >= 0.8) {
     status = 'MINOR_DEFICIT';
-    statusBadgeText = 'MINOR DEFICIT ⚠️';
+    statusBadgeText = 'MINOR DEFICIT';
     statusBadgeClass = 'minor-deficit';
     statusDescription = `Velocity lag of ${Math.abs(paceDeltaHours).toFixed(1)}h/day. Increase study blocks by ~${Math.round(Math.abs(paceDeltaHours) * 60)} mins/day to regain pace.`;
   } else {
     status = 'CRITICAL_LAG';
-    statusBadgeText = 'CRITICAL LAG 🚨';
+    statusBadgeText = 'CRITICAL LAG';
     statusBadgeClass = 'critical-lag';
     statusDescription = `Significant pace deficit of ${Math.abs(paceDeltaHours).toFixed(1)}h/day. Urgent pace recalibration needed to cover remaining ${remainingHours.toFixed(1)}h.`;
   }
@@ -1784,10 +1823,16 @@ function drawCircadianDensityCurve(canvas, hourlyMins) {
   const plotW = width - padLeft - padRight;
   const plotH = height - padTop - padBottom;
 
+  const isLight = document.body.getAttribute('data-theme') === 'light';
+  const gridStroke = isLight ? 'rgba(15, 23, 42, 0.08)' : 'rgba(255, 255, 255, 0.07)';
+  const axisLabelColor = isLight ? 'rgba(51, 65, 85, 0.85)' : 'rgba(161, 161, 170, 0.85)';
+  const curveColor = isLight ? '#059669' : '#34d399';
+  const peakTextColor = isLight ? '#047857' : '#34d399';
+
   const maxMins = Math.max(...hourlyMins, 10);
 
   // Subtle horizontal grid lines (0%, 50%, 100%)
-  ctx.strokeStyle = 'rgba(255, 255, 255, 0.06)';
+  ctx.strokeStyle = gridStroke;
   ctx.lineWidth = 1;
   [0, 0.5, 1].forEach(ratio => {
     const y = padTop + plotH * (1 - ratio);
@@ -1796,7 +1841,7 @@ function drawCircadianDensityCurve(canvas, hourlyMins) {
     ctx.lineTo(width - padRight, y);
     ctx.stroke();
 
-    ctx.fillStyle = 'rgba(148, 163, 184, 0.7)';
+    ctx.fillStyle = axisLabelColor;
     ctx.font = '9px Inter, sans-serif';
     ctx.textAlign = 'right';
     ctx.fillText(`${Math.round(maxMins * ratio)}m`, padLeft - 6, y + 3);
@@ -1863,7 +1908,7 @@ function drawCircadianDensityCurve(canvas, hourlyMins) {
 
     ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, p2.x, p2.y);
   }
-  ctx.strokeStyle = '#34d399';
+  ctx.strokeStyle = curveColor;
   ctx.lineWidth = 2.2;
   ctx.stroke();
 
@@ -1879,13 +1924,13 @@ function drawCircadianDensityCurve(canvas, hourlyMins) {
 
   if (peakVal > 0) {
     const peakP = points[peakIdx];
-    ctx.fillStyle = 'rgba(52, 211, 153, 0.25)';
+    ctx.fillStyle = isLight ? 'rgba(5, 150, 105, 0.18)' : 'rgba(52, 211, 153, 0.25)';
     ctx.beginPath();
     ctx.arc(peakP.x, peakP.y, 7, 0, Math.PI * 2);
     ctx.fill();
 
-    ctx.fillStyle = '#10b981';
-    ctx.strokeStyle = '#ffffff';
+    ctx.fillStyle = curveColor;
+    ctx.strokeStyle = isLight ? '#ffffff' : '#09090b';
     ctx.lineWidth = 1.5;
     ctx.beginPath();
     ctx.arc(peakP.x, peakP.y, 3.5, 0, Math.PI * 2);
@@ -1895,7 +1940,7 @@ function drawCircadianDensityCurve(canvas, hourlyMins) {
     const ampm = peakIdx >= 12 ? 'PM' : 'AM';
     const hr = peakIdx % 12 === 0 ? 12 : peakIdx % 12;
     const peakText = `${hr}:00 ${ampm} (${peakVal}m)`;
-    ctx.fillStyle = '#34d399';
+    ctx.fillStyle = peakTextColor;
     ctx.font = 'bold 9.5px Inter, sans-serif';
     ctx.textAlign = peakIdx > 18 ? 'right' : (peakIdx < 5 ? 'left' : 'center');
     ctx.fillText(peakText, peakP.x, Math.max(12, peakP.y - 10));
@@ -1903,7 +1948,7 @@ function drawCircadianDensityCurve(canvas, hourlyMins) {
 
   // X-axis time labels
   const hourTicks = [0, 4, 8, 12, 16, 20, 23];
-  ctx.fillStyle = 'rgba(148, 163, 184, 0.8)';
+  ctx.fillStyle = axisLabelColor;
   ctx.font = '9px Inter, sans-serif';
   ctx.textAlign = 'center';
   hourTicks.forEach(h => {
@@ -1957,6 +2002,12 @@ function drawSubjectRadar(canvas, subjectEquilibrium) {
   const cy = height / 2 + 6;
   const R = Math.min(cx, cy) - 46;
 
+  const isLight = document.body.getAttribute('data-theme') === 'light';
+  const ringOuter = isLight ? 'rgba(15, 23, 42, 0.22)' : 'rgba(255, 255, 255, 0.18)';
+  const ringInner = isLight ? 'rgba(15, 23, 42, 0.09)' : 'rgba(255, 255, 255, 0.07)';
+  const spokeColor = isLight ? 'rgba(15, 23, 42, 0.10)' : 'rgba(255, 255, 255, 0.08)';
+  const radarLabelColor = isLight ? '#0f172a' : '#f1f5f9';
+
   // Concentric polygon web rings (25%, 50%, 75%, 100%)
   const rings = [0.25, 0.50, 0.75, 1.0];
   rings.forEach((ringPct, ringIdx) => {
@@ -1970,7 +2021,7 @@ function drawSubjectRadar(canvas, subjectEquilibrium) {
       else ctx.lineTo(x, y);
     }
     ctx.closePath();
-    ctx.strokeStyle = ringIdx === 3 ? 'rgba(255, 255, 255, 0.18)' : 'rgba(255, 255, 255, 0.07)';
+    ctx.strokeStyle = ringIdx === 3 ? ringOuter : ringInner;
     ctx.lineWidth = ringIdx === 3 ? 1.2 : 0.8;
     ctx.stroke();
   });
@@ -1983,7 +2034,7 @@ function drawSubjectRadar(canvas, subjectEquilibrium) {
     ctx.beginPath();
     ctx.moveTo(cx, cy);
     ctx.lineTo(x, y);
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
+    ctx.strokeStyle = spokeColor;
     ctx.lineWidth = 1;
     ctx.stroke();
   }
@@ -2033,7 +2084,7 @@ function drawSubjectRadar(canvas, subjectEquilibrium) {
     const lx = cx + labelDist * Math.cos(p.angle);
     const ly = cy + labelDist * Math.sin(p.angle);
 
-    ctx.fillStyle = '#f1f5f9';
+    ctx.fillStyle = radarLabelColor;
     ctx.font = 'bold 9.5px Inter, sans-serif';
     ctx.textAlign = Math.cos(p.angle) > 0.3 ? 'left' : (Math.cos(p.angle) < -0.3 ? 'right' : 'center');
     ctx.textBaseline = Math.sin(p.angle) > 0.3 ? 'top' : (Math.sin(p.angle) < -0.3 ? 'bottom' : 'middle');
@@ -2242,10 +2293,10 @@ function computeAnalyticsReport(period) {
 
   // Circadian Buckets calculated synchronously from hourlyMins
   const circadianBuckets = {
-    morning: { label: '🌅 Morning (5am - 12pm)', cleanLabel: 'Morning (05:00 AM - 12:00 PM)', mins: 0, count: 0 },
-    afternoon: { label: '☀️ Afternoon (12pm - 5pm)', cleanLabel: 'Afternoon (12:00 PM - 05:00 PM)', mins: 0, count: 0 },
-    evening: { label: '🌆 Evening (5pm - 10pm)', cleanLabel: 'Evening (05:00 PM - 10:00 PM)', mins: 0, count: 0 },
-    night: { label: '🌙 Night (10pm - 5am)', cleanLabel: 'Night (10:00 PM - 05:00 AM)', mins: 0, count: 0 }
+    morning: { label: 'Morning (5am - 12pm)', cleanLabel: 'Morning (05:00 AM - 12:00 PM)', mins: 0, count: 0 },
+    afternoon: { label: 'Afternoon (12pm - 5pm)', cleanLabel: 'Afternoon (12:00 PM - 05:00 PM)', mins: 0, count: 0 },
+    evening: { label: 'Evening (5pm - 10pm)', cleanLabel: 'Evening (05:00 PM - 10:00 PM)', mins: 0, count: 0 },
+    night: { label: 'Night (10pm - 5am)', cleanLabel: 'Night (10:00 PM - 05:00 AM)', mins: 0, count: 0 }
   };
   for (let h = 0; h < 24; h++) {
     const m = hourlyMins[h];
@@ -2572,7 +2623,7 @@ function renderDeepAnalytics() {
   }
   const pillEl = document.getElementById('examCountdownPill');
   if (pillEl) {
-    pillEl.textContent = proj.daysRemaining > 0 ? `⏳ ${proj.daysRemaining} Days Left` : (proj.daysRemaining === 0 ? '⏳ Exam Today' : '⚠️ Past Deadline');
+    pillEl.textContent = proj.daysRemaining > 0 ? `${proj.daysRemaining} Days Left` : (proj.daysRemaining === 0 ? 'Exam Today' : 'Past Deadline');
   }
   const doneLabel = document.getElementById('examCompletedHoursLabel');
   if (doneLabel) {
@@ -2806,7 +2857,7 @@ async function exportAnalysisPdf() {
   const btn = document.getElementById('downloadAnalysisPdfBtn');
   if (btn) {
     btn.disabled = true;
-    btn.innerHTML = '<span>⏳</span> Loading PDF Engine...';
+    btn.innerHTML = `${ICON_SVG_DOC} Loading PDF Engine...`;
   }
 
   try {
@@ -2815,13 +2866,13 @@ async function exportAnalysisPdf() {
     showToast('Failed to load PDF library. Please check network connection.');
     if (btn) {
       btn.disabled = false;
-      btn.innerHTML = '<span>📑</span> Full Analysis PDF';
+      btn.innerHTML = `${ICON_SVG_DOC} Full Report PDF`;
     }
     return;
   }
 
   if (btn) {
-    btn.innerHTML = '<span>⏳</span> Generating PDF...';
+    btn.innerHTML = `${ICON_SVG_DOC} Generating PDF...`;
   }
 
   try {
@@ -2831,25 +2882,25 @@ async function exportAnalysisPdf() {
     const periodLabel = currentAnalyticsPeriod === 'all' ? 'All Time' : `Last ${currentAnalyticsPeriod} Days`;
     const today = todayStr();
 
-    // Page 1: Dark Header Banner
-    doc.setFillColor(4, 14, 8); // Dark #040e08
-    doc.rect(0, 0, 210, 36, 'F');
+    // Page 1: Clean Dark Header Banner
+    doc.setFillColor(9, 9, 11);
+    doc.rect(0, 0, 210, 34, 'F');
 
-    doc.setTextColor(52, 211, 153); // Accent bright #34d399
+    doc.setTextColor(255, 255, 255);
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(16);
     doc.text('FOCUS STUDY TIMER', 14, 15);
 
-    doc.setTextColor(240, 253, 244);
-    doc.setFontSize(11);
-    doc.text('Cognitive Deep Analysis & Performance Report', 14, 22);
+    doc.setTextColor(212, 212, 216);
+    doc.setFontSize(10.5);
+    doc.text('Study Performance & Progress Report', 14, 22);
 
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(8.5);
-    doc.setTextColor(167, 243, 208);
-    doc.text(`Reporting Timeframe: ${cleanPdfText(periodLabel)}  |  Generated: ${today}`, 14, 29);
+    doc.setTextColor(161, 161, 170);
+    doc.text(`Reporting Timeframe: ${cleanPdfText(periodLabel)}  |  Generated: ${today}`, 14, 28);
 
-    let currentY = 42;
+    let currentY = 40;
 
     const hasHistory = report.totalMinutes === 0 && report.allStudyTotalCount > 0;
     const effectiveReport = hasHistory ? computeAnalyticsReport('all') : report;
@@ -2875,7 +2926,7 @@ async function exportAnalysisPdf() {
     }
 
     // 1. Executive KPIs Table
-    const velText = report.totalMinutes > 0 
+    const velText = report.totalMinutes > 0
       ? `${report.velocity >= 0 ? '+' : ''}${report.velocity}% vs prior period`
       : (hasHistory ? `All-Time: ${effectiveReport.totalHours} hrs` : 'N/A (0 min in period)');
 
@@ -2886,39 +2937,34 @@ async function exportAnalysisPdf() {
         cleanPdfText(`Active Days: ${effectiveReport.activeDaysCount}`)
       ],
       [
-        cleanPdfText(`Focus Quality Score (FQS): ${effectiveReport.focusQualityScore}/100`),
-        cleanPdfText(`Cognitive Tier: ${effectiveReport.focusQualityTier}`),
-        cleanPdfText(`FQS Formula: 0.35*D + 0.25*C + 0.25*G + 0.15*P`)
-      ],
-      [
-        cleanPdfText(`Deep Work Ratio: ${effectiveReport.deepWorkRatio}% (>= 45m blocks)`),
-        cleanPdfText(`Avg Session Length: ${effectiveReport.avgSessionMin} mins`),
+        cleanPdfText(`Current Streak: ${currentStreakVal} days (Best: ${bestStreakVal} days)`),
+        cleanPdfText(`Avg Session: ${effectiveReport.avgSessionMin} mins`),
         cleanPdfText(`Study Velocity: ${velText}`)
       ],
       [
-        cleanPdfText(`Circadian Peak Window: ${effectiveReport.peakFocusWindow}`),
-        cleanPdfText(`Consistency: ${effectiveReport.consistencyPct}% | Goal Hit: ${effectiveReport.goalHitRate}%`),
-        cleanPdfText(`Streak Status: ${currentStreakVal} days current (Best: ${bestStreakVal})`)
+        cleanPdfText(`Peak Study Window: ${effectiveReport.peakFocusWindow}`),
+        cleanPdfText(`Consistency: ${effectiveReport.consistencyPct}%`),
+        cleanPdfText(`Daily Goal Hit Rate: ${effectiveReport.goalHitRate}%`)
       ]
     ];
 
-    const kpiTitle = hasHistory 
-      ? `EXECUTIVE FOCUS PERFORMANCE SUMMARY (ALL-TIME HISTORICAL DATA)`
-      : `EXECUTIVE PERFORMANCE & FOCUS STAMINA SUMMARY (${cleanPdfText(periodLabel).toUpperCase()})`;
+    const kpiTitle = hasHistory
+      ? `EXECUTIVE FOCUS SUMMARY (ALL-TIME HISTORICAL DATA)`
+      : `EXECUTIVE FOCUS SUMMARY (${cleanPdfText(periodLabel).toUpperCase()})`;
 
     doc.autoTable({
       startY: currentY,
       head: [[kpiTitle, '', '']],
       body: execRows,
       theme: 'grid',
-      headStyles: { fillColor: [16, 185, 129], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 9.5 },
+      headStyles: { fillColor: [24, 24, 27], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 9.5 },
       styles: { fontSize: 8.5, cellPadding: 3, textColor: [30, 41, 59] },
       margin: { left: 14, right: 14 }
     });
 
     currentY = doc.lastAutoTable.finalY + 6;
 
-    // 2. Exam & Syllabus Projection Audit Table
+    // 2. Exam & Syllabus Projection Table
     const proj = effectiveReport.examProjection;
     const projRows = [
       [
@@ -2937,151 +2983,67 @@ async function exportAnalysisPdf() {
         cleanPdfText(`Projected Finish: ${proj.projectedDate}`)
       ],
       [
-        { content: cleanPdfText(`Projection Audit: ${proj.statusDescription}`), colSpan: 3, styles: { fontStyle: 'italic', textColor: [71, 85, 105] } }
+        { content: cleanPdfText(`Projection Summary: ${proj.statusDescription}`), colSpan: 3, styles: { fontStyle: 'italic', textColor: [71, 85, 105] } }
       ]
     ];
 
     doc.autoTable({
       startY: currentY,
-      head: [['EXAM & SYLLABUS PROJECTION AUDIT TABLE', '', '']],
+      head: [['EXAM & SYLLABUS PROJECTION', '', '']],
       body: projRows,
       theme: 'grid',
-      headStyles: { fillColor: [6, 95, 70], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 9 },
+      headStyles: { fillColor: [5, 150, 105], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 9 },
       styles: { fontSize: 8, cellPadding: 2.5 },
       margin: { left: 14, right: 14 }
     });
 
     currentY = doc.lastAutoTable.finalY + 6;
 
-    // 3. Cognitive Workload & Fatigue Index Table
-    const fatigue = effectiveReport.fatigueReport;
-    const fatigueRows = [
-      [
-        cleanPdfText(`Fatigue Index Score: ${fatigue.fatigueScore} / 100`),
-        cleanPdfText(`Classification: ${fatigue.tierLabel}`),
-        cleanPdfText(`7-Day Daily Load: ${fatigue.avgDailyHours7d.toFixed(1)} hrs/day`)
-      ],
-      [
-        cleanPdfText(`High-Strain Days (>=5h): ${fatigue.consecutiveHighDays} consecutive`),
-        cleanPdfText(`Recovery Days (<2h): ${fatigue.recoveryDaysCount} of 7 days`),
-        cleanPdfText(`Rest Ratio: ${Math.round((fatigue.recoveryDaysCount / 7) * 100)}%`)
-      ],
-      [
-        { content: cleanPdfText(`Behavioral Assessment: ${fatigue.adviceText}`), colSpan: 3, styles: { fontStyle: 'italic', textColor: [71, 85, 105] } }
-      ]
-    ];
-
-    doc.autoTable({
-      startY: currentY,
-      head: [['COGNITIVE WORKLOAD & RECOVERY ASSESSMENT', '', '']],
-      body: fatigueRows,
-      theme: 'grid',
-      headStyles: { fillColor: [30, 41, 59], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 9 },
-      styles: { fontSize: 8, cellPadding: 2.5 },
-      margin: { left: 14, right: 14 }
-    });
-
-    currentY = doc.lastAutoTable.finalY + 6;
-
-    // 4. Vector 24-Hour Continuous Focus Density Wave (Drawn directly on Page 1)
-    doc.setFontSize(8.5);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(30, 41, 59);
-    doc.text('24-HOUR CONTINUOUS FOCUS DENSITY WAVE (00:00 - 23:59)', 14, currentY + 3);
-    currentY += 5;
-
-    drawPdfCircadianWave(doc, 14, currentY, 182, 38, effectiveReport.hourlyMins);
-    currentY += 44;
-
-    // ---------------- PAGE 2 ----------------
-    doc.addPage();
-    currentY = 18;
-
-    // 5. Subject Equilibrium & Ebbinghaus Scientific Recall Matrix Table
+    // 3. Subject Breakdown Table
     const subjRows = effectiveReport.subjectEquilibrium.map(s => {
       const statusText = s.daysAgo === 0 ? 'Today' : (s.daysAgo === 1 ? 'Yesterday' : `${s.daysAgo} days ago`);
-      const recallText = s.retentionPct < 60 
-        ? `CRITICAL RECALL DUE (${s.retentionPct}%)` 
-        : (s.retentionPct < 80 ? `REVIEW RECOMMENDED (${s.retentionPct}%)` : `OPTIMAL RETENTION (${s.retentionPct}%)`);
       return [
-        cleanPdfText(s.name), 
-        `${s.hours} hrs (${s.mins}m)`, 
-        `${s.pct}%`, 
-        statusText, 
-        `${s.retentionPct}% (S=${s.stabilityDays}d)`, 
-        recallText
+        cleanPdfText(s.name),
+        `${s.hours} hrs (${s.mins}m)`,
+        `${s.pct}%`,
+        statusText
       ];
     });
 
     doc.autoTable({
       startY: currentY,
-      head: [['SUBJECT EQUILIBRIUM & EBBINGHAUS SCIENTIFIC RECALL MATRIX', 'TOTAL TIME', 'SHARE', 'LAST STUDIED', 'RETENTION (R)', 'SCIENTIFIC RECALL STATUS']],
-      body: subjRows.length > 0 ? subjRows : [['No subjects recorded in this period', '-', '-', '-', '-', '-']],
+      head: [['SUBJECT BREAKDOWN', 'TOTAL TIME', 'SHARE', 'LAST STUDIED']],
+      body: subjRows.length > 0 ? subjRows : [['No subjects recorded in this period', '-', '-', '-']],
       theme: 'striped',
-      headStyles: { fillColor: [201, 150, 47], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8.5 },
-      styles: { fontSize: 7.5, cellPadding: 2.2 },
+      headStyles: { fillColor: [39, 39, 42], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8.5 },
+      styles: { fontSize: 8, cellPadding: 2.3 },
       margin: { left: 14, right: 14 }
     });
 
-    currentY = doc.lastAutoTable.finalY + 8;
+    currentY = doc.lastAutoTable.finalY + 6;
 
-    // 6. Vector Subject Equilibrium Radar Chart (Drawn directly on Page 2)
-    doc.setFontSize(8.5);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(30, 41, 59);
-    doc.text('CURRICULUM EQUILIBRIUM RADAR POLYGON', 14, currentY + 3);
-    currentY += 6;
-
-    drawPdfRadarChart(doc, 105, currentY + 32, 28, effectiveReport.subjectEquilibrium);
-    currentY += 68;
-
-    // 7. Cognitive Work Modality Breakdown Table
-    const workRows = effectiveReport.cognitiveWorkTypes.map(w => {
-      const nameLower = (w.name || '').toLowerCase();
-      const isActiveRecall = nameLower.includes('revision') ||
-                             nameLower.includes('practice') ||
-                             nameLower.includes('mock') ||
-                             nameLower.includes('test') ||
-                             nameLower.includes('quiz') ||
-                             nameLower.includes('memoriz') ||
-                             nameLower.includes('recall');
-      const activeType = isActiveRecall ? 'Active Recall / Test' : 'Content Acquisition / Notes';
-      return [cleanPdfText(w.name), `${w.mins} mins`, `${w.pct}%`, activeType];
-    });
+    // 4. Study Method Breakdown Table
+    const workRows = effectiveReport.cognitiveWorkTypes.map(w => [
+      cleanPdfText(w.name),
+      `${w.mins} mins`,
+      `${w.pct}%`
+    ]);
 
     doc.autoTable({
       startY: currentY,
-      head: [['COGNITIVE WORK MODALITY', 'DURATION', 'SHARE (%)', 'COGNITIVE TYPE']],
-      body: workRows.length > 0 ? workRows : [['No activity recorded in this period', '-', '-', '-']],
+      head: [['STUDY METHOD', 'DURATION', 'SHARE (%)']],
+      body: workRows.length > 0 ? workRows : [['No activity recorded in this period', '-', '-']],
       theme: 'striped',
-      headStyles: { fillColor: [30, 41, 59], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 9 },
-      styles: { fontSize: 8, cellPadding: 2.2 },
+      headStyles: { fillColor: [39, 39, 42], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8.5 },
+      styles: { fontSize: 8, cellPadding: 2.3 },
       margin: { left: 14, right: 14 }
     });
 
-    currentY = doc.lastAutoTable.finalY + 8;
-
-    // 8. Deterministic Cognitive Insights Box
-    const insightRows = effectiveReport.smartInsights.map(i => {
-      return [cleanPdfText(`${i.icon || '[Insight]'} ${i.text}`)];
-    });
-
-    doc.autoTable({
-      startY: currentY,
-      head: [['DETERMINISTIC COGNITIVE INSIGHTS & ACTIONABLE RECOMMENDATIONS']],
-      body: insightRows.length > 0 ? insightRows : [['[Insight] Maintain consistent daily study routines to build momentum.']],
-      theme: 'grid',
-      headStyles: { fillColor: [16, 185, 129], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 9 },
-      styles: { fontSize: 8.5, cellPadding: 3, textColor: [15, 23, 42] },
-      margin: { left: 14, right: 14 }
-    });
-
-    // ---------------- PAGE 3+ ----------------
-    // 9. Complete Session Audit Log Table
+    // ---------------- PAGE 2+ ----------------
+    // 5. Complete Session Audit Log Table
     doc.addPage();
     currentY = 18;
 
-    // Deduplicate and sort chronologically (newest sessions first)
     const sortedAuditSessions = deduplicateSessions(effectiveReport.filteredSessions).sort((a, b) => {
       const tsA = Number(a.ts || a.timestamp) || (new Date(a.date).getTime() || 0);
       const tsB = Number(b.ts || b.timestamp) || (new Date(b.date).getTime() || 0);
@@ -3094,39 +3056,38 @@ async function exportAnalysisPdf() {
       return [s.date, cleanPdfText(timeStr), cleanPdfText(s.subject), cleanPdfText(s.workType || 'Other'), `${s.minutes}m`];
     });
 
-    const auditHeader = hasHistory 
-      ? `SESSION AUDIT LOG (ALL TIME HISTORICAL SESSIONS: ${sortedAuditSessions.length})`
-      : `SESSION AUDIT LOG (${cleanPdfText(periodLabel).toUpperCase()}: ${sortedAuditSessions.length} SESSIONS)`;
+    const auditHeader = hasHistory
+      ? `SESSION LOG (ALL TIME: ${sortedAuditSessions.length} SESSIONS)`
+      : `SESSION LOG (${cleanPdfText(periodLabel).toUpperCase()}: ${sortedAuditSessions.length} SESSIONS)`;
 
     doc.autoTable({
       startY: currentY,
       head: [[auditHeader, 'TIME WINDOW', 'SUBJECT', 'WORK TYPE', 'MINUTES']],
       body: sessionRows.length > 0 ? sessionRows : [['No sessions recorded in this period', '-', '-', '-', '-']],
       theme: 'striped',
-      headStyles: { fillColor: [71, 85, 105], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8.5 },
+      headStyles: { fillColor: [63, 63, 70], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8.5 },
       styles: { fontSize: 7.5, cellPadding: 2 },
       margin: { left: 14, right: 14 }
     });
 
-    // Page Numbers Footer on all pages
     const pageCount = doc.internal.getNumberOfPages();
     for (let i = 1; i <= pageCount; i++) {
       doc.setPage(i);
       doc.setFontSize(8);
       doc.setTextColor(148, 163, 184);
-      doc.text(`Page ${i} of ${pageCount}  |  Focus Study Timer Cognitive Analytics Report`, 105, 290, { align: 'center' });
+      doc.text(`Page ${i} of ${pageCount}  |  Focus Study Timer Report`, 105, 290, { align: 'center' });
     }
 
-    const filename = `Focus_Study_Analysis_Report_${periodLabel.replace(/\s+/g, '_')}_${today}.pdf`;
+    const filename = `Focus_Study_Report_${periodLabel.replace(/\s+/g, '_')}_${today}.pdf`;
     doc.save(filename);
-    showToast('📑 Analysis PDF downloaded successfully!');
+    showToast('Report PDF downloaded successfully');
   } catch (err) {
     console.error('PDF export error:', err);
-    showToast('Failed to export Analysis PDF: ' + err.message);
+    showToast('Failed to export Report PDF: ' + err.message);
   } finally {
     if (btn) {
       btn.disabled = false;
-      btn.innerHTML = '<span>📑</span> Full Analysis PDF';
+      btn.innerHTML = `${ICON_SVG_DOC} Full Report PDF`;
     }
   }
 }
@@ -3450,7 +3411,7 @@ document.getElementById('exportPdfBtn').addEventListener('click', async ()=>{
     console.error(err);
     showToast('PDF Export failed');
   } finally {
-    btn.textContent = 'PDF';
+    btn.textContent = 'PDF Export';
     btn.disabled = false;
   }
 });
@@ -3468,10 +3429,12 @@ document.getElementById('backupJsonBtn').addEventListener('click', ()=>{
   };
   const jsonStr = JSON.stringify(backupData, null, 2);
   const blob = new Blob([jsonStr], { type:'application/json' });
+  const blobUrl = URL.createObjectURL(blob);
   const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
+  a.href = blobUrl;
   a.download = `focus-timer-backup-${todayStr()}.json`;
   a.click();
+  setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
   showToast('Data backup download started');
 });
 
@@ -3507,6 +3470,8 @@ document.getElementById('restoreFileInput').addEventListener('change', (e)=>{
       
       let newSessCount = 0;
       let newNonStudyCount = 0;
+      const toWriteNS = [];
+      const toWriteS = [];
 
       const rawNonStudy = Array.isArray(data.nonStudySessions) ? data.nonStudySessions : [];
       for (const nsRaw of rawNonStudy) {
@@ -3514,13 +3479,12 @@ document.getElementById('restoreFileInput').addEventListener('change', (e)=>{
         const ts = Number(nsRaw.ts || nsRaw.timestamp) || Date.now();
         const nsId = String(nsRaw.id || ('ns_' + ts));
         const ns = {
-          ...nsRaw,
           id: nsId,
           ts,
-          date: String(nsRaw.date),
-          subject: escapeHTML(nsRaw.subject),
-          workType: escapeHTML(nsRaw.workType || 'Other'),
-          minutes: Math.max(0, Math.round(Number(nsRaw.minutes)) || 0),
+          date: String(nsRaw.date).slice(0, 32),
+          subject: String(nsRaw.subject).slice(0, 100),
+          workType: String(nsRaw.workType || 'Other').slice(0, 100),
+          minutes: Math.max(0, Math.min(1440, Math.round(Number(nsRaw.minutes)) || 0)),
           isNonStudy: true
         };
         if (ns.minutes <= 0) continue;
@@ -3528,12 +3492,9 @@ document.getElementById('restoreFileInput').addEventListener('change', (e)=>{
         if (!isDuplicate) {
           nonStudySessions.push(ns);
           newNonStudyCount++;
-          if (currentUser) {
-            await setDoc(doc(db, 'users', currentUser.uid, 'nonStudySessions', ns.id), ns);
-          }
+          toWriteNS.push(ns);
         }
       }
-      if (!currentUser) { localSet('st_nonstudy_sessions', nonStudySessions); }
 
       const rawSessions = Array.isArray(data.sessions) ? data.sessions : [];
       for (const sRaw of rawSessions) {
@@ -3541,25 +3502,41 @@ document.getElementById('restoreFileInput').addEventListener('change', (e)=>{
         const ts = Number(sRaw.ts || sRaw.timestamp) || Date.now();
         const sId = String(sRaw.id || ('s_' + ts));
         const s = {
-          ...sRaw,
           id: sId,
           ts,
-          date: String(sRaw.date),
-          subject: escapeHTML(sRaw.subject),
-          workType: escapeHTML(sRaw.workType || 'Other'),
-          minutes: Math.max(0, Math.round(Number(sRaw.minutes)) || 0)
+          date: String(sRaw.date).slice(0, 32),
+          subject: String(sRaw.subject).slice(0, 100),
+          workType: String(sRaw.workType || 'Other').slice(0, 100),
+          minutes: Math.max(0, Math.min(1440, Math.round(Number(sRaw.minutes)) || 0))
         };
         if (s.minutes <= 0) continue;
         const isDuplicate = sessions.some(curr => (curr.ts && s.ts && curr.ts === s.ts) || (curr.id && s.id && curr.id === s.id && (curr.id.startsWith('s_') || curr.id.startsWith('ns_'))));
         if (!isDuplicate) {
           sessions.push(s);
           newSessCount++;
-          if (currentUser) {
-            await setDoc(doc(db, 'users', currentUser.uid, 'sessions', s.id), s);
-          }
+          toWriteS.push(s);
         }
       }
-      if (!currentUser) { localSet(LS_SESSIONS, sessions); }
+
+      if (currentUser) {
+        for (let i = 0; i < toWriteNS.length; i += 500) {
+          const batch = writeBatch(db);
+          toWriteNS.slice(i, i + 500).forEach(ns => {
+            batch.set(doc(db, 'users', currentUser.uid, 'nonStudySessions', ns.id), ns);
+          });
+          await batch.commit();
+        }
+        for (let i = 0; i < toWriteS.length; i += 500) {
+          const batch = writeBatch(db);
+          toWriteS.slice(i, i + 500).forEach(s => {
+            batch.set(doc(db, 'users', currentUser.uid, 'sessions', s.id), s);
+          });
+          await batch.commit();
+        }
+      } else {
+        localSet('st_nonstudy_sessions', nonStudySessions);
+        localSet(LS_SESSIONS, sessions);
+      }
       await refreshEverything();
       showToast(`Restore successful: ${newSessCount} study, ${newNonStudyCount} non-study added!`);
     } catch(err) {
@@ -3676,9 +3653,46 @@ function initTimerFromLocalState(){
    or the device off is still counted. On reload the timer resumes with
    the correct elapsed time (or finishes if it already expired). */
 
+const LS_THEME = 'ft_theme';
+const themeToggleBtn = document.getElementById('themeToggleBtn');
+
+function applyTheme(theme) {
+  const mode = theme === 'light' ? 'light' : 'dark';
+  document.body.classList.add('theme-switching');
+  document.body.setAttribute('data-theme', mode);
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      document.body.classList.remove('theme-switching');
+    });
+  });
+  if (themeToggleBtn) {
+    themeToggleBtn.innerHTML = mode === 'light' ? ICON_SVG_MOON : ICON_SVG_SUN;
+    themeToggleBtn.title = mode === 'light' ? 'Switch to Black Mode' : 'Switch to Light Mode';
+  }
+  const metaTheme = document.querySelector('meta[name="theme-color"]');
+  if (metaTheme) metaTheme.setAttribute('content', mode === 'light' ? '#f8fafc' : '#000000');
+  try { localStorage.setItem(LS_THEME, mode); } catch(e) {}
+  if (typeof statsDirty !== 'undefined') {
+    if (document.getElementById('view-stats')?.classList.contains('active')) {
+      refreshStatsView();
+    } else {
+      statsDirty = true;
+    }
+  }
+}
+
+if (themeToggleBtn) {
+  themeToggleBtn.addEventListener('click', () => {
+    const current = document.body.getAttribute('data-theme') === 'light' ? 'light' : 'dark';
+    applyTheme(current === 'light' ? 'dark' : 'light');
+  });
+}
+
 (async function init(){
   try { localStorage.removeItem('st_app_theme'); } catch(e) {}
-  document.body.setAttribute('data-theme', 'dark');
+  let savedTheme = 'dark';
+  try { savedTheme = localStorage.getItem(LS_THEME) || 'dark'; } catch(e) {}
+  applyTheme(savedTheme);
   renderAuthBar();
   await loadAll();
   
@@ -3706,7 +3720,7 @@ if ('serviceWorker' in navigator) {
 const stageTitleEl = document.getElementById('stageTitle');
 const stageTitles = {
   'view-timer': 'Focus Timer',
-  'view-stats': 'Performance Dashboard',
+  'view-stats': 'Analytics',
   'view-history': 'History & Data'
 };
 
@@ -3746,11 +3760,9 @@ document.addEventListener('click', (e) => {
 
 function switchView(targetId) {
   document.querySelectorAll('.sidebar-nav .nav-item, .nav-item').forEach(nav => {
-    if (nav.getAttribute('data-target') === targetId) {
-      nav.classList.add('active');
-    } else {
-      nav.classList.remove('active');
-    }
+    const isActive = nav.getAttribute('data-target') === targetId;
+    nav.classList.toggle('active', isActive);
+    nav.setAttribute('aria-current', isActive ? 'page' : 'false');
   });
 
   document.querySelectorAll('.view-section').forEach(view => view.classList.remove('active'));
@@ -3764,6 +3776,10 @@ function switchView(targetId) {
   if (appSidebar) {
     appSidebar.classList.remove('mobile-open');
   }
+
+  window.scrollTo({ top: 0, behavior: 'instant' });
+  const contentWrap = document.querySelector('.desktop-content-wrap');
+  if (contentWrap) contentWrap.scrollTop = 0;
 
   // Lazy render when entering stats or history tabs
   if (targetId === 'view-stats') {
@@ -3781,6 +3797,13 @@ document.querySelectorAll('.sidebar-nav .nav-item, .nav-item').forEach(item => {
   item.addEventListener('click', () => {
     const targetId = item.getAttribute('data-target');
     if (targetId) switchView(targetId);
+  });
+  item.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      const targetId = item.getAttribute('data-target');
+      if (targetId) switchView(targetId);
+    }
   });
 });
 
@@ -3922,9 +3945,9 @@ function renderSubjectAnalytics() {
     let badgeClass = 'normal';
     let badgeIcon = `${index + 1}`;
     
-    if (index === 0) { badgeClass = 'rank-1'; badgeIcon = '👑'; }
-    else if (index === 1) { badgeClass = 'silver'; badgeIcon = '🥈'; }
-    else if (index === 2) { badgeClass = 'bronze'; badgeIcon = '🥉'; }
+    if (index === 0) { badgeClass = 'rank-1'; badgeIcon = '1'; }
+    else if (index === 1) { badgeClass = 'silver'; badgeIcon = '2'; }
+    else if (index === 2) { badgeClass = 'bronze'; badgeIcon = '3'; }
 
     return `
       <div class="subj-rank-item">

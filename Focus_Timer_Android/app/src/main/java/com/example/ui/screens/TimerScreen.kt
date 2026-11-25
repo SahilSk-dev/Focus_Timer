@@ -37,11 +37,16 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Fullscreen
 import androidx.compose.material.icons.filled.FullscreenExit
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.NotificationsOff
+import androidx.compose.material.icons.filled.SubdirectoryArrowRight
+import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -159,7 +164,7 @@ fun TimerScreen(
     ) {
         val currentTheme by viewModel.currentAppTheme.collectAsState()
 
-        // App Header with single DARK / WHITE Mode Toggle
+        // App Header with single Black / Light Mode Toggle
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -172,12 +177,14 @@ fun TimerScreen(
                     modifier = Modifier
                         .size(38.dp)
                         .clip(RoundedCornerShape(12.dp))
-                        .background(ThemeGradientBrush),
+                        .background(if (currentTheme.isLight) Color(0xFF09090B) else Color(0xFFFFFFFF)),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(
-                        text = if (currentTheme.isLight) "☀️" else "🌙",
-                        fontSize = 20.sp
+                    Icon(
+                        imageVector = Icons.Default.Timer,
+                        contentDescription = "Focus Timer Logo",
+                        tint = if (currentTheme.isLight) Color(0xFFFFFFFF) else Color(0xFF09090B),
+                        modifier = Modifier.size(20.dp)
                     )
                 }
                 Spacer(modifier = Modifier.width(10.dp))
@@ -191,7 +198,7 @@ fun TimerScreen(
                         )
                     )
                     Text(
-                        text = if (currentTheme.isLight) "White Mode" else "Dark Mode",
+                        text = if (currentTheme.isLight) "Light Mode" else "Black Mode",
                         color = ThemeLight,
                         fontSize = 11.sp,
                         fontWeight = FontWeight.SemiBold
@@ -199,7 +206,7 @@ fun TimerScreen(
                 }
             }
 
-            // Single Toggle Button: DARK MODE / WHITE MODE
+            // Single Toggle Button: BLACK MODE / LIGHT MODE
             Surface(
                 onClick = { viewModel.toggleTheme() },
                 shape = RoundedCornerShape(14.dp),
@@ -212,8 +219,14 @@ fun TimerScreen(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
+                    Icon(
+                        imageVector = if (currentTheme.isLight) Icons.Default.DarkMode else Icons.Default.LightMode,
+                        contentDescription = null,
+                        tint = TextPrimary,
+                        modifier = Modifier.size(15.dp)
+                    )
                     Text(
-                        text = if (currentTheme.isLight) "🌙 Dark" else "☀️ White",
+                        text = if (currentTheme.isLight) "Black" else "Light",
                         color = TextPrimary,
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold
@@ -246,17 +259,28 @@ fun TimerScreen(
                     if (selectedSubject.isNotBlank()) {
                         val subText = if (!selectedSubSubject.isNullOrBlank()) "$selectedSubject - $selectedSubSubject" else selectedSubject
                         Text(
-                            text = "🎯 $subText",
+                            text = subText,
                             color = GoldLight,
                             fontSize = 13.sp,
                             fontWeight = FontWeight.SemiBold
                         )
                     } else {
-                        Text(
-                            text = "⚠️ Select a subject below",
-                            color = TextDim,
-                            fontSize = 13.sp
-                        )
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(5.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Info,
+                                contentDescription = null,
+                                tint = TextDim,
+                                modifier = Modifier.size(14.dp)
+                            )
+                            Text(
+                                text = "Select a subject below",
+                                color = TextDim,
+                                fontSize = 13.sp
+                            )
+                        }
                     }
 
                     IconButton(
@@ -294,19 +318,19 @@ fun TimerScreen(
                     Box(
                         modifier = Modifier
                             .background(
-                                color = if (pomoPhase == "work") Color(0x33C9962F) else Color(0x338BA888),
+                                color = PanelElevated,
                                 shape = RoundedCornerShape(16.dp)
                             )
                             .border(
                                 width = 1.dp,
-                                color = if (pomoPhase == "work") GoldAccent else Color(0xFF8BA888),
+                                color = LineBorder,
                                 shape = RoundedCornerShape(16.dp)
                             )
                             .padding(horizontal = 12.dp, vertical = 4.dp)
                     ) {
                         Text(
-                            text = if (pomoPhase == "work") "⏳ Focus Session (25 mins)" else "☕ Break (5 mins)",
-                            color = if (pomoPhase == "work") GoldBright else Color(0xFF8BA888),
+                            text = if (pomoPhase == "work") "Focus Session (25 mins)" else "Break (5 mins)",
+                            color = TextPrimary,
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Medium
                         )
@@ -414,10 +438,17 @@ fun TimerScreen(
                 ) {
                     Row(
                         modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
+                        Icon(
+                            imageVector = Icons.Default.Edit,
+                            contentDescription = null,
+                            tint = GoldBright,
+                            modifier = Modifier.size(14.dp)
+                        )
                         Text(
-                            text = "✏️ Edit Mode: Tap any subject to edit/rename, or ＋ to add.",
+                            text = "Edit Mode: Tap any subject to edit/rename, or + to add.",
                             color = GoldBright,
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Medium
@@ -448,7 +479,7 @@ fun TimerScreen(
 
                 if (!isTimerActive && isEditMode) {
                     AddChip(
-                        label = "＋ Subject",
+                        label = "+ Subject",
                         onClick = onOpenAddSubject
                     )
                 }
@@ -477,7 +508,7 @@ fun TimerScreen(
                     }
                     if (!isTimerActive && isEditMode && currentSubjObj != null) {
                         AddChip(
-                            label = "＋ Sub-Subject",
+                            label = "+ Sub-Subject",
                             onClick = { onOpenAddSubSubject(currentSubjObj.name) }
                         )
                     }
@@ -513,7 +544,7 @@ fun TimerScreen(
                 }
                 if (!isTimerActive && isEditMode) {
                     AddChip(
-                        label = "＋ Work Type",
+                        label = "+ Work Type",
                         onClick = onOpenAddWorkType
                     )
                 }
@@ -632,7 +663,11 @@ fun TimerScreen(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Text("⏱️", fontSize = 24.sp)
+                    Icon(
+                        imageVector = Icons.Default.Timer,
+                        contentDescription = null,
+                        tint = GoldBright
+                    )
                     Text(
                         text = "Reset Timer?",
                         color = GoldBright,
@@ -733,7 +768,12 @@ private fun SubjectChip(
             horizontalArrangement = Arrangement.spacedBy(4.dp)
         ) {
             if (isEditMode) {
-                Text(text = "✏️", fontSize = 11.sp)
+                Icon(
+                    imageVector = Icons.Default.Edit,
+                    contentDescription = null,
+                    tint = textColor,
+                    modifier = Modifier.size(12.dp)
+                )
             }
             Text(
                 text = name,
@@ -900,7 +940,7 @@ private fun FullscreenFocusLayout(
                 }
                 if (pomoPhase != null) {
                     Text(
-                        text = if (pomoPhase == "work") "⏳ Focus" else "☕ Break",
+                        text = if (pomoPhase == "work") "Focus" else "Break",
                         color = GoldLight,
                         fontSize = 12.sp
                     )

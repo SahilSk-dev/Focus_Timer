@@ -96,7 +96,7 @@ class FocusViewModel(application: Application) : AndroidViewModel(application) {
     fun setAppTheme(theme: AppTheme) {
         _currentAppTheme.value = theme
         prefs.edit().putString("app_theme", theme.id).apply()
-        showToast("${theme.displayName} ${theme.icon} applied")
+        showToast("${theme.displayName} applied")
     }
 
     private val db = AppDatabase.getInstance(application)
@@ -536,7 +536,7 @@ class FocusViewModel(application: Application) : AndroidViewModel(application) {
             _stopwatchMode.value = false
             repository.clearRunningTimerState()
             _pomoPhase.value = "work"
-            showToast("☕ Break cancelled")
+            showToast("Break cancelled")
             return
         }
 
@@ -626,10 +626,10 @@ class FocusViewModel(application: Application) : AndroidViewModel(application) {
         if (_pomodoroMode.value) {
             if (_pomoPhase.value == "work") {
                 saveSession(25)
-                showToast("⏳ Focus session complete! Take a 5-min break.")
+                showToast("Focus session complete! Take a 5-min break.")
                 _pomoPhase.value = "break"
             } else {
-                showToast("☕ Break finished! Ready for next session.")
+                showToast("Break finished! Ready for next session.")
                 _pomoPhase.value = "work"
             }
         } else {
@@ -637,7 +637,7 @@ class FocusViewModel(application: Application) : AndroidViewModel(application) {
             if (mins >= 1) {
                 saveSession(mins)
             }
-            showToast("⏰ Time is up!")
+            showToast("Time is up!")
         }
     }
 

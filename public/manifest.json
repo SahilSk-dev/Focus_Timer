@@ -4,8 +4,8 @@
   "description": "A progressive web app to track study and non-study time effectively.",
   "start_url": "./index.html",
   "display": "standalone",
-  "background_color": "#0d0d0c",
-  "theme_color": "#0d0d0c",
+  "background_color": "#000000",
+  "theme_color": "#000000",
   "icons": [
     {
       "src": "icon.svg",

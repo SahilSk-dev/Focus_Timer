@@ -116,7 +116,7 @@ class AlarmService : Service() {
 
         val notification = NotificationCompat.Builder(this, TRACKING_CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_media_play)
-            .setContentTitle("⏱️ Study Session Active: $title")
+            .setContentTitle("Study Session Active: $title")
             .setContentText("Focusing: $timeText (Running in background)")
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setOngoing(true)
@@ -146,7 +146,7 @@ class AlarmService : Service() {
 
         val notification = NotificationCompat.Builder(this, TRACKING_CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_media_play)
-            .setContentTitle("⏱️ Study Session Active: $title")
+            .setContentTitle("Study Session Active: $title")
             .setContentText("Focusing: $timeText (Running in background)")
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setOngoing(true)
@@ -199,7 +199,7 @@ class AlarmService : Service() {
 
         val notification = NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
-            .setContentTitle("⏰ Time is Up! ($title)")
+            .setContentTitle("Time is Up! ($title)")
             .setContentText("Focus session completed. Tap to open or stop alarm.")
             .setPriority(NotificationCompat.PRIORITY_MAX)
             .setCategory(NotificationCompat.CATEGORY_ALARM)

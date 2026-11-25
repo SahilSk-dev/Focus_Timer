@@ -199,12 +199,11 @@ fun HistorySettingsScreen(
             .padding(horizontal = 16.dp, vertical = 12.dp)
     ) {
         Text(
-            text = "History & Management",
+            text = "History & Data",
             style = TextStyle(
                 brush = GoldGradientBrush,
-                fontSize = 24.sp,
-                fontWeight = FontWeight.Bold,
-                
+                fontSize = 22.sp,
+                fontWeight = FontWeight.Bold
             ),
             modifier = Modifier.padding(bottom = 12.dp, top = 4.dp)
         )
@@ -270,13 +269,18 @@ fun HistorySettingsScreen(
                             viewModel.restoreSession(deleted)
                             recentlyDeletedSession = null
                         }) {
-                            Text("UNDO ↩️", color = GoldBright, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                            Text("UNDO", color = GoldBright, fontWeight = FontWeight.Bold, fontSize = 13.sp)
                         }
                         IconButton(
                             onClick = { recentlyDeletedSession = null },
-                            modifier = Modifier.size(24.dp)
+                            modifier = Modifier.size(28.dp)
                         ) {
-                            Text("✕", color = TextDim, fontSize = 12.sp)
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = "Dismiss",
+                                tint = TextDim,
+                                modifier = Modifier.size(16.dp)
+                            )
                         }
                     }
                 }
@@ -400,7 +404,7 @@ fun HistorySettingsScreen(
                                     modifier = Modifier.fillMaxWidth().height(46.dp)
                                 ) {
                                     Text(
-                                        "Sign In with Google 🔑",
+                                        "Sign in with Google",
                                         fontWeight = FontWeight.Bold,
                                         fontSize = 14.sp
                                     )
@@ -535,7 +539,7 @@ fun HistorySettingsScreen(
                                         modifier = Modifier.size(18.dp)
                                     )
                                     Text(
-                                        text = "Generate PDF Report (Web) ↗",
+                                        text = "Open PDF Report (Web)",
                                         fontWeight = FontWeight.Bold,
                                         fontSize = 13.sp
                                     )
@@ -544,7 +548,7 @@ fun HistorySettingsScreen(
 
                             Spacer(modifier = Modifier.height(4.dp))
                             Text(
-                                text = "💡 Generates high-resolution multi-page PDF tables with auto-pagination on Web",
+                                text = "Generates multi-page PDF tables with your synced sessions on the Web Dashboard.",
                                 color = TextDim,
                                 fontSize = 11.sp,
                                 modifier = Modifier.padding(horizontal = 2.dp)
@@ -691,7 +695,12 @@ fun HistorySettingsScreen(
                                             verticalAlignment = Alignment.CenterVertically,
                                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                                         ) {
-                                            Text(text = currentOption.icon, fontSize = 16.sp)
+                                            Icon(
+                                                imageVector = Icons.Default.MusicNote,
+                                                contentDescription = null,
+                                                tint = GoldAccent,
+                                                modifier = Modifier.size(18.dp)
+                                            )
                                             Column {
                                                 Text(
                                                     text = currentOption.displayName,
@@ -729,7 +738,12 @@ fun HistorySettingsScreen(
                                                     verticalAlignment = Alignment.CenterVertically,
                                                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                                                 ) {
-                                                    Text(opt.icon, fontSize = 16.sp)
+                                                    Icon(
+                                                        imageVector = Icons.Default.MusicNote,
+                                                        contentDescription = null,
+                                                        tint = if (alarmToneId == opt.id) GoldBright else TextDim,
+                                                        modifier = Modifier.size(16.dp)
+                                                    )
                                                     Column {
                                                         Text(
                                                             opt.displayName,
@@ -1468,7 +1482,12 @@ fun HistorySettingsScreen(
                                             onClick = { subList = subList.filter { it != sub } },
                                             modifier = Modifier.size(20.dp)
                                         ) {
-                                            Text("✕", color = DangerRed, fontSize = 10.sp)
+                                            Icon(
+                                                imageVector = Icons.Default.Close,
+                                                contentDescription = "Remove sub-subject",
+                                                tint = DangerRed,
+                                                modifier = Modifier.size(12.dp)
+                                            )
                                         }
                                     }
                                 }
@@ -1725,13 +1744,13 @@ private fun SessionHistoryItem(
                 if (session.isNonStudy) {
                     Spacer(modifier = Modifier.height(4.dp))
                     Surface(
-                        color = Color(0xFF2A2825),
+                        color = PanelElevated,
                         shape = RoundedCornerShape(4.dp),
-                        border = BorderStroke(1.dp, Color(0xFF4D483F))
+                        border = BorderStroke(1.dp, LineBorder)
                     ) {
                         Text(
                             text = "Non-Study",
-                            color = Color(0xFFC0B8AA),
+                            color = TextDim,
                             fontSize = 10.sp,
                             fontWeight = FontWeight.Medium,
                             modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
@@ -1807,13 +1826,13 @@ private fun generateReportText(sessions: List<StudySessionEntity>, range: String
     val bySubject = sessions.groupBy { it.subject }.mapValues { it.value.sumOf { s -> s.minutes } }
 
     val sb = StringBuilder()
-    sb.appendLine("📊 Focus Study Timer - Study Report ($range)")
+    sb.appendLine("Focus Study Timer - Study Report ($range)")
     sb.appendLine("Total Focus Time: $hours hrs $remMins mins ($totalMins minutes)")
     sb.appendLine("Total Sessions: ${sessions.size}")
     sb.appendLine("\n--- Breakdown by Subject ---")
     bySubject.entries.sortedByDescending { it.value }.forEach { (subj, m) ->
-        sb.appendLine("• $subj: $m mins")
+        sb.appendLine("- $subj: $m mins")
     }
-    sb.appendLine("\nKeep studying with consistency! ⏱️")
+    sb.appendLine("\nKeep studying with consistency!")
     return sb.toString()
 }

@@ -18,13 +18,19 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.LocalFireDepartment
 import androidx.compose.material.icons.filled.OpenInBrowser
 import androidx.compose.material.icons.filled.PictureAsPdf
+import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material.icons.filled.TrackChanges
+import androidx.compose.ui.graphics.vector.ImageVector
+import com.example.ui.theme.ActiveTheme
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -110,13 +116,9 @@ fun StatsScreen(
         if (dailyTarget > 0) ((todayDoneMinutes.toFloat() / dailyTarget) * 100).toInt().coerceAtMost(100) else 0
     }
 
-    // Level & XP
+    // Total Focus
     val totalStudyMinutes = remember(studySessions) { studySessions.sumOf { it.minutes } }
     val totalHoursDouble = remember(totalStudyMinutes) { totalStudyMinutes / 60.0 }
-    val xpPerLevel = 300
-    val level = remember(totalStudyMinutes) { (totalStudyMinutes / xpPerLevel) + 1 }
-    val currentXp = remember(totalStudyMinutes) { totalStudyMinutes % xpPerLevel }
-    val xpPct = remember(currentXp) { ((currentXp.toFloat() / xpPerLevel) * 100).toInt().coerceIn(0, 100) }
 
     // Week comparison
     val weekComparison = remember(studySessions) { calculateWeekComparison(studySessions) }
@@ -143,15 +145,15 @@ fun StatsScreen(
         ) {
             Column {
                 Text(
-                    text = "Performance",
+                    text = "Performance Dashboard",
                     style = TextStyle(
                         brush = GoldGradientBrush,
-                        fontSize = 22.sp,
+                        fontSize = 20.sp,
                         fontWeight = FontWeight.Bold
                     )
                 )
                 Text(
-                    text = "Daily activity & summary",
+                    text = "Analytics, consistency & study pacing",
                     color = TextDim,
                     fontSize = 12.sp
                 )
@@ -177,7 +179,7 @@ fun StatsScreen(
                         modifier = Modifier.size(15.dp)
                     )
                     Text(
-                        text = "Web PDF ↗",
+                        text = "Web PDF",
                         color = GoldLight,
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold
@@ -187,7 +189,7 @@ fun StatsScreen(
         }
 
         // ============================================================
-        // 2. 2x2 METRIC DASHBOARD GRID
+        // 2. KPI METRIC CARDS (Day Streak, Total Focus, Daily Goal)
         // ============================================================
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -195,7 +197,7 @@ fun StatsScreen(
         ) {
             // Card 1: Streak
             MetricCard(
-                icon = "🔥",
+                icon = Icons.Default.LocalFireDepartment,
                 title = "Day Streak",
                 value = "$currentStreak days",
                 subtext = "Best: $bestStreak days",
@@ -204,7 +206,7 @@ fun StatsScreen(
 
             // Card 2: Total Study Hours
             MetricCard(
-                icon = "⏱️",
+                icon = Icons.Default.Schedule,
                 title = "Total Focus",
                 value = "${String.format(Locale.US, "%.1f", totalHoursDouble)} hrs",
                 subtext = "${studySessions.size} sessions",
@@ -214,108 +216,68 @@ fun StatsScreen(
 
         Spacer(modifier = Modifier.height(10.dp))
 
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        // Card 3: Daily Goal (Full-width clean card)
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { showTargetEditDialog = true },
+            color = PanelDark,
+            shape = RoundedCornerShape(12.dp),
+            border = BorderStroke(1.dp, LineBorder)
         ) {
-            // Card 3: Daily Goal
-            Surface(
-                modifier = Modifier
-                    .weight(1f)
-                    .clickable { showTargetEditDialog = true },
-                color = PanelDark,
-                shape = RoundedCornerShape(12.dp),
-                border = BorderStroke(1.dp, LineBorder)
-            ) {
-                Column(modifier = Modifier.padding(12.dp)) {
+            Column(modifier = Modifier.padding(14.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        Text(text = "🎯 Daily Goal", color = TextDim, fontSize = 11.sp, fontWeight = FontWeight.Medium)
+                        Icon(
+                            imageVector = Icons.Default.TrackChanges,
+                            contentDescription = null,
+                            tint = TextDim,
+                            modifier = Modifier.size(15.dp)
+                        )
+                        Text(text = "Daily Goal", color = TextDim, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                    }
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Text(
+                            text = "$todayDoneMinutes / $dailyTarget mins ($targetPct%)",
+                            color = TextPrimary,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold
+                        )
                         Icon(
                             imageVector = Icons.Default.Edit,
                             contentDescription = "Edit Goal",
                             tint = GoldAccent,
-                            modifier = Modifier.size(13.dp)
+                            modifier = Modifier.size(14.dp)
                         )
                     }
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = "$todayDoneMinutes / $dailyTarget m",
-                        color = TextPrimary,
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    // Progress bar
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(6.dp)
-                            .clip(RoundedCornerShape(3.dp))
-                            .background(LineBorder)
-                    ) {
-                        if (targetPct > 0) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth(targetPct / 100f)
-                                    .height(6.dp)
-                                    .clip(RoundedCornerShape(3.dp))
-                                    .background(GoldGradientBrush)
-                            )
-                        }
-                    }
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(text = "$targetPct% achieved", color = GoldLight, fontSize = 11.sp)
                 }
-            }
-
-            // Card 4: Level & XP
-            Surface(
-                modifier = Modifier.weight(1f),
-                color = PanelDark,
-                shape = RoundedCornerShape(12.dp),
-                border = BorderStroke(1.dp, LineBorder)
-            ) {
-                Column(modifier = Modifier.padding(12.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(text = "⚡ Scholar Rank", color = TextDim, fontSize = 11.sp, fontWeight = FontWeight.Medium)
-                        Text(text = "Lv. $level", color = GoldBright, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                Spacer(modifier = Modifier.height(10.dp))
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(7.dp)
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(LineBorder)
+                ) {
+                    if (targetPct > 0) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth(targetPct / 100f)
+                                .height(7.dp)
+                                .clip(RoundedCornerShape(4.dp))
+                                .background(SuccessGreen)
+                        )
                     }
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = "Level $level",
-                        color = TextPrimary,
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    // Progress bar
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(6.dp)
-                            .clip(RoundedCornerShape(3.dp))
-                            .background(LineBorder)
-                    ) {
-                        if (xpPct > 0) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth(xpPct / 100f)
-                                    .height(6.dp)
-                                    .clip(RoundedCornerShape(3.dp))
-                                    .background(SuccessGreen)
-                            )
-                        }
-                    }
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(text = "$currentXp / $xpPerLevel XP", color = TextDim, fontSize = 11.sp)
                 }
             }
         }
@@ -323,7 +285,7 @@ fun StatsScreen(
         Spacer(modifier = Modifier.height(20.dp))
 
         // ============================================================
-        // 3. STUDY ACTIVITY (Daily vs Weekly Comparison)
+        // 3. ACTIVITY BREAKDOWN (Today vs 7 Days)
         // ============================================================
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -332,7 +294,7 @@ fun StatsScreen(
         ) {
             Column {
                 Text(
-                    text = "Study Activity",
+                    text = "Activity Breakdown",
                     style = TextStyle(
                         brush = GoldGradientBrush,
                         fontSize = 16.sp,
@@ -466,7 +428,7 @@ fun StatsScreen(
         Spacer(modifier = Modifier.height(20.dp))
 
         // ============================================================
-        // 4. SUBJECT RANKING (Last 7 Days)
+        // 4. TOP SUBJECTS (Last 7 Days)
         // ============================================================
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -474,14 +436,14 @@ fun StatsScreen(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = "Subject Ranking (7 Days)",
+                text = "Top Subjects (7 Days)",
                 style = TextStyle(
                     brush = GoldGradientBrush,
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Bold
                 )
             )
-            Text(text = "Top Ranks", color = TextDim, fontSize = 11.sp)
+            Text(text = "Leaderboard", color = TextDim, fontSize = 11.sp)
         }
 
         Spacer(modifier = Modifier.height(10.dp))
@@ -503,17 +465,32 @@ fun StatsScreen(
                                 .padding(vertical = 6.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            val badgeEmoji = when (index) {
-                                0 -> "🥇"
-                                1 -> "🥈"
-                                2 -> "🥉"
-                                else -> "${index + 1}"
+                            val badgeBg = when (index) {
+                                0 -> Color(0xFFF59E0B)
+                                1 -> Color(0xFF94A3B8)
+                                2 -> Color(0xFFD97706)
+                                else -> PanelElevated
                             }
-                            Text(
-                                text = badgeEmoji,
-                                fontSize = if (index < 3) 16.sp else 12.sp,
-                                modifier = Modifier.width(26.dp)
-                            )
+                            val badgeFg = when (index) {
+                                0, 1 -> Color(0xFF09090B)
+                                2 -> Color.White
+                                else -> TextDim
+                            }
+                            Box(
+                                contentAlignment = Alignment.Center,
+                                modifier = Modifier
+                                    .size(22.dp)
+                                    .clip(CircleShape)
+                                    .background(badgeBg)
+                            ) {
+                                Text(
+                                    text = "${index + 1}",
+                                    color = badgeFg,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(10.dp))
                             Text(
                                 text = item.subjectName,
                                 color = TextPrimary,
@@ -541,7 +518,7 @@ fun StatsScreen(
         Spacer(modifier = Modifier.height(20.dp))
 
         // ============================================================
-        // 5. 12-WEEK CONSISTENCY HEATMAP
+        // 5. CONSISTENCY HEATMAP (84 DAYS)
         // ============================================================
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -549,7 +526,7 @@ fun StatsScreen(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = "12-Week Consistency Grid",
+                text = "Consistency Heatmap",
                 style = TextStyle(
                     brush = GoldGradientBrush,
                     fontSize = 16.sp,
@@ -561,6 +538,22 @@ fun StatsScreen(
 
         Spacer(modifier = Modifier.height(10.dp))
 
+        val heatmapColors = if (ActiveTheme.isLight) {
+            listOf(
+                PanelElevated,
+                Color(0xFFA7F3D0),
+                Color(0xFF34D399),
+                Color(0xFF059669)
+            )
+        } else {
+            listOf(
+                PanelElevated,
+                Color(0xFF065F46),
+                Color(0xFF10B981),
+                Color(0xFF34D399)
+            )
+        }
+
         Surface(
             modifier = Modifier.fillMaxWidth(),
             color = PanelDark,
@@ -568,7 +561,7 @@ fun StatsScreen(
             border = BorderStroke(1.dp, LineBorder)
         ) {
             Column(modifier = Modifier.padding(14.dp)) {
-                HeatmapGrid(sessions = studySessions)
+                HeatmapGrid(sessions = studySessions, colors = heatmapColors)
 
                 Spacer(modifier = Modifier.height(10.dp))
 
@@ -580,13 +573,10 @@ fun StatsScreen(
                 ) {
                     Text(text = "Less", color = TextDim, fontSize = 11.sp)
                     Spacer(modifier = Modifier.width(4.dp))
-                    Box(modifier = Modifier.size(10.dp).background(Color(0xFF1C1C1A), RoundedCornerShape(2.dp)))
-                    Spacer(modifier = Modifier.width(3.dp))
-                    Box(modifier = Modifier.size(10.dp).background(Color(0xFF4A3A1A), RoundedCornerShape(2.dp)))
-                    Spacer(modifier = Modifier.width(3.dp))
-                    Box(modifier = Modifier.size(10.dp).background(Color(0xFF7A5F22), RoundedCornerShape(2.dp)))
-                    Spacer(modifier = Modifier.width(3.dp))
-                    Box(modifier = Modifier.size(10.dp).background(Color(0xFFC9962F), RoundedCornerShape(2.dp)))
+                    heatmapColors.forEachIndexed { idx, c ->
+                        if (idx > 0) Spacer(modifier = Modifier.width(3.dp))
+                        Box(modifier = Modifier.size(10.dp).background(c, RoundedCornerShape(2.dp)))
+                    }
                     Spacer(modifier = Modifier.width(4.dp))
                     Text(text = "More", color = TextDim, fontSize = 11.sp)
                 }
@@ -596,13 +586,13 @@ fun StatsScreen(
         Spacer(modifier = Modifier.height(22.dp))
 
         // ============================================================
-        // 6. DEEP COGNITIVE ANALYTICS & WEB PDF PORTAL CARD
+        // 6. WEB DASHBOARD & FULL REPORT PORTAL CARD
         // ============================================================
         Surface(
             modifier = Modifier.fillMaxWidth(),
             color = PanelElevated,
             shape = RoundedCornerShape(14.dp),
-            border = BorderStroke(1.dp, GoldAccent.copy(alpha = 0.6f))
+            border = BorderStroke(1.dp, LineBorder)
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Row(
@@ -610,16 +600,21 @@ fun StatsScreen(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    Text(text = "🌐", fontSize = 24.sp)
+                    Icon(
+                        imageVector = Icons.Default.OpenInBrowser,
+                        contentDescription = null,
+                        tint = TextPrimary,
+                        modifier = Modifier.size(22.dp)
+                    )
                     Column {
                         Text(
-                            text = "Deep Cognitive Analytics",
-                            color = GoldBright,
+                            text = "Web Dashboard & Full PDF",
+                            color = TextPrimary,
                             fontSize = 15.sp,
                             fontWeight = FontWeight.Bold
                         )
                         Text(
-                            text = "High-Resolution Executive Suite & PDF",
+                            text = "Exam projection, peak hours & PDF reports",
                             color = TextDim,
                             fontSize = 11.sp
                         )
@@ -629,8 +624,8 @@ fun StatsScreen(
                 Spacer(modifier = Modifier.height(10.dp))
 
                 Text(
-                    text = "Access your full 24h Circadian Wave, 6-Axis Spider Radar Polygon, Cognitive Fatigue Matrix, Milestone Badges, and high-resolution PDF report with clean multi-page tables on the Web Dashboard.",
-                    color = TextPrimary.copy(alpha = 0.9f),
+                    text = "Open the synced Web Dashboard for Exam & Syllabus Projection, Peak Study Time, Study Method Breakdown, and clean multi-page PDF reports.",
+                    color = TextPrimary.copy(alpha = 0.85f),
                     fontSize = 12.sp,
                     lineHeight = 17.sp
                 )
@@ -642,15 +637,15 @@ fun StatsScreen(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    listOf("🌊 Circadian Wave", "🕸️ Spider Radar", "⚡ Fatigue", "📄 AutoTable PDF").forEach { tag ->
+                    listOf("Exam Goal", "Peak Hours", "Methods", "PDF Report").forEach { tag ->
                         Box(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(6.dp))
                                 .background(PanelDark)
                                 .border(1.dp, LineBorder, RoundedCornerShape(6.dp))
-                                .padding(horizontal = 7.dp, vertical = 4.dp)
+                                .padding(horizontal = 8.dp, vertical = 4.dp)
                         ) {
-                            Text(text = tag, color = GoldLight, fontSize = 10.sp, fontWeight = FontWeight.Medium)
+                            Text(text = tag, color = TextDim, fontSize = 10.sp, fontWeight = FontWeight.Medium)
                         }
                     }
                 }
@@ -681,7 +676,7 @@ fun StatsScreen(
                             modifier = Modifier.size(18.dp)
                         )
                         Text(
-                            text = "Open Web Analytics & Reports ↗",
+                            text = "Open Web Dashboard",
                             fontWeight = FontWeight.Bold,
                             fontSize = 13.sp
                         )
@@ -777,7 +772,7 @@ fun StatsScreen(
 // ============================================================
 @Composable
 private fun MetricCard(
-    icon: String,
+    icon: ImageVector,
     title: String,
     value: String,
     subtext: String,
@@ -791,17 +786,22 @@ private fun MetricCard(
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
             Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                Text(text = "$icon $title", color = TextDim, fontSize = 11.sp, fontWeight = FontWeight.Medium)
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = TextDim,
+                    modifier = Modifier.size(14.dp)
+                )
+                Text(text = title, color = TextDim, fontSize = 11.sp, fontWeight = FontWeight.Medium)
             }
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(6.dp))
             Text(
                 text = value,
                 color = TextPrimary,
-                fontSize = 16.sp,
+                fontSize = 17.sp,
                 fontWeight = FontWeight.Bold
             )
             Spacer(modifier = Modifier.height(2.dp))
@@ -831,7 +831,7 @@ private fun CleanBarChartRow(
             text = label,
             color = TextPrimary,
             fontSize = 12.sp,
-            modifier = Modifier.width(72.dp),
+            modifier = Modifier.width(92.dp),
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )
@@ -847,7 +847,7 @@ private fun CleanBarChartRow(
                     .fillMaxWidth(pct)
                     .height(8.dp)
                     .clip(RoundedCornerShape(4.dp))
-                    .background(GoldGradientBrush)
+                    .background(SuccessGreen)
             )
         }
         Spacer(modifier = Modifier.width(8.dp))
@@ -866,7 +866,10 @@ private fun CleanBarChartRow(
 // COMPONENT: HEATMAP GRID (FAST 84-CELL CANVAS)
 // ============================================================
 @Composable
-private fun HeatmapGrid(sessions: List<StudySessionEntity>) {
+private fun HeatmapGrid(
+    sessions: List<StudySessionEntity>,
+    colors: List<Color>
+) {
     val totalsByDate = remember(sessions) {
         sessions.groupBy { it.date }.mapValues { it.value.sumOf { s -> s.minutes } }
     }
@@ -890,13 +893,6 @@ private fun HeatmapGrid(sessions: List<StudySessionEntity>) {
         }
         list
     }
-
-    val colors = listOf(
-        Color(0xFF1C1C1A),
-        Color(0xFF4A3A1A),
-        Color(0xFF7A5F22),
-        Color(0xFFC9962F)
-    )
 
     Row(
         modifier = Modifier

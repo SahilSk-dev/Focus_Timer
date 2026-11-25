@@ -15,6 +15,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -161,10 +162,10 @@ fun FocusTimerApp(
                             icon = {
                                 Icon(
                                     imageVector = Icons.Default.BarChart,
-                                    contentDescription = "Stats"
+                                    contentDescription = "Analytics"
                                 )
                             },
-                            label = { Text("Stats", fontWeight = if (currentNavIndex == 1) FontWeight.Bold else FontWeight.Normal) },
+                            label = { Text("Analytics", maxLines = 1, fontWeight = if (currentNavIndex == 1) FontWeight.Bold else FontWeight.Normal) },
                             colors = NavigationBarItemDefaults.colors(
                                 selectedIconColor = BgDark,
                                 selectedTextColor = TextPrimary,
@@ -180,10 +181,10 @@ fun FocusTimerApp(
                             icon = {
                                 Icon(
                                     imageVector = Icons.Default.History,
-                                    contentDescription = "History"
+                                    contentDescription = "History & Data"
                                 )
                             },
-                            label = { Text("History", fontWeight = if (currentNavIndex == 2) FontWeight.Bold else FontWeight.Normal) },
+                            label = { Text("History & Data", maxLines = 1, fontSize = 11.sp, fontWeight = if (currentNavIndex == 2) FontWeight.Bold else FontWeight.Normal) },
                             colors = NavigationBarItemDefaults.colors(
                                 selectedIconColor = BgDark,
                                 selectedTextColor = TextPrimary,
@@ -254,7 +255,7 @@ fun FocusTimerApp(
                             onCheckedChange = { isNewSubjectCore = it },
                             colors = CheckboxDefaults.colors(checkedColor = GoldAccent)
                         )
-                        Text("Core Subject (Shimmer glow)", color = TextPrimary, fontSize = 13.sp)
+                        Text("Core Subject (Highlight Effect)", color = TextPrimary, fontSize = 13.sp)
                     }
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Checkbox(
@@ -490,7 +491,11 @@ fun FocusTimerApp(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Text("⏰", fontSize = 28.sp)
+                    Icon(
+                        imageVector = Icons.Default.NotificationsActive,
+                        contentDescription = null,
+                        tint = GoldBright
+                    )
                     Text("Time's Up!", color = GoldBright, fontWeight = FontWeight.Bold, fontSize = 22.sp)
                 }
             },
@@ -515,7 +520,7 @@ fun FocusTimerApp(
                     modifier = Modifier.fillMaxWidth().height(52.dp),
                     shape = RoundedCornerShape(12.dp)
                 ) {
-                    Text("STOP ALARM 🔔", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                    Text("STOP ALARM", fontWeight = FontWeight.Bold, fontSize = 16.sp)
                 }
             },
             containerColor = PanelDark
