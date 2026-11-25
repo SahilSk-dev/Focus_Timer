@@ -14,6 +14,22 @@
       },
       "oauth_client": [
         {
+          "client_id": "486309866833-2q913eab2isipvmqll0kb0mqjc33g1ph.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.sahil.focusstudy",
+            "certificate_hash": "934accd8fc389244df001a3dd1910ae225e04b5b"
+          }
+        },
+        {
+          "client_id": "486309866833-kiliu9h4ld5jumsokvqvrk0airke9lgi.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.sahil.focusstudy",
+            "certificate_hash": "59ed9df20fd930b283b0272b3b668630eb836ccf"
+          }
+        },
+        {
           "client_id": "486309866833-g02tgb2ip175690ns4p885csmh89q8ip.apps.googleusercontent.com",
           "client_type": 3
         }
