@@ -459,11 +459,12 @@ fun HistorySettingsScreen(
                                         containerColor = GoldAccent,
                                         contentColor = BgDark
                                     ),
+                                    enabled = syncStatus != "Signing in...",
                                     shape = RoundedCornerShape(8.dp),
                                     modifier = Modifier.fillMaxWidth().height(46.dp)
                                 ) {
                                     Text(
-                                        "Sign in with Google",
+                                        if (syncStatus == "Signing in...") "Signing in..." else "Sign in with Google",
                                         fontWeight = FontWeight.Bold,
                                         fontSize = 14.sp
                                     )

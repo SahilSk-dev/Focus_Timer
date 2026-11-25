@@ -5,17 +5,22 @@ import android.content.Context
 import android.content.SharedPreferences
 import android.util.Log
 import androidx.credentials.CredentialManager
+import androidx.credentials.CredentialOption
 import androidx.credentials.GetCredentialRequest
+import androidx.credentials.exceptions.GetCredentialCancellationException
 import androidx.credentials.exceptions.GetCredentialException
+import androidx.credentials.exceptions.NoCredentialException
 import com.example.data.local.StudyDao
 import com.example.data.model.StudySessionEntity
 import com.example.data.model.SubjectEntity
 import com.example.data.model.WorkTypeEntity
 import com.google.android.libraries.identity.googleid.GetGoogleIdOption
+import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.auth.GoogleAuthProvider
+import com.google.firebase.auth.OAuthProvider
 import com.google.firebase.firestore.DocumentChange
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
@@ -181,29 +186,58 @@ class FirebaseSyncManager(
         _syncStatus.value = "Guest Mode"
     }
 
-    // Google Sign-In using Android Credential Manager
+    // Google Sign-In: tries native Credential Manager first, then falls back to Firebase web OAuth
+    // so debug APKs without a registered SHA-1 in Firebase Console can still sign in seamlessly.
     suspend fun signInWithGoogle(activity: Activity): Result<FirebaseUser> {
+        val fbAuth = auth ?: return Result.failure(Exception("Firebase not initialized"))
+        _syncStatus.value = "Signing in..."
+        val credentialManager = CredentialManager.create(activity)
+
+        val googleIdOption = GetGoogleIdOption.Builder()
+            .setFilterByAuthorizedAccounts(false)
+            .setServerClientId(WEB_CLIENT_ID)
+            .setAutoSelectEnabled(false)
+            .build()
+
+        val credentialAttempt = tryCredentialSignIn(activity, credentialManager, googleIdOption, fbAuth)
+        if (credentialAttempt.isSuccess) return credentialAttempt
+        val firstErr = credentialAttempt.exceptionOrNull()
+        if (firstErr is GetCredentialCancellationException) {
+            _syncStatus.value = "Sign-in cancelled"
+            return Result.failure(firstErr)
+        }
+
+        // Second native attempt: explicit Sign in with Google bottom sheet option
+        val signInWithGoogleOption = GetSignInWithGoogleOption.Builder(WEB_CLIENT_ID).build()
+        val sheetAttempt = tryCredentialSignIn(activity, credentialManager, signInWithGoogleOption, fbAuth)
+        if (sheetAttempt.isSuccess) return sheetAttempt
+        val secondErr = sheetAttempt.exceptionOrNull()
+        if (secondErr is GetCredentialCancellationException) {
+            _syncStatus.value = "Sign-in cancelled"
+            return Result.failure(secondErr)
+        }
+
+        // Fallback when Credential Manager has no matching SHA-1 OAuth client on this APK build
+        Log.w(TAG, "Credential Manager unavailable (${secondErr?.message}); falling back to Firebase OAuthProvider")
+        return signInWithWebOAuthFallback(activity, fbAuth)
+    }
+
+    private suspend fun tryCredentialSignIn(
+        activity: Activity,
+        credentialManager: CredentialManager,
+        option: CredentialOption,
+        fbAuth: FirebaseAuth
+    ): Result<FirebaseUser> {
         return try {
-            _syncStatus.value = "Signing in..."
-            val credentialManager = CredentialManager.create(activity)
-            val googleIdOption = GetGoogleIdOption.Builder()
-                .setFilterByAuthorizedAccounts(false)
-                .setServerClientId(WEB_CLIENT_ID)
-                .setAutoSelectEnabled(false)
-                .build()
-
             val request = GetCredentialRequest.Builder()
-                .addCredentialOption(googleIdOption)
+                .addCredentialOption(option)
                 .build()
-
             val result = credentialManager.getCredential(activity, request)
             val credential = result.credential
 
             if (credential.type == GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL) {
-                val fbAuth = auth ?: return Result.failure(Exception("Firebase not initialized"))
                 val googleIdTokenCredential = GoogleIdTokenCredential.createFrom(credential.data)
-                val idToken = googleIdTokenCredential.idToken
-                val authCredential = GoogleAuthProvider.getCredential(idToken, null)
+                val authCredential = GoogleAuthProvider.getCredential(googleIdTokenCredential.idToken, null)
                 val authResult = fbAuth.signInWithCredential(authCredential).await()
                 val user = authResult.user
                 if (user != null) {
@@ -216,23 +250,47 @@ class FirebaseSyncManager(
             } else {
                 Result.failure(Exception("Unsupported credential type"))
             }
-        } catch (e: androidx.credentials.exceptions.NoCredentialException) {
-            val msg = "No Google account found on device. Please add a Google account in Android Settings or configure SHA-1 in Firebase Console."
-            Log.e(TAG, "NoCredentialException: ${e.message}")
-            _syncStatus.value = "No Google account found"
-            Result.failure(Exception(msg, e))
-        } catch (e: androidx.credentials.exceptions.GetCredentialCancellationException) {
-            _syncStatus.value = "Sign-in cancelled"
+        } catch (e: GetCredentialCancellationException) {
+            Result.failure(e)
+        } catch (e: NoCredentialException) {
             Result.failure(e)
         } catch (e: GetCredentialException) {
-            val msg = "Credential error (${e::class.simpleName}): ${e.message}"
-            Log.e(TAG, msg, e)
-            _syncStatus.value = "Sign-in failed"
-            Result.failure(Exception(msg, e))
-        } catch (e: Exception) {
-            Log.e(TAG, "Google Sign-In failed: ${e.message}", e)
-            _syncStatus.value = "Sign-in error: ${e.message}"
             Result.failure(e)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    private suspend fun signInWithWebOAuthFallback(
+        activity: Activity,
+        fbAuth: FirebaseAuth
+    ): Result<FirebaseUser> {
+        return try {
+            val pending = fbAuth.pendingAuthResult
+            val authResult = if (pending != null) {
+                pending.await()
+            } else {
+                val provider = OAuthProvider.newBuilder("google.com")
+                    .addCustomParameter("prompt", "select_account")
+                    .build()
+                fbAuth.startActivityForSignInWithProvider(activity, provider).await()
+            }
+            val user = authResult.user
+            if (user != null) {
+                _currentUser.value = user
+                startRealtimeSync(user.uid)
+                Result.success(user)
+            } else {
+                _syncStatus.value = "Sign-in failed"
+                Result.failure(Exception("Google authentication returned no user"))
+            }
+        } catch (e: Exception) {
+            val msg = e.message ?: "Google Sign-In failed"
+            val cancelled = msg.contains("canceled", ignoreCase = true) ||
+                msg.contains("cancelled", ignoreCase = true)
+            _syncStatus.value = if (cancelled) "Sign-in cancelled" else "Sign-in failed"
+            Log.e(TAG, "OAuthProvider fallback failed: $msg", e)
+            Result.failure(Exception(if (cancelled) "Sign-in cancelled" else msg, e))
         }
     }
 
