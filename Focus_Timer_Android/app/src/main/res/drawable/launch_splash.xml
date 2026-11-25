@@ -8,9 +8,6 @@
     <item
         android:width="92dp"
         android:height="92dp"
-        android:gravity="center">
-        <bitmap
-            android:gravity="fill"
-            android:src="@drawable/app_icon_fg" />
-    </item>
+        android:drawable="@drawable/app_icon_fg"
+        android:gravity="center" />
 </layer-list>

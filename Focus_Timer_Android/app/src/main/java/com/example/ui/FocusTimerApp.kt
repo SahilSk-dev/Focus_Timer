@@ -78,6 +78,7 @@ import com.example.ui.theme.PanelElevated
 import com.example.ui.theme.TextDim
 import com.example.ui.theme.TextPrimary
 import com.example.viewmodel.FocusViewModel
+import kotlinx.coroutines.delay
 
 @Composable
 fun FocusTimerApp(
