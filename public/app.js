@@ -3560,7 +3560,7 @@ function renderHistory(){
   const nonStudySet = getNonStudySubjectNamesSet();
   list.innerHTML = sorted.map(s=>{
     const isNS = isNonStudyRecord(s, nonStudySet);
-    const badge = isNS ? `<span style="background:var(--line); padding:2px 6px; border-radius:4px; font-size:0.7rem; display:inline-block; width:max-content;">Non-Study</span>` : '';
+    const badge = isNS ? `<span class="hist-ns-badge">Non-Study</span>` : '';
     const safeSubject = escapeHTML(s.subject);
     const safeWorkType = escapeHTML(s.workType || 'Other');
     const safeId = escapeHTML(s.id);

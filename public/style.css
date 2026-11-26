@@ -1102,6 +1102,17 @@ button.primary:not(:disabled):hover {
 }
 .del-btn:hover { color: var(--danger); }
 
+.hist-ns-badge {
+  background: var(--line);
+  color: var(--text);
+  padding: 2px 7px;
+  border-radius: 5px;
+  font-size: 0.7rem;
+  font-weight: 500;
+  white-space: nowrap;
+  flex-shrink: 0;
+  line-height: 1.3;
+}
 .edit-btn {
   all: unset;
   cursor: pointer;
@@ -1111,6 +1122,59 @@ button.primary:not(:disabled):hover {
   transition: color 0.15s;
 }
 .edit-btn:hover { color: var(--gold); }
+
+.session-form-box {
+  max-width: 620px;
+  width: 92%;
+}
+.session-time-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: 10px;
+  align-items: end;
+  margin-bottom: 12px;
+}
+.session-duration-cell {
+  display: flex;
+  align-items: flex-end;
+}
+.session-duration-cell .session-duration-badge {
+  margin-bottom: 0;
+  white-space: nowrap;
+  padding: 9px 14px;
+}
+.session-fields-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  margin-top: 4px;
+}
+.session-field-col {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+.session-chips-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+@media (max-width: 640px) {
+  .session-time-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+  .session-duration-cell {
+    grid-column: 1 / -1;
+  }
+  .session-duration-cell .session-duration-badge {
+    width: 100%;
+  }
+  .session-fields-grid {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+}
 
 .history-header-row {
   display: flex;
@@ -1184,6 +1248,32 @@ button.primary:not(:disabled):hover {
   font-size: 0.76rem;
   font-weight: 500;
   margin-bottom: 10px;
+}
+body[data-theme="light"] .add-session-btn {
+  background: rgba(180, 130, 20, 0.12);
+  color: #8a5a00;
+  border-color: #b8860b;
+}
+body[data-theme="light"] .session-duration-badge {
+  background: rgba(180, 130, 20, 0.12);
+  color: #8a5a00;
+  border-color: rgba(184, 134, 11, 0.45);
+}
+body[data-theme="light"] .session-duration-badge.invalid {
+  background: rgba(220, 38, 38, 0.1);
+  color: #b91c1c;
+  border-color: rgba(220, 38, 38, 0.45);
+}
+body[data-theme="light"] .session-overlap-warn {
+  background: rgba(245, 158, 11, 0.14);
+  color: #92400e;
+  border-color: #d97706;
+}
+body[data-theme="light"] .session-preset-pill.active,
+body[data-theme="light"] .session-preset-pill:hover {
+  color: #8a5a00;
+  border-color: #b8860b;
+  background: rgba(180, 130, 20, 0.12);
 }
 
 /* Export */
@@ -3979,6 +4069,12 @@ html:has(body[data-theme="light"]) { background-color: #f8fafc; }
     border-radius: 20px;
     box-shadow: 0 4px 18px rgba(0, 0, 0, 0.18);
   }
+  .history-header-row {
+    margin-bottom: 12px;
+  }
+  .history-header-row .history-title {
+    margin-bottom: 0;
+  }
   .history-title,
   .tools-title { font-size: 1rem; margin-bottom: 14px; display: block; }
   .history-list { max-height: none; }
@@ -4000,6 +4096,9 @@ html:has(body[data-theme="light"]) { background-color: #f8fafc; }
     justify-content: space-between;
     gap: 8px;
   }
+  .hist-actions-wrap {
+    gap: 2px;
+  }
   .hist-bottom-line {
     display: flex;
     align-items: center;
@@ -4016,19 +4115,21 @@ html:has(body[data-theme="light"]) { background-color: #f8fafc; }
     background: rgba(255, 255, 255, 0.08);
     white-space: nowrap;
   }
+  .edit-btn,
   .del-btn {
     all: unset;
     box-sizing: border-box;
     display: grid;
     place-content: center;
-    width: 32px;
-    height: 32px;
-    border-radius: 9px;
+    width: 30px;
+    height: 30px;
+    border-radius: 8px;
     color: var(--text-muted);
     cursor: pointer;
-    font-size: 1.15rem;
+    font-size: 1.05rem;
     line-height: 1;
   }
+  .edit-btn:active { background: rgba(212, 175, 55, 0.14); color: var(--gold); }
   .del-btn:active { background: rgba(239, 68, 68, 0.14); color: var(--danger); }
 
   .export-row { gap: 10px; margin-top: 0; }
