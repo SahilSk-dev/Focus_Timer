@@ -27,10 +27,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.CloudSync
+import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.NotificationsActive
-import androidx.compose.material.icons.filled.PhoneAndroid
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -595,7 +594,7 @@ private fun WelcomeOnboardingOverlay(
                             .height(50.dp)
                     ) {
                         Icon(
-                            imageVector = Icons.Default.CloudSync,
+                            imageVector = Icons.Default.Cloud,
                             contentDescription = null,
                             modifier = Modifier.size(18.dp)
                         )
@@ -616,7 +615,7 @@ private fun WelcomeOnboardingOverlay(
                             .height(48.dp)
                     ) {
                         Icon(
-                            imageVector = Icons.Default.PhoneAndroid,
+                            imageVector = Icons.Default.Timer,
                             contentDescription = null,
                             tint = TextPrimary,
                             modifier = Modifier.size(17.dp)

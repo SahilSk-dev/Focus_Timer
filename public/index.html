@@ -294,8 +294,8 @@
         <div class="analytics-engine-section">
           <div class="section-header-row">
             <div>
-              <h3 class="section-title"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px; margin-right:6px;"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>Study Insights & Goal Projection</h3>
-              <div class="section-subtitle">Exam pacing, peak study hours & method breakdown</div>
+              <h3 class="section-title"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px; margin-right:6px;"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>Study Insights &amp; Analytics</h3>
+              <div class="section-subtitle">Focus quality, peak study hours &amp; method breakdown</div>
             </div>
             <button class="download-analysis-pdf-btn" id="downloadAnalysisPdfBtn" title="Export Complete Report to PDF">
               <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg> Full Report PDF
@@ -311,58 +311,6 @@
 
           <!-- Empty Notice Banner when current filter has 0 sessions but all-time has data -->
           <div id="analyticsEmptyNotice" class="analytics-empty-notice" style="display:none;"></div>
-
-          <!-- Study Goal & Daily Pace Card (Full Width) -->
-          <div class="exam-projection-card" id="examProjectionCard">
-            <div class="exam-projection-header">
-              <div class="exam-projection-title-wrap">
-                <span class="exam-projection-icon"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg></span>
-                <div>
-                  <div class="exam-projection-name" id="examTargetName">Study Goal & Daily Pace</div>
-                  <div class="exam-projection-sub" id="examTargetSub">Track your hours & daily study pace</div>
-                </div>
-              </div>
-              <div class="exam-projection-actions">
-                <span class="exam-countdown-pill" id="examCountdownPill">-- Days Left</span>
-                <button class="exam-edit-btn" id="examGoalEditBtn" title="Set Study Goal & Target Date"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px; margin-right:4px;"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>Edit Goal</button>
-              </div>
-            </div>
-
-            <!-- Study Goal Progress Bar -->
-            <div class="exam-progress-wrap">
-              <div class="exam-progress-labels">
-                <span id="examCompletedHoursLabel">0.0h Done</span>
-                <span id="examTargetHoursLabel">Goal: 150h</span>
-              </div>
-              <div class="track" style="height: 8px;"><div class="fill green" id="examProgressFill" style="width: 0%;"></div></div>
-            </div>
-
-            <!-- 4-Stat Metrics Grid -->
-            <div class="exam-metrics-grid">
-              <div class="exam-metric-box">
-                <div class="exam-metric-val" id="examRemainingHoursVal">0h</div>
-                <div class="exam-metric-label">Hours Left</div>
-              </div>
-              <div class="exam-metric-box">
-                <div class="exam-metric-val" id="examRequiredPaceVal">0.0h/d</div>
-                <div class="exam-metric-label">Daily Pace Needed</div>
-              </div>
-              <div class="exam-metric-box">
-                <div class="exam-metric-val" id="examActualVelocityVal">0.0h/d</div>
-                <div class="exam-metric-label">Your 7-Day Avg</div>
-              </div>
-              <div class="exam-metric-box">
-                <div class="exam-metric-val" id="examProjectedDateVal">--</div>
-                <div class="exam-metric-label">Est. Finish</div>
-              </div>
-            </div>
-
-            <!-- Friendly Status Banner -->
-            <div class="exam-status-footer">
-              <div class="exam-status-badge" id="examFeasibilityBadge">Checking Pace...</div>
-              <div class="exam-status-text" id="examFeasibilityText">See how many hours per day you need to reach your goal on time.</div>
-            </div>
-          </div>
 
           <!-- Clean 2-Column Insights Grid -->
           <div class="analytics-grid">

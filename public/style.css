@@ -78,7 +78,7 @@ html, body {
   margin: 0;
   padding: 0;
   background: var(--bg);
-  overflow-x: hidden;
+  overflow-x: clip;
 }
 body {
   background: var(--bg) !important;
@@ -88,7 +88,7 @@ body {
   margin: 0;
   padding: 0;
   display: block;
-  overflow-x: hidden;
+  overflow-x: clip;
   -webkit-font-smoothing: antialiased;
 }
 button, .btn, .sel-chip, .nav-item, input, select {
