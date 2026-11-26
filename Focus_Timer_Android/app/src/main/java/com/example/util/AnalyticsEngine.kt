@@ -142,7 +142,7 @@ object AnalyticsEngine {
         examGoal: ExamGoal? = null,
         dailyTargetMinutes: Int = 120
     ): AnalyticsReport {
-        val studySessions = allSessions.filter { !it.isNonStudy && !it.id.startsWith("ns") }
+        val studySessions = allSessions.filter { !it.isNonStudy }
         val now = Calendar.getInstance()
         val daysLimit = timeframe.days
 

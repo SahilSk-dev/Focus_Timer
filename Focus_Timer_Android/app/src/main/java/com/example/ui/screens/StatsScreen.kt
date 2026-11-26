@@ -99,7 +99,7 @@ fun StatsScreen(
     val studySessions = remember(allSessions, nonStudySubjectNames) {
         allSessions.filter { s ->
             val baseSubj = s.subject.substringBefore(" - ")
-            !s.isNonStudy && !s.id.startsWith("ns") &&
+            !s.isNonStudy &&
                 !nonStudySubjectNames.contains(s.subject) && !nonStudySubjectNames.contains(baseSubj)
         }
     }
