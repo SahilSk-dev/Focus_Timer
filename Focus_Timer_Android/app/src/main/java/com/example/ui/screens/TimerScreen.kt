@@ -51,6 +51,7 @@ import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
@@ -158,23 +159,20 @@ fun TimerScreen(
         return
     }
 
+    val currentTheme by viewModel.currentAppTheme.collectAsState()
+
     Column(
         modifier = modifier
             .fillMaxSize()
             .background(BgDark)
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 20.dp, vertical = 16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        val currentTheme by viewModel.currentAppTheme.collectAsState()
-
-        // App Header with Sidebar Menu + Brand + Black / Light Mode Toggle
+        // Pinned / Locked Top Header (never scrolls away)
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween,
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(bottom = 18.dp)
+                .padding(horizontal = 20.dp, vertical = 12.dp)
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 IconButton(
@@ -253,7 +251,17 @@ fun TimerScreen(
             }
         }
 
-        Spacer(modifier = Modifier.height(4.dp))
+        HorizontalDivider(color = LineBorder.copy(alpha = 0.6f))
+
+        // Scrollable Timer Body
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 20.dp, vertical = 14.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
 
         // Hero Timer Stage (Clock + Phase Badge + Start/Pause/Reset above the fold!)
         Surface(
@@ -676,6 +684,7 @@ fun TimerScreen(
         }
 
         Spacer(modifier = Modifier.height(24.dp))
+        }
     }
 
     // Reset Confirmation Dialog (When user spent >= 1m)
@@ -1020,8 +1029,8 @@ private fun FullscreenFocusLayout(
             Spacer(modifier = Modifier.height(16.dp))
 
             Row(
-                modifier = Modifier.fillMaxWidth().widthIn(max = 420.dp),
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
+                modifier = Modifier.fillMaxWidth().widthIn(max = 520.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 Button(
                     onClick = onStart,
@@ -1033,7 +1042,7 @@ private fun FullscreenFocusLayout(
                     shape = RoundedCornerShape(10.dp),
                     modifier = Modifier.weight(1f).height(48.dp)
                 ) {
-                    Text("Start", fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                    Text("Start", fontWeight = FontWeight.Bold, fontSize = 14.sp)
                 }
 
                 Button(
@@ -1047,7 +1056,7 @@ private fun FullscreenFocusLayout(
                     shape = RoundedCornerShape(10.dp),
                     modifier = Modifier.weight(1f).height(48.dp)
                 ) {
-                    Text("Pause", fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                    Text("Pause", fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
                 }
 
                 Button(
@@ -1060,7 +1069,19 @@ private fun FullscreenFocusLayout(
                     shape = RoundedCornerShape(10.dp),
                     modifier = Modifier.weight(1f).height(48.dp)
                 ) {
-                    Text("Reset", fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                    Text("Reset", fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                }
+
+                Button(
+                    onClick = onExitFullscreen,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFFDC2626),
+                        contentColor = Color.White
+                    ),
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier.weight(1f).height(48.dp)
+                ) {
+                    Text("Exit", fontSize = 14.sp, fontWeight = FontWeight.Bold)
                 }
             }
         }

@@ -166,12 +166,11 @@ fun HistoryScreen(
         modifier = modifier
             .fillMaxSize()
             .background(BgDark)
-            .padding(horizontal = 16.dp, vertical = 12.dp)
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(bottom = 12.dp, top = 4.dp),
+                .padding(horizontal = 16.dp, vertical = 12.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -232,6 +231,14 @@ fun HistoryScreen(
             }
         }
 
+        HorizontalDivider(color = LineBorder.copy(alpha = 0.6f))
+
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 12.dp)
+        ) {
         if (recentlyDeletedSession != null) {
             val deleted = recentlyDeletedSession!!
             Surface(
@@ -319,7 +326,8 @@ fun HistoryScreen(
         } else {
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                contentPadding = PaddingValues(bottom = 16.dp)
             ) {
                 items(
                     items = allSessions,
@@ -333,6 +341,7 @@ fun HistoryScreen(
                     )
                 }
             }
+        }
         }
     }
 
@@ -530,12 +539,11 @@ fun SettingsToolsScreen(
         modifier = modifier
             .fillMaxSize()
             .background(BgDark)
-            .padding(horizontal = 16.dp, vertical = 12.dp)
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(bottom = 12.dp, top = 4.dp),
+                .padding(horizontal = 16.dp, vertical = 12.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -575,6 +583,14 @@ fun SettingsToolsScreen(
             }
         }
 
+        HorizontalDivider(color = LineBorder.copy(alpha = 0.6f))
+
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 12.dp)
+        ) {
         // 4-section selector: Cloud Sync | Backup & Data | Alarm | Subjects
         Surface(
             modifier = Modifier.fillMaxWidth(),
@@ -1581,6 +1597,7 @@ fun SettingsToolsScreen(
             }
             }
         }
+        }
     }
 
     // Add / Edit Subject & Work Type Dialogs (shared unified dialogs)
@@ -2385,7 +2402,7 @@ private fun SessionFormDialog(
                     ) {
                         Text(
                             text = "Overlaps with ${overlap.subject} (${com.example.util.DateFormatterCache.formatTime(oStart)} - ${com.example.util.DateFormatterCache.formatTime(oEnd)})",
-                            color = Color(0xFFFCD34D),
+                            color = if (ActiveTheme.isLight) Color(0xFFB45309) else Color(0xFFFCD34D),
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Medium,
                             modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)

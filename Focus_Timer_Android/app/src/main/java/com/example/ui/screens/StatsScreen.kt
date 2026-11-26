@@ -134,16 +134,14 @@ fun StatsScreen(
         modifier = modifier
             .fillMaxSize()
             .background(BgDark)
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 16.dp, vertical = 14.dp)
     ) {
         // ============================================================
-        // 1. HEADER (Menu + Title + Single PDF Report Action)
+        // 1. LOCKED HEADER (Menu + Title + Single PDF Report Action)
         // ============================================================
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(bottom = 14.dp),
+                .padding(horizontal = 16.dp, vertical = 12.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -205,6 +203,16 @@ fun StatsScreen(
                 }
             }
         }
+
+        HorizontalDivider(color = LineBorder.copy(alpha = 0.6f))
+
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 16.dp, vertical = 14.dp)
+        ) {
 
         // ============================================================
         // 2. KPI METRIC CARDS (Day Streak, Total Focus, Daily Goal)
@@ -697,6 +705,7 @@ fun StatsScreen(
         }
 
         Spacer(modifier = Modifier.height(30.dp))
+        }
     }
 
     // ============================================================

@@ -129,11 +129,11 @@ fun FocusTimerApp(
     }
     val currentAppTheme by viewModel.currentAppTheme.collectAsState()
 
-    BackHandler(enabled = drawerState.isOpen || activeSettingsSection != null) {
-        if (drawerState.isOpen) {
-            coroutineScope.launch { drawerState.close() }
-        } else {
-            activeSettingsSection = null
+    BackHandler(enabled = isFullscreen || drawerState.isOpen || activeSettingsSection != null) {
+        when {
+            isFullscreen -> viewModel.toggleFullscreen()
+            drawerState.isOpen -> coroutineScope.launch { drawerState.close() }
+            else -> activeSettingsSection = null
         }
     }
 
@@ -231,10 +231,9 @@ fun FocusTimerApp(
                     Column(
                         modifier = Modifier
                             .fillMaxSize()
-                            .verticalScroll(rememberScrollState())
                             .padding(horizontal = 16.dp, vertical = 20.dp)
                     ) {
-                        // Sidebar Header
+                        // Pinned Sidebar Header & Account Pill
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -279,7 +278,7 @@ fun FocusTimerApp(
                             },
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(bottom = 16.dp)
+                                .padding(bottom = 14.dp)
                         ) {
                             Row(
                                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp),
@@ -301,6 +300,16 @@ fun FocusTimerApp(
                                 )
                             }
                         }
+
+                        HorizontalDivider(color = LineBorder, modifier = Modifier.padding(bottom = 12.dp))
+
+                        // Scrollable Middle Navigation + Settings List
+                        Column(
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxWidth()
+                                .verticalScroll(rememberScrollState())
+                        ) {
 
                         val itemColors = NavigationDrawerItemDefaults.colors(
                             selectedContainerColor = GoldAccent.copy(alpha = 0.2f),
@@ -367,10 +376,11 @@ fun FocusTimerApp(
                             )
                         }
 
-                        Spacer(modifier = Modifier.weight(1f))
+                        }
+
                         HorizontalDivider(color = LineBorder, modifier = Modifier.padding(vertical = 12.dp))
 
-                        // Appearance quick switch
+                        // Appearance quick switch (pinned at bottom of Sidebar)
                         Surface(
                             color = PanelElevated,
                             shape = RoundedCornerShape(10.dp),
