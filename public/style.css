@@ -525,10 +525,24 @@ body[data-theme="light"] input:focus {
   border-radius: 12px;
   padding: 24px;
   width: 90%;
-  max-width: 340px;
+  max-width: 380px;
+  max-height: 90vh;
+  overflow-y: auto;
   box-shadow: 0 12px 35px rgba(0,0,0,0.8);
   transform: translateY(15px);
   transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+#sessionFormModal input[type="time"] {
+  width: 100%;
+  background: var(--panel-elevated);
+  border: 1px solid var(--line);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 8px 10px;
+  color-scheme: dark;
+}
+body[data-theme="light"] #sessionFormModal input[type="time"] {
+  color-scheme: light;
 }
 .modal-overlay.show .modal-box { transform: translateY(0); }
 .modal-title {
@@ -1087,6 +1101,90 @@ button.primary:not(:disabled):hover {
   transition: color 0.15s;
 }
 .del-btn:hover { color: var(--danger); }
+
+.edit-btn {
+  all: unset;
+  cursor: pointer;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  padding: 2px 6px;
+  transition: color 0.15s;
+}
+.edit-btn:hover { color: var(--gold); }
+
+.history-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.history-header-row .history-title {
+  margin-bottom: 0;
+}
+.add-session-btn {
+  background: rgba(212, 175, 55, 0.12);
+  border: 1px solid var(--gold);
+  color: var(--gold-bright, var(--gold));
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, transform 0.1s;
+  white-space: nowrap;
+}
+.add-session-btn:hover { background: rgba(212, 175, 55, 0.22); }
+
+.session-presets-row {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.session-preset-pill {
+  flex: 1;
+  background: var(--panel-elevated);
+  border: 1px solid var(--line);
+  color: var(--text-muted);
+  border-radius: 8px;
+  padding: 6px 8px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: center;
+}
+.session-preset-pill.active,
+.session-preset-pill:hover {
+  border-color: var(--gold);
+  color: var(--gold-bright, var(--gold));
+  background: rgba(212, 175, 55, 0.12);
+}
+.session-duration-badge {
+  background: rgba(212, 175, 55, 0.12);
+  border: 1px solid rgba(212, 175, 55, 0.45);
+  color: var(--gold-bright, var(--gold));
+  border-radius: 8px;
+  padding: 7px 10px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-align: center;
+  margin-bottom: 10px;
+}
+.session-duration-badge.invalid {
+  background: rgba(239, 68, 68, 0.14);
+  border-color: rgba(239, 68, 68, 0.55);
+  color: #fca5a5;
+}
+.session-overlap-warn {
+  background: rgba(245, 158, 11, 0.16);
+  border: 1px solid #f59e0b;
+  color: #fcd34d;
+  border-radius: 8px;
+  padding: 7px 10px;
+  font-size: 0.76rem;
+  font-weight: 500;
+  margin-bottom: 10px;
+}
 
 /* Export */
 .export-row { display: flex; flex-direction: column; gap: 12px; margin-top: 10px; width: 100%; }

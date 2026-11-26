@@ -32,6 +32,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Cloud
@@ -43,6 +44,7 @@ import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.Sync
@@ -75,7 +77,10 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TimePicker
+import androidx.compose.material3.TimePickerDefaults
 import androidx.compose.material3.rememberDatePickerState
+import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -153,6 +158,7 @@ fun HistorySettingsScreen(
     var selectedTab by remember { mutableStateOf(0) } // 0: History, 1: Backup & Export, 2: Subjects & Work
     var sessionToDelete by remember { mutableStateOf<StudySessionEntity?>(null) }
     var sessionToEdit by remember { mutableStateOf<StudySessionEntity?>(null) }
+    var showAddSessionDialog by remember { mutableStateOf(false) }
     var subjectToEdit by remember { mutableStateOf<SubjectEntity?>(null) }
     var workTypeToEdit by remember { mutableStateOf<WorkTypeEntity?>(null) }
     var showAddSubjectDialog by remember { mutableStateOf(false) }
@@ -385,35 +391,62 @@ fun HistorySettingsScreen(
             when (tabIndex) {
                 0 -> {
                 // SESSION HISTORY LIST
-                if (allSessions.isEmpty()) {
-                    Box(
+                Column(modifier = Modifier.fillMaxSize()) {
+                    OutlinedButton(
+                        onClick = { showAddSessionDialog = true },
                         modifier = Modifier
-                            .fillMaxSize()
-                            .padding(top = 40.dp),
-                        contentAlignment = Alignment.TopCenter
+                            .fillMaxWidth()
+                            .padding(bottom = 10.dp),
+                        shape = RoundedCornerShape(10.dp),
+                        border = BorderStroke(1.dp, GoldAccent),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            containerColor = PanelDark,
+                            contentColor = GoldBright
+                        )
                     ) {
+                        Icon(
+                            imageVector = Icons.Default.Add,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = "No study sessions recorded yet.\nStart a timer to record your focus time!",
-                            color = TextDim,
-                            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                            fontSize = 14.sp
+                            text = "Add Missed Session",
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 13.sp
                         )
                     }
-                } else {
-                    LazyColumn(
-                        modifier = Modifier.fillMaxSize(),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        items(
-                            items = allSessions,
-                            key = { it.id },
-                            contentType = { "session_item" }
-                        ) { session ->
-                            SessionHistoryItem(
-                                session = session,
-                                onEdit = { sessionToEdit = session },
-                                onDelete = { sessionToDelete = session }
+
+                    if (allSessions.isEmpty()) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(top = 32.dp),
+                            contentAlignment = Alignment.TopCenter
+                        ) {
+                            Text(
+                                text = "No study sessions recorded yet.\nStart a timer or tap Add Missed Session!",
+                                color = TextDim,
+                                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                                fontSize = 14.sp
                             )
+                        }
+                    } else {
+                        LazyColumn(
+                            modifier = Modifier.fillMaxSize(),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            items(
+                                items = allSessions,
+                                key = { it.id },
+                                contentType = { "session_item" }
+                            ) { session ->
+                                SessionHistoryItem(
+                                    session = session,
+                                    onEdit = { sessionToEdit = session },
+                                    onDelete = { sessionToDelete = session }
+                                )
+                            }
                         }
                     }
                 }
@@ -1363,215 +1396,48 @@ fun HistorySettingsScreen(
         )
     }
 
-    // Edit session dialog
-    if (sessionToEdit != null) {
-        val s = sessionToEdit!!
-        var editSubject by remember(s) { mutableStateOf(s.subject) }
-        var editSubSubject by remember(s) { mutableStateOf(s.subSubject ?: "") }
-        var editWorkType by remember(s) { mutableStateOf(s.workType) }
-        var editMinutes by remember(s) { mutableStateOf(s.minutes.toString()) }
-        var editDate by remember(s) { mutableStateOf(s.date) }
-        var editIsNonStudy by remember(s) { mutableStateOf(s.isNonStudy) }
-
-        AlertDialog(
-            onDismissRequest = { sessionToEdit = null },
-            title = { Text("Edit Session", color = GoldBright) },
-            text = {
-                Column(
-                    modifier = Modifier.verticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    OutlinedTextField(
-                        value = editSubject,
-                        onValueChange = { editSubject = it },
-                        label = { Text("Subject (e.g. Bengali, Math, SLEEP)", color = TextDim) },
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = GoldAccent,
-                            unfocusedBorderColor = LineBorder,
-                            focusedTextColor = TextPrimary,
-                            unfocusedTextColor = TextPrimary
-                        )
-                    )
-
-                    // Quick subject chips
-                    FlowRow(
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        verticalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        subjects.forEach { subj ->
-                            val isSel = editSubject.equals(subj.name, ignoreCase = true)
-                            Surface(
-                                shape = RoundedCornerShape(12.dp),
-                                color = if (isSel) GoldAccent.copy(alpha = 0.2f) else PanelElevated,
-                                border = BorderStroke(1.dp, if (isSel) GoldAccent else LineBorder),
-                                modifier = Modifier.clickable {
-                                    editSubject = subj.name
-                                    editIsNonStudy = subj.isNonStudy
-                                }
-                            ) {
-                                Text(
-                                    text = subj.name + if (subj.isNonStudy) " (NS)" else "",
-                                    color = if (isSel) GoldBright else TextDim,
-                                    fontSize = 11.sp,
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                                )
-                            }
-                        }
-                    }
-
-                    OutlinedTextField(
-                        value = editSubSubject,
-                        onValueChange = { editSubSubject = it },
-                        label = { Text("Sub-Subject (Optional)", color = TextDim) },
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = GoldAccent,
-                            unfocusedBorderColor = LineBorder,
-                            focusedTextColor = TextPrimary,
-                            unfocusedTextColor = TextPrimary
-                        )
-                    )
-
-                    OutlinedTextField(
-                        value = editWorkType,
-                        onValueChange = { editWorkType = it },
-                        label = { Text("Work Type (e.g. Revision, Memorize, N/A)", color = TextDim) },
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = GoldAccent,
-                            unfocusedBorderColor = LineBorder,
-                            focusedTextColor = TextPrimary,
-                            unfocusedTextColor = TextPrimary
-                        )
-                    )
-
-                    // Quick work type chips
-                    FlowRow(
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        verticalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        workTypes.forEach { wt ->
-                            val isSel = editWorkType.equals(wt.name, ignoreCase = true)
-                            Surface(
-                                shape = RoundedCornerShape(12.dp),
-                                color = if (isSel) GoldAccent.copy(alpha = 0.2f) else PanelElevated,
-                                border = BorderStroke(1.dp, if (isSel) GoldAccent else LineBorder),
-                                modifier = Modifier.clickable { editWorkType = wt.name }
-                            ) {
-                                Text(
-                                    text = wt.name,
-                                    color = if (isSel) GoldBright else TextDim,
-                                    fontSize = 11.sp,
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                                )
-                            }
-                        }
-                    }
-
-                    OutlinedTextField(
-                        value = editMinutes,
-                        onValueChange = { editMinutes = it },
-                        label = { Text("Duration (Minutes)", color = TextDim) },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = GoldAccent,
-                            unfocusedBorderColor = LineBorder,
-                            focusedTextColor = TextPrimary,
-                            unfocusedTextColor = TextPrimary
-                        )
-                    )
-
-                    OutlinedTextField(
-                        value = editDate,
-                        onValueChange = { editDate = it },
-                        label = { Text("Date (YYYY-MM-DD)", color = TextDim) },
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = GoldAccent,
-                            unfocusedBorderColor = LineBorder,
-                            focusedTextColor = TextPrimary,
-                            unfocusedTextColor = TextPrimary
-                        )
-                    )
-
-                    // Non-Study Category Checkbox
-                    Surface(
-                        shape = RoundedCornerShape(8.dp),
-                        color = PanelElevated,
-                        border = BorderStroke(1.dp, if (editIsNonStudy) GoldAccent else LineBorder),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { editIsNonStudy = !editIsNonStudy }
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = "Non-Study Session",
-                                    color = if (editIsNonStudy) GoldBright else TextPrimary,
-                                    fontSize = 13.sp,
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                                Text(
-                                    text = "Excluded from daily study goal & deep focus stats",
-                                    color = TextDim,
-                                    fontSize = 11.sp
-                                )
-                            }
-                            Checkbox(
-                                checked = editIsNonStudy,
-                                onCheckedChange = { editIsNonStudy = it },
-                                colors = CheckboxDefaults.colors(checkedColor = GoldAccent)
-                            )
-                        }
-                    }
-                }
+    // Unified Add / Edit Session Dialog (Start Time -> End Time, no Date edit on existing sessions)
+    if (showAddSessionDialog || sessionToEdit != null) {
+        val editing = sessionToEdit
+        SessionFormDialog(
+            existingSession = editing,
+            allSessions = allSessions,
+            subjects = subjects,
+            workTypes = workTypes,
+            onDismiss = {
+                showAddSessionDialog = false
+                sessionToEdit = null
             },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        val mins = editMinutes.toIntOrNull()
-                        val trimmedDate = editDate.trim()
-                        val dateValid = Regex("^\\d{4}-\\d{2}-\\d{2}$").matches(trimmedDate)
-                        if (editSubject.isBlank()) {
-                            viewModel.showToast("Subject name cannot be empty")
-                            return@Button
-                        }
-                        if (mins == null || mins !in 1..1440) {
-                            viewModel.showToast("Duration must be between 1 and 1440 minutes")
-                            return@Button
-                        }
-                        if (!dateValid) {
-                            viewModel.showToast("Date must use YYYY-MM-DD format")
-                            return@Button
-                        }
-                        val updated = s.copy(
-                            subject = editSubject.trim(),
-                            subSubject = if (editSubSubject.isNotBlank()) editSubSubject.trim() else null,
-                            workType = editWorkType.trim().ifBlank { "Other" },
-                            minutes = mins,
-                            date = trimmedDate,
-                            isNonStudy = editIsNonStudy
-                        )
-                        viewModel.updateSession(updated, previousIsNonStudy = s.isNonStudy)
-                        sessionToEdit = null
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = GoldAccent, contentColor = BgDark)
-                ) {
-                    Text("Save & Sync")
+            onShowToast = { viewModel.showToast(it) },
+            onSave = { date, subject, subSubject, workType, minutes, endTs, isNonStudy ->
+                if (editing != null) {
+                    val updated = editing.copy(
+                        subject = subject,
+                        subSubject = subSubject,
+                        workType = workType,
+                        minutes = minutes,
+                        timestamp = endTs,
+                        isNonStudy = isNonStudy
+                    )
+                    viewModel.updateSession(
+                        updated,
+                        previousIsNonStudy = editing.isNonStudy,
+                        previousTimestamp = editing.timestamp
+                    )
+                    sessionToEdit = null
+                } else {
+                    viewModel.addManualSession(
+                        date = date,
+                        subject = subject,
+                        subSubject = subSubject,
+                        workType = workType,
+                        minutes = minutes,
+                        endTimestamp = endTs,
+                        isNonStudy = isNonStudy
+                    )
+                    showAddSessionDialog = false
                 }
-            },
-            dismissButton = {
-                TextButton(onClick = { sessionToEdit = null }) {
-                    Text("Cancel", color = TextDim)
-                }
-            },
-            containerColor = PanelDark
+            }
         )
     }
 
@@ -2086,5 +1952,521 @@ private fun shiftIsoDate(baseDateStr: String, deltaDays: Int): String {
         sdf.format(cal.time)
     } catch (_: Exception) {
         baseDateStr
+    }
+}
+
+private fun extractHourMinute(timestamp: Long): Pair<Int, Int> {
+    val cal = Calendar.getInstance().apply { timeInMillis = timestamp }
+    return cal.get(Calendar.HOUR_OF_DAY) to cal.get(Calendar.MINUTE)
+}
+
+private fun buildLocalTimestamp(dateStr: String, hourOfDay: Int, minute: Int): Long {
+    val cal = Calendar.getInstance()
+    val parsed = com.example.util.DateFormatterCache.parseIsoDate(dateStr)
+    if (parsed != null) cal.time = parsed
+    cal.set(Calendar.HOUR_OF_DAY, hourOfDay)
+    cal.set(Calendar.MINUTE, minute)
+    cal.set(Calendar.SECOND, 0)
+    cal.set(Calendar.MILLISECOND, 0)
+    return cal.timeInMillis
+}
+
+private fun formatMinutesOfDay(hourOfDay: Int, minute: Int): String {
+    val cal = Calendar.getInstance().apply {
+        set(Calendar.HOUR_OF_DAY, hourOfDay)
+        set(Calendar.MINUTE, minute)
+    }
+    return com.example.util.DateFormatterCache.formatTime(cal.timeInMillis)
+}
+
+private fun findOverlappingSession(
+    allSessions: List<StudySessionEntity>,
+    dateStr: String,
+    startTs: Long,
+    endTs: Long,
+    excludeId: Long?
+): StudySessionEntity? {
+    return allSessions.firstOrNull { other ->
+        if (excludeId != null && other.id == excludeId) return@firstOrNull false
+        if (other.date != dateStr) return@firstOrNull false
+        val otherEnd = other.timestamp
+        val otherStart = otherEnd - (other.minutes.toLong() * 60_000L)
+        otherStart < endTs && otherEnd > startTs
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
+@Composable
+private fun SessionFormDialog(
+    existingSession: StudySessionEntity?,
+    allSessions: List<StudySessionEntity>,
+    subjects: List<SubjectEntity>,
+    workTypes: List<WorkTypeEntity>,
+    onDismiss: () -> Unit,
+    onShowToast: (String) -> Unit,
+    onSave: (
+        date: String,
+        subject: String,
+        subSubject: String?,
+        workType: String,
+        minutes: Int,
+        endTimestamp: Long,
+        isNonStudy: Boolean
+    ) -> Unit
+) {
+    val isEdit = existingSession != null
+    val todayStr = remember { FocusRepository.getTodayString() }
+    val yesterdayStr = remember(todayStr) { shiftIsoDate(todayStr, -1) }
+
+    val initialDate = existingSession?.date ?: todayStr
+    val defaultEndTs = existingSession?.timestamp ?: System.currentTimeMillis()
+    val defaultStartTs = if (existingSession != null) {
+        defaultEndTs - (existingSession.minutes.toLong() * 60_000L)
+    } else {
+        defaultEndTs - (30L * 60_000L)
+    }
+    val (initStartH, initStartM) = remember(existingSession) { extractHourMinute(defaultStartTs) }
+    val (initEndH, initEndM) = remember(existingSession) { extractHourMinute(defaultEndTs) }
+
+    var selectedDate by remember(existingSession) { mutableStateOf(initialDate) }
+    var subject by remember(existingSession) { mutableStateOf(existingSession?.subject ?: (subjects.firstOrNull { !it.isNonStudy }?.name ?: "")) }
+    var subSubject by remember(existingSession) { mutableStateOf(existingSession?.subSubject ?: "") }
+    var workType by remember(existingSession) { mutableStateOf(existingSession?.workType ?: (workTypes.firstOrNull()?.name ?: "Revision")) }
+    var isNonStudy by remember(existingSession) { mutableStateOf(existingSession?.isNonStudy ?: false) }
+
+    var startHour by remember(existingSession) { mutableStateOf(initStartH) }
+    var startMinute by remember(existingSession) { mutableStateOf(initStartM) }
+    var endHour by remember(existingSession) { mutableStateOf(initEndH) }
+    var endMinute by remember(existingSession) { mutableStateOf(initEndM) }
+    var pickingTimeFor by remember { mutableStateOf<String?>(null) } // "start" or "end"
+
+    val startTotalMins = startHour * 60 + startMinute
+    val endTotalMins = endHour * 60 + endMinute
+    val computedMinutes = endTotalMins - startTotalMins
+    val startTs = remember(selectedDate, startHour, startMinute) {
+        buildLocalTimestamp(selectedDate, startHour, startMinute)
+    }
+    val endTs = remember(selectedDate, endHour, endMinute) {
+        buildLocalTimestamp(selectedDate, endHour, endMinute)
+    }
+
+    val overlap = remember(allSessions, selectedDate, startTs, endTs, existingSession?.id, computedMinutes) {
+        if (computedMinutes in 1..1440) {
+            findOverlappingSession(allSessions, selectedDate, startTs, endTs, existingSession?.id)
+        } else {
+            null
+        }
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                text = if (isEdit) "Edit Session" else "Add Missed Session",
+                color = GoldBright
+            )
+        },
+        text = {
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                if (!isEdit) {
+                    // Quick date toggle for missed sessions (Today / Yesterday)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        listOf("Today" to todayStr, "Yesterday" to yesterdayStr).forEach { (label, dateVal) ->
+                            val isSel = selectedDate == dateVal
+                            Surface(
+                                shape = RoundedCornerShape(10.dp),
+                                color = if (isSel) GoldAccent.copy(alpha = 0.2f) else PanelElevated,
+                                border = BorderStroke(1.dp, if (isSel) GoldAccent else LineBorder),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clickable { selectedDate = dateVal }
+                            ) {
+                                Text(
+                                    text = "$label (${com.example.util.DateFormatterCache.formatReadableDate(dateVal)})",
+                                    color = if (isSel) GoldBright else TextDim,
+                                    fontSize = 11.sp,
+                                    fontWeight = if (isSel) FontWeight.SemiBold else FontWeight.Normal,
+                                    textAlign = TextAlign.Center,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 7.dp)
+                                )
+                            }
+                        }
+                    }
+
+                    // Quick missed-duration presets ending now
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        listOf("Last 30m" to 30, "Last 1h" to 60, "Last 2h" to 120).forEach { (label, mins) ->
+                            Surface(
+                                shape = RoundedCornerShape(10.dp),
+                                color = PanelElevated,
+                                border = BorderStroke(1.dp, LineBorder),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clickable {
+                                        val now = System.currentTimeMillis()
+                                        val (eh, em) = extractHourMinute(now)
+                                        val (sh, sm) = extractHourMinute(now - mins * 60_000L)
+                                        endHour = eh
+                                        endMinute = em
+                                        startHour = sh
+                                        startMinute = sm
+                                        selectedDate = todayStr
+                                    }
+                            ) {
+                                Text(
+                                    text = label,
+                                    color = GoldLight,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    textAlign = TextAlign.Center,
+                                    modifier = Modifier.padding(vertical = 6.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+
+                // Start Time -> End Time Pickers
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = PanelElevated,
+                        border = BorderStroke(1.dp, LineBorder),
+                        modifier = Modifier
+                            .weight(1f)
+                            .clickable { pickingTimeFor = "start" }
+                    ) {
+                        Column(modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp)) {
+                            Text("Start Time", color = TextDim, fontSize = 10.sp)
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Schedule,
+                                    contentDescription = null,
+                                    tint = GoldAccent,
+                                    modifier = Modifier.size(14.dp)
+                                )
+                                Text(
+                                    text = formatMinutesOfDay(startHour, startMinute),
+                                    color = TextPrimary,
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+                        }
+                    }
+
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = PanelElevated,
+                        border = BorderStroke(1.dp, LineBorder),
+                        modifier = Modifier
+                            .weight(1f)
+                            .clickable { pickingTimeFor = "end" }
+                    ) {
+                        Column(modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp)) {
+                            Text("End Time", color = TextDim, fontSize = 10.sp)
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Schedule,
+                                    contentDescription = null,
+                                    tint = GoldAccent,
+                                    modifier = Modifier.size(14.dp)
+                                )
+                                Text(
+                                    text = formatMinutesOfDay(endHour, endMinute),
+                                    color = TextPrimary,
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+                        }
+                    }
+                }
+
+                // Live calculated duration badge
+                val durationValid = computedMinutes in 1..1440
+                val durHours = computedMinutes / 60
+                val durRemMins = computedMinutes % 60
+                val durText = if (durationValid) {
+                    if (durHours > 0) "Duration: ${durHours}h ${durRemMins}m ($computedMinutes min)"
+                    else "Duration: $computedMinutes min"
+                } else {
+                    "End time must be after Start time"
+                }
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = if (durationValid) GoldAccent.copy(alpha = 0.12f) else DangerRed.copy(alpha = 0.14f),
+                    border = BorderStroke(1.dp, if (durationValid) GoldAccent.copy(alpha = 0.45f) else DangerRed.copy(alpha = 0.6f)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = durText,
+                        color = if (durationValid) GoldBright else DangerRed,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(vertical = 6.dp, horizontal = 8.dp)
+                    )
+                }
+
+                // Time Overlap Warning
+                if (overlap != null) {
+                    val oEnd = overlap.timestamp
+                    val oStart = oEnd - (overlap.minutes.toLong() * 60_000L)
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = Color(0x33F59E0B),
+                        border = BorderStroke(1.dp, Color(0xFFF59E0B)),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            text = "Overlaps with ${overlap.subject} (${com.example.util.DateFormatterCache.formatTime(oStart)} - ${com.example.util.DateFormatterCache.formatTime(oEnd)})",
+                            color = Color(0xFFFCD34D),
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Medium,
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                        )
+                    }
+                }
+
+                OutlinedTextField(
+                    value = subject,
+                    onValueChange = { subject = it },
+                    label = { Text("Subject (e.g. Bengali, Math, SLEEP)", color = TextDim) },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = GoldAccent,
+                        unfocusedBorderColor = LineBorder,
+                        focusedTextColor = TextPrimary,
+                        unfocusedTextColor = TextPrimary
+                    )
+                )
+
+                // Quick subject chips
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    subjects.forEach { subj ->
+                        val isSel = subject.equals(subj.name, ignoreCase = true)
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = if (isSel) GoldAccent.copy(alpha = 0.2f) else PanelElevated,
+                            border = BorderStroke(1.dp, if (isSel) GoldAccent else LineBorder),
+                            modifier = Modifier.clickable {
+                                subject = subj.name
+                                isNonStudy = subj.isNonStudy
+                            }
+                        ) {
+                            Text(
+                                text = subj.name + if (subj.isNonStudy) " (NS)" else "",
+                                color = if (isSel) GoldBright else TextDim,
+                                fontSize = 11.sp,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                            )
+                        }
+                    }
+                }
+
+                OutlinedTextField(
+                    value = subSubject,
+                    onValueChange = { subSubject = it },
+                    label = { Text("Sub-Subject (Optional)", color = TextDim) },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = GoldAccent,
+                        unfocusedBorderColor = LineBorder,
+                        focusedTextColor = TextPrimary,
+                        unfocusedTextColor = TextPrimary
+                    )
+                )
+
+                OutlinedTextField(
+                    value = workType,
+                    onValueChange = { workType = it },
+                    label = { Text("Work Type (e.g. Revision, Memorize, N/A)", color = TextDim) },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = GoldAccent,
+                        unfocusedBorderColor = LineBorder,
+                        focusedTextColor = TextPrimary,
+                        unfocusedTextColor = TextPrimary
+                    )
+                )
+
+                // Quick work type chips
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    workTypes.forEach { wt ->
+                        val isSel = workType.equals(wt.name, ignoreCase = true)
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = if (isSel) GoldAccent.copy(alpha = 0.2f) else PanelElevated,
+                            border = BorderStroke(1.dp, if (isSel) GoldAccent else LineBorder),
+                            modifier = Modifier.clickable { workType = wt.name }
+                        ) {
+                            Text(
+                                text = wt.name,
+                                color = if (isSel) GoldBright else TextDim,
+                                fontSize = 11.sp,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                            )
+                        }
+                    }
+                }
+
+                // Non-Study Category Checkbox
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = PanelElevated,
+                    border = BorderStroke(1.dp, if (isNonStudy) GoldAccent else LineBorder),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { isNonStudy = !isNonStudy }
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Non-Study Session",
+                                color = if (isNonStudy) GoldBright else TextPrimary,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Text(
+                                text = "Excluded from daily study goal & deep focus stats",
+                                color = TextDim,
+                                fontSize = 11.sp
+                            )
+                        }
+                        Checkbox(
+                            checked = isNonStudy,
+                            onCheckedChange = { isNonStudy = it },
+                            colors = CheckboxDefaults.colors(checkedColor = GoldAccent)
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    if (subject.isBlank()) {
+                        onShowToast("Subject name cannot be empty")
+                        return@Button
+                    }
+                    if (computedMinutes !in 1..1440) {
+                        onShowToast("End time must be after Start time")
+                        return@Button
+                    }
+                    onSave(
+                        selectedDate,
+                        subject.trim(),
+                        if (subSubject.isNotBlank()) subSubject.trim() else null,
+                        workType.trim().ifBlank { "Other" },
+                        computedMinutes,
+                        endTs,
+                        isNonStudy
+                    )
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = GoldAccent, contentColor = BgDark)
+            ) {
+                Text(if (isEdit) "Save & Sync" else "Add & Sync")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel", color = TextDim)
+            }
+        },
+        containerColor = PanelDark
+    )
+
+    if (pickingTimeFor != null) {
+        val isStart = pickingTimeFor == "start"
+        val pickerState = rememberTimePickerState(
+            initialHour = if (isStart) startHour else endHour,
+            initialMinute = if (isStart) startMinute else endMinute,
+            is24Hour = false
+        )
+        AlertDialog(
+            onDismissRequest = { pickingTimeFor = null },
+            title = {
+                Text(
+                    text = if (isStart) "Select Start Time" else "Select End Time",
+                    color = GoldBright
+                )
+            },
+            text = {
+                Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    TimePicker(
+                        state = pickerState,
+                        colors = TimePickerDefaults.colors(
+                            clockDialColor = PanelElevated,
+                            selectorColor = GoldAccent,
+                            containerColor = PanelDark,
+                            periodSelectorBorderColor = LineBorder,
+                            periodSelectorSelectedContainerColor = GoldAccent.copy(alpha = 0.25f),
+                            periodSelectorSelectedContentColor = GoldBright,
+                            periodSelectorUnselectedContentColor = TextDim,
+                            timeSelectorSelectedContainerColor = GoldAccent.copy(alpha = 0.25f),
+                            timeSelectorUnselectedContainerColor = PanelElevated,
+                            timeSelectorSelectedContentColor = GoldBright,
+                            timeSelectorUnselectedContentColor = TextPrimary
+                        )
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        if (isStart) {
+                            startHour = pickerState.hour
+                            startMinute = pickerState.minute
+                        } else {
+                            endHour = pickerState.hour
+                            endMinute = pickerState.minute
+                        }
+                        pickingTimeFor = null
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = GoldAccent, contentColor = BgDark)
+                ) {
+                    Text("Set Time")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { pickingTimeFor = null }) {
+                    Text("Cancel", color = TextDim)
+                }
+            },
+            containerColor = PanelDark
+        )
     }
 }

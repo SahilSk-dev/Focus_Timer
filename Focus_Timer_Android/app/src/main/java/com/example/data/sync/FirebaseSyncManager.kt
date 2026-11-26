@@ -312,17 +312,24 @@ class FirebaseSyncManager(
         }
     }
 
-    suspend fun uploadSession(session: StudySessionEntity, previousIsNonStudy: Boolean? = null) {
+    suspend fun uploadSession(
+        session: StudySessionEntity,
+        previousIsNonStudy: Boolean? = null,
+        previousTimestamp: Long? = null
+    ) {
         val user = auth?.currentUser ?: return
         val fs = firestore ?: return
         try {
-            // If category flipped (Study <-> NonStudy), remove from previous collection first
-            if (previousIsNonStudy != null && previousIsNonStudy != session.isNonStudy) {
-                val oldCol = if (previousIsNonStudy) "nonStudySessions" else "sessions"
+            val categoryChanged = previousIsNonStudy != null && previousIsNonStudy != session.isNonStudy
+            val timestampChanged = previousTimestamp != null && previousTimestamp != session.timestamp
+            // If category flipped (Study <-> NonStudy) or timestamp changed, remove old Firestore doc first
+            if (categoryChanged || timestampChanged) {
+                val oldCol = if (previousIsNonStudy ?: session.isNonStudy) "nonStudySessions" else "sessions"
+                val oldTs = previousTimestamp ?: session.timestamp
                 try {
-                    val oldDocRef = fs.collection("users").document(user.uid).collection(oldCol).document(session.timestamp.toString())
+                    val oldDocRef = fs.collection("users").document(user.uid).collection(oldCol).document(oldTs.toString())
                     oldDocRef.delete().await()
-                    val querySnap = fs.collection("users").document(user.uid).collection(oldCol).whereEqualTo("ts", session.timestamp).get().await()
+                    val querySnap = fs.collection("users").document(user.uid).collection(oldCol).whereEqualTo("ts", oldTs).get().await()
                     for (doc in querySnap.documents) {
                         doc.reference.delete().await()
                     }

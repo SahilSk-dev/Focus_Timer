@@ -8,6 +8,7 @@ import android.os.Build
 
 object AlarmHelper {
     const val ALARM_REQUEST_CODE = 1001
+    const val PAUSE_REMINDER_REQUEST_CODE = 1002
 
     fun scheduleAlarm(context: Context, triggerAtMillis: Long, sessionTitle: String) {
         val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager ?: return
@@ -64,6 +65,35 @@ object AlarmHelper {
             }
             val flags = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             val pendingIntent = PendingIntent.getBroadcast(context, ALARM_REQUEST_CODE, intent, flags)
+            alarmManager.cancel(pendingIntent)
+        } catch (_: Exception) {}
+    }
+
+    fun schedulePauseReminder(context: Context, triggerAtMillis: Long, sessionTitle: String) {
+        val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager ?: return
+        val intent = Intent(context, AlarmReceiver::class.java).apply {
+            action = AlarmReceiver.ACTION_PAUSE_REMINDER
+            putExtra(AlarmReceiver.EXTRA_SESSION_TITLE, sessionTitle)
+        }
+        val flags = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        val pendingIntent = PendingIntent.getBroadcast(context, PAUSE_REMINDER_REQUEST_CODE, intent, flags)
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAtMillis, pendingIntent)
+            } else {
+                alarmManager.set(AlarmManager.RTC_WAKEUP, triggerAtMillis, pendingIntent)
+            }
+        } catch (_: Exception) {}
+    }
+
+    fun cancelPauseReminder(context: Context) {
+        try {
+            val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager ?: return
+            val intent = Intent(context, AlarmReceiver::class.java).apply {
+                action = AlarmReceiver.ACTION_PAUSE_REMINDER
+            }
+            val flags = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            val pendingIntent = PendingIntent.getBroadcast(context, PAUSE_REMINDER_REQUEST_CODE, intent, flags)
             alarmManager.cancel(pendingIntent)
         } catch (_: Exception) {}
     }

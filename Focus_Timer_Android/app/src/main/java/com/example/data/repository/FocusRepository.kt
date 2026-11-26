@@ -141,11 +141,15 @@ class FocusRepository(
         return id
     }
 
-    suspend fun updateSession(session: StudySessionEntity, previousIsNonStudy: Boolean? = null) {
+    suspend fun updateSession(
+        session: StudySessionEntity,
+        previousIsNonStudy: Boolean? = null,
+        previousTimestamp: Long? = null
+    ) {
         SessionSyncLock.mutex.withLock {
             studyDao.updateSession(session)
         }
-        syncManager.uploadSession(session, previousIsNonStudy)
+        syncManager.uploadSession(session, previousIsNonStudy, previousTimestamp)
     }
 
     suspend fun deleteSession(id: Long) {

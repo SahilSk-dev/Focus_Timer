@@ -396,14 +396,14 @@
             <div class="android-app-copy">
               <div class="android-app-eyebrow">Android app</div>
               <div class="android-app-title" id="androidAppTitle">Focus Timer for Android</div>
-              <p class="android-app-sub">Native APK build with offline tracking, background alarms and Google sync.</p>
-              <p class="android-app-meta">Version 1.1.7 &middot; Debug build &middot; Android 7.0+</p>
+              <p class="android-app-sub">Track study sessions offline, get reliable background alarms, and sync with Google.</p>
+              <p class="android-app-meta">Works on Android 7.0+ &middot; Offline tracking &middot; Cloud sync</p>
             </div>
           </div>
           <div class="android-app-actions">
             <a class="android-download-btn" id="androidDownloadBtn" href="https://github.com/SahilSk-dev/Focus_Timer/releases/download/android-latest/focus-timer-debug.apk" download>
               <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>
-              Download APK
+              Download App
             </a>
             <button type="button" class="android-guide-btn" data-android-guide-open aria-haspopup="dialog" aria-controls="androidGuideModal">Installation guide</button>
           </div>
@@ -413,7 +413,10 @@
 
           <!-- Session History Audit Log -->
           <div class="history-audit-col">
-            <div class="stats-title history-title">Session History</div>
+            <div class="history-header-row">
+              <div class="stats-title history-title">Session History</div>
+              <button type="button" class="add-session-btn" id="addMissedSessionBtn">+ Add Session</button>
+            </div>
             <div class="history-list" id="historyList"></div>
           </div>
 
@@ -545,6 +548,60 @@
     <div class="modal-btn-row" style="justify-content:flex-end;">
       <button class="modal-btn cancel" id="examGoalCancelBtn">Cancel</button>
       <button class="modal-btn primary" id="examGoalSaveBtn">Save Goal</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add / Edit Session Modal (Start Time -> End Time, no Date edit on existing sessions) -->
+<div class="modal-overlay" id="sessionFormModal" role="dialog" aria-modal="true" aria-labelledby="sessionFormTitle">
+  <div class="modal-box">
+    <div class="modal-title" id="sessionFormTitle" style="margin-bottom:6px;">Add Missed Session</div>
+    <div class="modal-desc" id="sessionFormDesc">Log study time when you forgot to start the timer.</div>
+
+    <div id="sessionFormAddOnlyWrap">
+      <div class="session-presets-row" id="sessionFormDateRow">
+        <button type="button" class="session-preset-pill active" id="sessionDateTodayBtn">Today</button>
+        <button type="button" class="session-preset-pill" id="sessionDateYesterdayBtn">Yesterday</button>
+      </div>
+      <div class="session-presets-row">
+        <button type="button" class="session-preset-pill" data-preset-mins="30">Last 30m</button>
+        <button type="button" class="session-preset-pill" data-preset-mins="60">Last 1h</button>
+        <button type="button" class="session-preset-pill" data-preset-mins="120">Last 2h</button>
+      </div>
+    </div>
+
+    <div class="time-row" style="margin-bottom:10px;">
+      <div>
+        <label class="field-label" for="sessionFormStart">Start Time</label>
+        <input type="time" id="sessionFormStart">
+      </div>
+      <div>
+        <label class="field-label" for="sessionFormEnd">End Time</label>
+        <input type="time" id="sessionFormEnd">
+      </div>
+    </div>
+
+    <div class="session-duration-badge" id="sessionFormDurationBadge">Duration: 30 min</div>
+    <div class="session-overlap-warn" id="sessionFormOverlapWarn" style="display:none;"></div>
+
+    <label class="field-label" for="sessionFormSubject">Subject</label>
+    <input type="text" id="sessionFormSubject" placeholder="e.g. Bengali, Math, SLEEP" maxlength="40" style="margin-bottom:8px;">
+    <div id="sessionFormSubjectChips" class="sel-chips" style="max-height:84px; overflow-y:auto; margin-bottom:10px;"></div>
+
+    <label class="field-label" for="sessionFormWorkType">Work Type</label>
+    <input type="text" id="sessionFormWorkType" placeholder="e.g. Revision, Practice" maxlength="40" style="margin-bottom:8px;">
+    <div id="sessionFormWorkTypeChips" class="sel-chips" style="max-height:76px; overflow-y:auto; margin-bottom:10px;"></div>
+
+    <div class="modal-check-row" style="margin-bottom:14px;">
+      <label class="modal-check-label">
+        <input type="checkbox" id="sessionFormNonStudy">
+        <span>Non-Study Session (Excluded from daily study goal)</span>
+      </label>
+    </div>
+
+    <div class="modal-btn-row" style="justify-content:flex-end;">
+      <button type="button" class="modal-btn cancel" id="sessionFormCancelBtn">Cancel</button>
+      <button type="button" class="modal-btn primary" id="sessionFormSaveBtn">Save &amp; Sync</button>
     </div>
   </div>
 </div>

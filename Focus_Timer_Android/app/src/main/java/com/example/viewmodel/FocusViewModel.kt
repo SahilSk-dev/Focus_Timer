@@ -452,6 +452,7 @@ class FocusViewModel(application: Application) : AndroidViewModel(application) {
             showToast("Please select a subject to start")
             return
         }
+        AlarmHelper.cancelPauseReminder(getApplication())
         vibratePhone(40)
         if (!_isTimerActive.value) {
             // First time start
@@ -546,6 +547,13 @@ class FocusViewModel(application: Application) : AndroidViewModel(application) {
         _isRunning.value = false
         timerJob?.cancel()
         AlarmHelper.cancelAlarm(getApplication())
+        if (_isTimerActive.value) {
+            AlarmHelper.schedulePauseReminder(
+                getApplication(),
+                System.currentTimeMillis() + 10L * 60_000L,
+                _selectedSubject.value.ifBlank { "Study Session" }
+            )
+        }
         persistCurrentTimerState()
         // Stop foreground notification when user explicitly pauses
         AlarmService.stop(getApplication())
@@ -554,6 +562,7 @@ class FocusViewModel(application: Application) : AndroidViewModel(application) {
     fun resetTimer() {
         vibratePhone(60)
         AlarmHelper.cancelAlarm(getApplication())
+        AlarmHelper.cancelPauseReminder(getApplication())
         AlarmService.stop(getApplication())
         val wasActive = _isTimerActive.value
         val wasStopwatch = _stopwatchMode.value
@@ -744,10 +753,41 @@ class FocusViewModel(application: Application) : AndroidViewModel(application) {
         } catch (_: Exception) {}
     }
 
-    fun updateSession(session: StudySessionEntity, previousIsNonStudy: Boolean? = null) {
+    fun updateSession(
+        session: StudySessionEntity,
+        previousIsNonStudy: Boolean? = null,
+        previousTimestamp: Long? = null
+    ) {
         viewModelScope.launch {
-            repository.updateSession(session, previousIsNonStudy)
+            repository.updateSession(session, previousIsNonStudy, previousTimestamp)
             showToast("Session updated & synced")
+        }
+    }
+
+    fun addManualSession(
+        date: String,
+        subject: String,
+        subSubject: String?,
+        workType: String,
+        minutes: Int,
+        endTimestamp: Long,
+        isNonStudy: Boolean
+    ) {
+        viewModelScope.launch {
+            val entity = StudySessionEntity(
+                date = date,
+                subject = subject,
+                subSubject = subSubject,
+                workType = workType,
+                minutes = minutes,
+                timestamp = endTimestamp,
+                isNonStudy = isNonStudy
+            )
+            repository.addSession(entity)
+            showToast("✅ $minutes mins added & synced")
+            if (!isNonStudy && date == FocusRepository.getTodayString()) {
+                checkDailyTargetAchievement(minutes)
+            }
         }
     }
 

@@ -348,6 +348,84 @@ async function deleteSession(id){
   }
 }
 
+async function addManualSession(dateStr, subjName, workType, minutes, endTs, isNS){
+  if(minutes <= 0) return;
+  const rec = {
+    date: dateStr,
+    subject: subjName,
+    workType: workType || 'Other',
+    minutes,
+    ts: endTs,
+    isNonStudy: !!isNS,
+    id: String(endTs)
+  };
+  const colName = isNS ? 'nonStudySessions' : 'sessions';
+  if(currentUser){
+    try {
+      await setDoc(doc(db, 'users', currentUser.uid, colName, String(rec.ts)), rec, { merge: true });
+    } catch(e) {
+      showToast('No internet! Session saved offline.');
+    }
+  }
+  if(isNS){
+    rec.id = currentUser ? rec.id : ('ns' + endTs);
+    nonStudySessions.push(rec);
+    localSet('st_nonstudy_sessions', nonStudySessions);
+  } else {
+    rec.id = currentUser ? rec.id : ('l' + endTs);
+    sessions.push(rec);
+    localSet(LS_SESSIONS, sessions);
+  }
+}
+
+async function updateSessionRecord(existing, updated){
+  const oldTs = Number(existing.ts || existing.timestamp || 0);
+  const oldIsNS = !!existing.isNonStudy;
+  const newIsNS = !!updated.isNonStudy;
+  const newTs = Number(updated.ts || oldTs);
+  const colChanged = oldIsNS !== newIsNS;
+  const tsChanged = oldTs > 0 && newTs !== oldTs;
+
+  // Remove old record locally
+  if(oldIsNS){
+    nonStudySessions = nonStudySessions.filter(s => s.id !== existing.id && !(oldTs > 0 && Number(s.ts || s.timestamp || 0) === oldTs));
+    localSet('st_nonstudy_sessions', nonStudySessions);
+  } else {
+    sessions = sessions.filter(s => s.id !== existing.id && !(oldTs > 0 && Number(s.ts || s.timestamp || 0) === oldTs));
+    localSet(LS_SESSIONS, sessions);
+  }
+
+  const nextRec = {
+    date: updated.date,
+    subject: updated.subject,
+    workType: updated.workType || 'Other',
+    minutes: updated.minutes,
+    ts: newTs,
+    isNonStudy: newIsNS,
+    id: String(newTs)
+  };
+
+  if(currentUser){
+    try {
+      if(colChanged || tsChanged){
+        await deleteCloudDocsForSession(oldIsNS ? 'nonStudySessions' : 'sessions', existing.id, oldTs);
+      }
+      const targetCol = newIsNS ? 'nonStudySessions' : 'sessions';
+      await setDoc(doc(db, 'users', currentUser.uid, targetCol, String(newTs)), nextRec, { merge: true });
+    } catch(e) {
+      showToast('No internet! Updated offline.');
+    }
+  }
+
+  if(newIsNS){
+    nonStudySessions.push(nextRec);
+    localSet('st_nonstudy_sessions', nonStudySessions);
+  } else {
+    sessions.push(nextRec);
+    localSet(LS_SESSIONS, sessions);
+  }
+}
+
 async function savePrefs(){
   if(currentUser){
     try { await setDoc(doc(db,'users',currentUser.uid,'meta','prefs'), prefs); }
@@ -3497,6 +3575,7 @@ function renderHistory(){
         </div>
         <div class="hist-actions-wrap">
           <span class="hist-min">${Number(s.minutes) || 0} min</span>
+          <button class="edit-btn" data-id="${safeId}" title="Edit session">&#9998;</button>
           <button class="del-btn" data-id="${safeId}" title="Delete session">&times;</button>
         </div>
       </div>
@@ -3506,6 +3585,12 @@ function renderHistory(){
       </div>
     </div>`;
   }).join('');
+  list.querySelectorAll('.edit-btn').forEach(b=>{
+    b.addEventListener('click', ()=>{
+      const target = sorted.find(item => String(item.id) === String(b.dataset.id));
+      if(target) openSessionFormModal(target);
+    });
+  });
   list.querySelectorAll('.del-btn').forEach(b=>{
     b.addEventListener('click', async ()=>{
       await deleteSession(b.dataset.id);
@@ -3514,6 +3599,207 @@ function renderHistory(){
     });
   });
 }
+
+/* ---------- Add / Edit Session Modal (Start -> End Time, no Date edit) ---------- */
+(function initSessionFormModal(){
+  const modal = document.getElementById('sessionFormModal');
+  const openBtn = document.getElementById('addMissedSessionBtn');
+  if(!modal || !openBtn) return;
+
+  const titleEl = document.getElementById('sessionFormTitle');
+  const descEl = document.getElementById('sessionFormDesc');
+  const addOnlyWrap = document.getElementById('sessionFormAddOnlyWrap');
+  const todayBtn = document.getElementById('sessionDateTodayBtn');
+  const yesterdayBtn = document.getElementById('sessionDateYesterdayBtn');
+  const startInput = document.getElementById('sessionFormStart');
+  const endInput = document.getElementById('sessionFormEnd');
+  const durBadge = document.getElementById('sessionFormDurationBadge');
+  const overlapWarn = document.getElementById('sessionFormOverlapWarn');
+  const subjInput = document.getElementById('sessionFormSubject');
+  const subjChipsEl = document.getElementById('sessionFormSubjectChips');
+  const wtInput = document.getElementById('sessionFormWorkType');
+  const wtChipsEl = document.getElementById('sessionFormWorkTypeChips');
+  const nsCheck = document.getElementById('sessionFormNonStudy');
+  const cancelBtn = document.getElementById('sessionFormCancelBtn');
+  const saveBtn = document.getElementById('sessionFormSaveBtn');
+
+  let editingTarget = null;
+  let activeDateStr = todayStr();
+
+  function pad2(n){ return String(n).padStart(2, '0'); }
+  function tsToTimeInput(ts){
+    const d = new Date(ts);
+    return `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+  }
+  function dateTimeToTs(dateStr, timeStr){
+    const [y, m, d] = dateStr.split('-').map(Number);
+    const [hh, mm] = (timeStr || '00:00').split(':').map(Number);
+    return new Date(y, (m || 1) - 1, d || 1, hh || 0, mm || 0, 0, 0).getTime();
+  }
+  function formatClock12(ts){
+    return new Date(ts).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  }
+  function shiftLocalIsoDate(days){
+    const d = new Date();
+    d.setDate(d.getDate() + days);
+    return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+  }
+
+  function renderQuickChips(){
+    const subjs = (prefs.subjects || []).map(s => typeof s === 'string' ? { name: s, isNonStudy: false } : s);
+    subjChipsEl.innerHTML = subjs.map(s => {
+      const sel = subjInput.value.trim().toLowerCase() === s.name.toLowerCase();
+      return `<button type="button" class="chip ${sel ? 'active' : ''}" data-subj="${escapeHTML(s.name)}" data-ns="${s.isNonStudy ? '1' : '0'}">${escapeHTML(s.name)}${s.isNonStudy ? ' (NS)' : ''}</button>`;
+    }).join('');
+    subjChipsEl.querySelectorAll('button').forEach(btn => {
+      btn.addEventListener('click', () => {
+        subjInput.value = btn.dataset.subj;
+        nsCheck.checked = btn.dataset.ns === '1';
+        renderQuickChips();
+      });
+    });
+
+    const wts = prefs.workTypes || ['Revision', 'Practice', 'Lecture'];
+    wtChipsEl.innerHTML = wts.map(w => {
+      const sel = wtInput.value.trim().toLowerCase() === String(w).toLowerCase();
+      return `<button type="button" class="chip ${sel ? 'active' : ''}" data-wt="${escapeHTML(w)}">${escapeHTML(w)}</button>`;
+    }).join('');
+    wtChipsEl.querySelectorAll('button').forEach(btn => {
+      btn.addEventListener('click', () => {
+        wtInput.value = btn.dataset.wt;
+        renderQuickChips();
+      });
+    });
+  }
+
+  function updateDurationAndOverlap(){
+    const sTs = dateTimeToTs(activeDateStr, startInput.value);
+    const eTs = dateTimeToTs(activeDateStr, endInput.value);
+    const mins = Math.round((eTs - sTs) / 60000);
+    if(mins >= 1 && mins <= 1440){
+      const h = Math.floor(mins / 60);
+      const m = mins % 60;
+      durBadge.textContent = h > 0 ? `Duration: ${h}h ${m}m (${mins} min)` : `Duration: ${mins} min`;
+      durBadge.classList.remove('invalid');
+
+      const all = deduplicateSessions([...sessions, ...nonStudySessions]);
+      const overlap = all.find(other => {
+        if(editingTarget && String(other.id) === String(editingTarget.id)) return false;
+        if(other.date !== activeDateStr) return false;
+        const oEnd = Number(other.ts || other.timestamp || 0);
+        const oStart = oEnd - (Number(other.minutes || 0) * 60000);
+        return oStart < eTs && oEnd > sTs;
+      });
+      if(overlap){
+        const oEnd = Number(overlap.ts || overlap.timestamp || 0);
+        const oStart = oEnd - (Number(overlap.minutes || 0) * 60000);
+        overlapWarn.textContent = `Overlaps with ${overlap.subject} (${formatClock12(oStart)} - ${formatClock12(oEnd)})`;
+        overlapWarn.style.display = 'block';
+      } else {
+        overlapWarn.style.display = 'none';
+      }
+    } else {
+      durBadge.textContent = 'End time must be after Start time';
+      durBadge.classList.add('invalid');
+      overlapWarn.style.display = 'none';
+    }
+  }
+
+  window.openSessionFormModal = function(existing = null){
+    editingTarget = existing;
+    const isEdit = !!existing;
+    titleEl.textContent = isEdit ? 'Edit Session' : 'Add Missed Session';
+    descEl.textContent = isEdit
+      ? 'Adjust the time range or subject details for this session.'
+      : 'Log study time when you forgot to start the timer.';
+    addOnlyWrap.style.display = isEdit ? 'none' : 'block';
+
+    const today = todayStr();
+    const yesterday = shiftLocalIsoDate(-1);
+    activeDateStr = isEdit ? (existing.date || today) : today;
+    todayBtn.classList.toggle('active', activeDateStr === today);
+    yesterdayBtn.classList.toggle('active', activeDateStr === yesterday);
+
+    const endTs = isEdit ? Number(existing.ts || existing.timestamp || Date.now()) : Date.now();
+    const startTs = isEdit
+      ? endTs - (Number(existing.minutes || 30) * 60000)
+      : endTs - (30 * 60000);
+
+    startInput.value = tsToTimeInput(startTs);
+    endInput.value = tsToTimeInput(endTs);
+
+    const nonStudySet = getNonStudySubjectNamesSet();
+    const firstStudySubj = (prefs.subjects || []).find(s => !s.isNonStudy);
+    subjInput.value = isEdit ? (existing.subject || '') : (firstStudySubj ? (firstStudySubj.name || firstStudySubj) : '');
+    wtInput.value = isEdit ? (existing.workType || 'Other') : ((prefs.workTypes && prefs.workTypes[0]) || 'Revision');
+    nsCheck.checked = isEdit ? isNonStudyRecord(existing, nonStudySet) : false;
+
+    renderQuickChips();
+    updateDurationAndOverlap();
+    modal.classList.add('show');
+  };
+
+  openBtn.addEventListener('click', () => window.openSessionFormModal(null));
+  todayBtn.addEventListener('click', () => {
+    activeDateStr = todayStr();
+    todayBtn.classList.add('active');
+    yesterdayBtn.classList.remove('active');
+    updateDurationAndOverlap();
+  });
+  yesterdayBtn.addEventListener('click', () => {
+    activeDateStr = shiftLocalIsoDate(-1);
+    yesterdayBtn.classList.add('active');
+    todayBtn.classList.remove('active');
+    updateDurationAndOverlap();
+  });
+  addOnlyWrap.querySelectorAll('[data-preset-mins]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const mins = Number(btn.dataset.presetMins || 30);
+      const now = Date.now();
+      activeDateStr = todayStr();
+      todayBtn.classList.add('active');
+      yesterdayBtn.classList.remove('active');
+      endInput.value = tsToTimeInput(now);
+      startInput.value = tsToTimeInput(now - mins * 60000);
+      updateDurationAndOverlap();
+    });
+  });
+
+  startInput.addEventListener('input', updateDurationAndOverlap);
+  endInput.addEventListener('input', updateDurationAndOverlap);
+  subjInput.addEventListener('input', renderQuickChips);
+  wtInput.addEventListener('input', renderQuickChips);
+  cancelBtn.addEventListener('click', () => modal.classList.remove('show'));
+
+  saveBtn.addEventListener('click', async () => {
+    const subj = subjInput.value.trim();
+    const wt = wtInput.value.trim() || 'Other';
+    const isNS = !!nsCheck.checked;
+    const sTs = dateTimeToTs(activeDateStr, startInput.value);
+    const eTs = dateTimeToTs(activeDateStr, endInput.value);
+    const mins = Math.round((eTs - sTs) / 60000);
+
+    if(!subj){ showToast('Subject name cannot be empty'); return; }
+    if(mins < 1 || mins > 1440){ showToast('End time must be after Start time'); return; }
+
+    if(editingTarget){
+      await updateSessionRecord(editingTarget, {
+        date: editingTarget.date || activeDateStr,
+        subject: subj,
+        workType: wt,
+        minutes: mins,
+        ts: eTs,
+        isNonStudy: isNS
+      });
+      showToast(currentUser ? 'Session updated & synced' : 'Session updated');
+    } else {
+      await addManualSession(activeDateStr, subj, wt, mins, eTs, isNS);
+      showToast(currentUser ? `${mins} min added & synced` : `${mins} min added`);
+    }
+    modal.classList.remove('show');
+    await refreshEverything();
+  });
+})();
 
 /* ---------- report export ---------- */
 function getExportSessions(){
