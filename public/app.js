@@ -3169,42 +3169,7 @@ async function exportAnalysisPdf() {
 
     currentY = doc.lastAutoTable.finalY + 6;
 
-    // 2. Study Goal & Daily Pace Table
-    const proj = effectiveReport.examProjection;
-    const projRows = [
-      [
-        cleanPdfText(`Goal: ${proj.examName}`),
-        cleanPdfText(`Target Date: ${proj.targetDate || 'Not set'} (${proj.daysRemaining} days left)`),
-        cleanPdfText(`Status: ${proj.statusBadgeText}`)
-      ],
-      [
-        cleanPdfText(`Done: ${proj.completedHours.toFixed(1)}h / ${proj.targetHours}h`),
-        cleanPdfText(`Hours Left: ${proj.remainingHours.toFixed(1)}h`),
-        cleanPdfText(`Daily Pace Needed: ${proj.requiredDailyHours.toFixed(1)} hrs/day`)
-      ],
-      [
-        cleanPdfText(`Your 7-Day Avg: ${proj.currentDailyHours.toFixed(1)} hrs/day`),
-        cleanPdfText(`Pace Diff: ${proj.paceDeltaHours >= 0 ? '+' : ''}${proj.paceDeltaHours.toFixed(1)} hrs/day`),
-        cleanPdfText(`Est. Finish: ${proj.projectedDate}`)
-      ],
-      [
-        { content: cleanPdfText(`Summary: ${proj.statusDescription}`), colSpan: 3, styles: { fontStyle: 'italic', textColor: [71, 85, 105] } }
-      ]
-    ];
-
-    doc.autoTable({
-      startY: currentY,
-      head: [[{ content: 'STUDY GOAL & DAILY PACE', colSpan: 3 }]],
-      body: projRows,
-      theme: 'grid',
-      headStyles: { fillColor: [5, 150, 105], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 9 },
-      styles: { fontSize: 8, cellPadding: 2.5, overflow: 'linebreak' },
-      margin: { left: 14, right: 14 }
-    });
-
-    currentY = doc.lastAutoTable.finalY + 6;
-
-    // 3. Subject Breakdown Table
+    // 2. Subject Breakdown Table
     const subjRows = effectiveReport.subjectEquilibrium.map(s => {
       const statusText = s.daysAgo === 0 ? 'Today' : (s.daysAgo === 1 ? 'Yesterday' : `${s.daysAgo} days ago`);
       return [
