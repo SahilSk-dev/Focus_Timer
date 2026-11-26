@@ -25,8 +25,10 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import com.example.ui.theme.AppTheme
@@ -128,15 +130,33 @@ class FocusViewModel(application: Application) : AndroidViewModel(application) {
 
     val allSessions: StateFlow<List<StudySessionEntity>> = repository.getAllSessions()
         .flowOn(Dispatchers.IO)
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     val allSubjects: StateFlow<List<SubjectEntity>> = repository.getAllSubjects()
         .flowOn(Dispatchers.IO)
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     val allWorkTypes: StateFlow<List<WorkTypeEntity>> = repository.getAllWorkTypes()
         .flowOn(Dispatchers.IO)
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+    // Deduplicated sessions computed off the UI thread so switching to History/Analytics is instant
+    val deduplicatedSessions: StateFlow<List<StudySessionEntity>> = allSessions
+        .map { com.example.data.local.SessionDeduplicator.deduplicateList(it) }
+        .flowOn(Dispatchers.Default)
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+    // Pre-filtered study-only sessions for Analytics off the UI thread
+    val studySessionsOnly: StateFlow<List<StudySessionEntity>> = combine(
+        deduplicatedSessions,
+        allSubjects
+    ) { deduped, subjects ->
+        deduped.filter { s ->
+            s.minutes > 0 && !com.example.data.local.SessionDeduplicator.isNonStudySession(s, subjects)
+        }
+    }
+        .flowOn(Dispatchers.Default)
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     // Alarm & Sync States
     val isAlarmRinging: StateFlow<Boolean> = AlarmService.isAlarmRinging
@@ -230,6 +250,23 @@ class FocusViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _dailyTargetMinutes = MutableStateFlow(repository.dailyTargetMinutes)
     val dailyTargetMinutes: StateFlow<Int> = _dailyTargetMinutes.asStateFlow()
+
+    val statsInsightsReport: StateFlow<com.example.util.AnalyticsReport> = combine(
+        studySessionsOnly,
+        dailyTargetMinutes
+    ) { studySess, targetMins ->
+        com.example.util.AnalyticsEngine.computeReport(
+            allSessions = studySess,
+            timeframe = com.example.util.AnalyticsTimeframe.LAST_7_DAYS,
+            dailyTargetMinutes = targetMins
+        )
+    }
+        .flowOn(Dispatchers.Default)
+        .stateIn(
+            viewModelScope,
+            SharingStarted.Eagerly,
+            com.example.util.AnalyticsReport.empty(com.example.util.AnalyticsTimeframe.LAST_7_DAYS)
+        )
 
     private val _showConfetti = MutableStateFlow(false)
     val showConfetti: StateFlow<Boolean> = _showConfetti.asStateFlow()

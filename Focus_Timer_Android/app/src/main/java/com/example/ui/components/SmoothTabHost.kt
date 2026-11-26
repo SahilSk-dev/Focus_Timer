@@ -1,6 +1,6 @@
 package com.example.ui.components
 
-import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
@@ -12,13 +12,17 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.layout.layout
 import androidx.compose.ui.zIndex
 
+private val SilkEaseOut = CubicBezierEasing(0.22f, 1f, 0.36f, 1f)
+
 /**
- * Keeps all tab subtrees mounted once warmed so switching tabs preserves scroll state
- * and avoids teardown/recomposition jank, while running a light crossfade + slide transition.
+ * Hardware-composited tab host that keeps warmed tab subtrees laid out at (0, 0)
+ * and animates strictly on the RenderNode graphicsLayer (zero layout/placement invalidation
+ * per animation frame) for butter-smooth 60/120fps tab switches.
  */
 @Composable
 fun SmoothTabHost(
@@ -26,7 +30,8 @@ fun SmoothTabHost(
     tabCount: Int,
     modifier: Modifier = Modifier,
     prewarmAll: Boolean = true,
-    slideDistancePx: Float = 28f,
+    warmedCount: Int = if (prewarmAll) tabCount else 1,
+    slideDistancePx: Float = 44f,
     content: @Composable (index: Int) -> Unit
 ) {
     var previousIndex by remember { mutableIntStateOf(selectedIndex) }
@@ -36,16 +41,18 @@ fun SmoothTabHost(
         previousIndex = selectedIndex
     }
 
+    val effectiveWarmCount = warmedCount.coerceIn(1, tabCount)
+
     Box(modifier = modifier.clipToBounds()) {
         for (index in 0 until tabCount) {
-            if (!prewarmAll && index != selectedIndex) continue
+            if (index >= effectiveWarmCount && index != selectedIndex) continue
 
             val isSelected = index == selectedIndex
-            val progress by animateFloatAsState(
+            val progressState = animateFloatAsState(
                 targetValue = if (isSelected) 1f else 0f,
                 animationSpec = tween(
-                    durationMillis = 190,
-                    easing = FastOutSlowInEasing
+                    durationMillis = 220,
+                    easing = SilkEaseOut
                 ),
                 label = "smooth_tab_progress_$index"
             )
@@ -54,22 +61,29 @@ fun SmoothTabHost(
                 modifier = Modifier
                     .fillMaxSize()
                     .zIndex(if (isSelected) 1f else 0f)
-                    .layout { measurable, constraints ->
-                        val placeable = measurable.measure(constraints)
-                        layout(placeable.width, placeable.height) {
-                            // Skip drawing and hit-testing once faded out while keeping subtree alive.
-                            if (progress > 0.01f) {
-                                placeable.placeRelative(0, 0)
-                            }
+                    .drawWithContent {
+                        if (progressState.value > 0.005f) {
+                            drawContent()
                         }
                     }
                     .graphicsLayer {
-                        alpha = progress
-                        val remaining = 1f - progress
+                        val p = progressState.value
+                        val remaining = 1f - p
+                        alpha = p
                         translationX = if (isSelected) {
                             transitionDirection * slideDistancePx * remaining
                         } else {
-                            -transitionDirection * (slideDistancePx * 0.45f) * remaining
+                            -transitionDirection * (slideDistancePx * 0.28f) * remaining
+                        }
+                        if (isSelected && remaining > 0.001f) {
+                            val s = 0.985f + 0.015f * p
+                            scaleX = s
+                            scaleY = s
+                        }
+                        compositingStrategy = if (p in 0.005f..0.995f) {
+                            CompositingStrategy.Offscreen
+                        } else {
+                            CompositingStrategy.Auto
                         }
                     }
             ) {

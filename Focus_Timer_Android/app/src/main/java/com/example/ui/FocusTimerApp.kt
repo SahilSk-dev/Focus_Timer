@@ -10,7 +10,10 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -120,6 +123,10 @@ fun FocusTimerApp(
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     var currentNavIndex by remember { mutableStateOf(0) }
     var activeSettingsSection by remember { mutableStateOf<SettingsSection?>(null) }
+    var lastSettingsSection by remember { mutableStateOf(SettingsSection.SYNC) }
+    if (activeSettingsSection != null) {
+        lastSettingsSection = activeSettingsSection!!
+    }
     val currentAppTheme by viewModel.currentAppTheme.collectAsState()
 
     BackHandler(enabled = drawerState.isOpen || activeSettingsSection != null) {
@@ -133,7 +140,7 @@ fun FocusTimerApp(
     val isStartupReady by viewModel.isStartupReady.collectAsState()
     val isOnboarded by viewModel.isOnboarded.collectAsState()
     val currentUser by viewModel.currentUser.collectAsState()
-    var prewarmTabs by remember { mutableStateOf(false) }
+    var warmedTabCount by remember { mutableStateOf(1) }
     var showStartupSplash by remember { mutableStateOf(true) }
 
     LaunchedEffect(currentUser) {
@@ -145,9 +152,11 @@ fun FocusTimerApp(
     LaunchedEffect(isStartupReady) {
         if (isStartupReady) {
             showStartupSplash = false
-            // Defer prewarming hidden tabs until after the splash fades out so the main thread never hitches on cold start
-            delay(300)
-            prewarmTabs = true
+            // Stagger warming Analytics & History one per idle window so the home screen never stutters after launch
+            delay(220)
+            if (warmedTabCount < 2) warmedTabCount = 2
+            delay(220)
+            if (warmedTabCount < 3) warmedTabCount = 3
         }
     }
 
@@ -500,42 +509,46 @@ fun FocusTimerApp(
                     .fillMaxSize()
                     .padding(if (isFullscreen) androidx.compose.foundation.layout.PaddingValues(0.dp) else innerPadding)
             ) {
-                if (activeSettingsSection != null) {
+                SmoothTabHost(
+                    selectedIndex = currentNavIndex,
+                    tabCount = 3,
+                    modifier = Modifier.fillMaxSize(),
+                    warmedCount = warmedTabCount
+                ) { tabIndex ->
+                    when (tabIndex) {
+                        0 -> TimerScreen(
+                            viewModel = viewModel,
+                            onOpenAddSubject = { showAddSubjectDialog = true },
+                            onOpenAddSubSubject = { parent -> subSubjectTargetSubject = parent },
+                            onOpenAddWorkType = { showAddWorkTypeDialog = true },
+                            onEditSubject = { name, id -> editSubjectTarget = name to id },
+                            onEditWorkType = { wt -> editWorkTypeTarget = wt },
+                            onOpenDrawer = { coroutineScope.launch { drawerState.open() } }
+                        )
+                        1 -> StatsScreen(
+                            viewModel = viewModel,
+                            onOpenDrawer = { coroutineScope.launch { drawerState.open() } }
+                        )
+                        2 -> HistoryScreen(
+                            viewModel = viewModel,
+                            onOpenDrawer = { coroutineScope.launch { drawerState.open() } },
+                            onOpenSettings = { section -> activeSettingsSection = section }
+                        )
+                    }
+                }
+
+                AnimatedVisibility(
+                    visible = activeSettingsSection != null,
+                    enter = fadeIn(tween(180)) + slideInHorizontally(tween(220)) { it / 5 },
+                    exit = fadeOut(tween(150)) + slideOutHorizontally(tween(180)) { it / 5 }
+                ) {
                     SettingsToolsScreen(
                         viewModel = viewModel,
-                        selectedSection = activeSettingsSection!!,
+                        selectedSection = lastSettingsSection,
                         onSelectSection = { activeSettingsSection = it },
                         onBack = { activeSettingsSection = null },
                         onOpenDrawer = { coroutineScope.launch { drawerState.open() } }
                     )
-                } else {
-                    SmoothTabHost(
-                        selectedIndex = currentNavIndex,
-                        tabCount = 3,
-                        modifier = Modifier.fillMaxSize(),
-                        prewarmAll = prewarmTabs
-                    ) { tabIndex ->
-                        when (tabIndex) {
-                            0 -> TimerScreen(
-                                viewModel = viewModel,
-                                onOpenAddSubject = { showAddSubjectDialog = true },
-                                onOpenAddSubSubject = { parent -> subSubjectTargetSubject = parent },
-                                onOpenAddWorkType = { showAddWorkTypeDialog = true },
-                                onEditSubject = { name, id -> editSubjectTarget = name to id },
-                                onEditWorkType = { wt -> editWorkTypeTarget = wt },
-                                onOpenDrawer = { coroutineScope.launch { drawerState.open() } }
-                            )
-                            1 -> StatsScreen(
-                                viewModel = viewModel,
-                                onOpenDrawer = { coroutineScope.launch { drawerState.open() } }
-                            )
-                            2 -> HistoryScreen(
-                                viewModel = viewModel,
-                                onOpenDrawer = { coroutineScope.launch { drawerState.open() } },
-                                onOpenSettings = { section -> activeSettingsSection = section }
-                            )
-                        }
-                    }
                 }
             }
         }

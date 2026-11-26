@@ -78,25 +78,28 @@ class FirebaseSyncManager(
     private val scope = CoroutineScope(Dispatchers.IO)
 
     init {
-        try {
-            val fbAuth = auth
-            if (fbAuth != null) {
-                _currentUser.value = fbAuth.currentUser
-                fbAuth.addAuthStateListener { listenerAuth ->
-                    val user = listenerAuth.currentUser
-                    _currentUser.value = user
-                    if (user != null) {
-                        startRealtimeSync(user.uid)
-                    } else {
-                        stopRealtimeSync()
+        // Initialize FirebaseAuth & Firestore off the main thread so cold launch frame 1 stays 60/120fps
+        scope.launch {
+            try {
+                val fbAuth = auth
+                if (fbAuth != null) {
+                    _currentUser.value = fbAuth.currentUser
+                    fbAuth.addAuthStateListener { listenerAuth ->
+                        val user = listenerAuth.currentUser
+                        _currentUser.value = user
+                        if (user != null) {
+                            startRealtimeSync(user.uid)
+                        } else {
+                            stopRealtimeSync()
+                        }
+                    }
+                    if (fbAuth.currentUser != null) {
+                        startRealtimeSync(fbAuth.currentUser!!.uid)
                     }
                 }
-                if (fbAuth.currentUser != null) {
-                    startRealtimeSync(fbAuth.currentUser!!.uid)
-                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error initializing FirebaseAuth: ${e.message}")
             }
-        } catch (e: Exception) {
-            Log.e(TAG, "Error initializing FirebaseAuth: ${e.message}")
         }
     }
 

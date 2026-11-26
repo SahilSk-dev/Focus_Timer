@@ -95,14 +95,9 @@ fun StatsScreen(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
-    val allSessions by viewModel.allSessions.collectAsState()
-    val allSubjects by viewModel.allSubjects.collectAsState()
-    val studySessions = remember(allSessions, allSubjects) {
-        com.example.data.local.SessionDeduplicator.deduplicateList(allSessions).filter { s ->
-            s.minutes > 0 && !com.example.data.local.SessionDeduplicator.isNonStudySession(s, allSubjects)
-        }
-    }
+    val studySessions by viewModel.studySessionsOnly.collectAsState()
     val dailyTarget by viewModel.dailyTargetMinutes.collectAsState()
+    val insightsReport by viewModel.statsInsightsReport.collectAsState()
 
     var showTargetEditDialog by remember { mutableStateOf(false) }
     var statsTab by remember { mutableStateOf("daily") } // "daily" or "weekly"
@@ -132,15 +127,8 @@ fun StatsScreen(
     // Week comparison
     val weekComparison = remember(studySessions) { calculateWeekComparison(studySessions) }
 
-    // Last 7 days ranking & Peak Focus insights
+    // Last 7 days ranking (insightsReport already precomputed off UI thread)
     val rankingList = remember(studySessions) { calculate7DaysRanking(studySessions) }
-    val insightsReport = remember(studySessions, dailyTarget) {
-        com.example.util.AnalyticsEngine.computeReport(
-            allSessions = studySessions,
-            timeframe = com.example.util.AnalyticsTimeframe.LAST_7_DAYS,
-            dailyTargetMinutes = dailyTarget
-        )
-    }
 
     Column(
         modifier = modifier

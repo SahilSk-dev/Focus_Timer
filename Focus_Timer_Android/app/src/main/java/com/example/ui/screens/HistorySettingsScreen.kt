@@ -153,10 +153,7 @@ fun HistoryScreen(
     onOpenSettings: (SettingsSection) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
-    val rawSessions by viewModel.allSessions.collectAsState()
-    val allSessions = remember(rawSessions) {
-        com.example.data.local.SessionDeduplicator.deduplicateList(rawSessions)
-    }
+    val allSessions by viewModel.deduplicatedSessions.collectAsState()
     val subjects by viewModel.allSubjects.collectAsState()
     val workTypes by viewModel.allWorkTypes.collectAsState()
 
@@ -424,10 +421,7 @@ fun SettingsToolsScreen(
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
 
-    val rawSessions by viewModel.allSessions.collectAsState()
-    val allSessions = remember(rawSessions) {
-        com.example.data.local.SessionDeduplicator.deduplicateList(rawSessions)
-    }
+    val allSessions by viewModel.deduplicatedSessions.collectAsState()
     val subjects by viewModel.allSubjects.collectAsState()
     val workTypes by viewModel.allWorkTypes.collectAsState()
     val currentUser by viewModel.currentUser.collectAsState()
