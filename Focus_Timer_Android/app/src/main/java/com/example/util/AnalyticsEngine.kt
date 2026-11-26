@@ -142,7 +142,7 @@ object AnalyticsEngine {
         examGoal: ExamGoal? = null,
         dailyTargetMinutes: Int = 120
     ): AnalyticsReport {
-        val studySessions = allSessions.filter { !it.isNonStudy }
+        val studySessions = allSessions.filter { !it.isNonStudy && !it.id.startsWith("ns") }
         val now = Calendar.getInstance()
         val daysLimit = timeframe.days
 
@@ -439,12 +439,25 @@ object AnalyticsEngine {
         val paceRatio = if (requiredDailyHours > 0.0) currentDailyHours / requiredDailyHours else 1.0
 
         val (status, statusBadgeText, statusDescription) = when {
-            remainingHours <= 0.0 -> Triple("COMPLETE", "GOAL ACHIEVED", "Congratulations! You have completed 100% of your targeted syllabus hours.")
-            daysRemaining < 0 -> Triple("EXPIRED", "DEADLINE PASSED", "The target exam date has passed. Edit the target date in settings to recalibrate.")
-            daysRemaining == 0 -> Triple("DEADLINE_TODAY", "EXAM TODAY", "Target deadline is today! Focus on high-yield formulas and active recall.")
-            paceRatio >= 1.0 -> Triple("ON_TRACK", "ON TRACK", "Velocity surplus of +${String.format(Locale.US, "%.1f", paceDeltaHours)}h/day. Syllabus will be completed on schedule.")
-            paceRatio >= 0.8 -> Triple("MINOR_DEFICIT", "MINOR DEFICIT", "Velocity lag of ${String.format(Locale.US, "%.1f", kotlin.math.abs(paceDeltaHours))}h/day. Increase study blocks by ~${Math.round(kotlin.math.abs(paceDeltaHours) * 60)} mins/day to regain pace.")
-            else -> Triple("CRITICAL_LAG", "CRITICAL LAG", "Significant pace deficit of ${String.format(Locale.US, "%.1f", kotlin.math.abs(paceDeltaHours))}h/day. Urgent pace recalibration needed to cover remaining ${String.format(Locale.US, "%.1f", remainingHours)}h.")
+            remainingHours <= 0.0 -> Triple("COMPLETE", "Goal Reached!", "Awesome work — you have completed your study goal!")
+            daysRemaining < 0 -> Triple("EXPIRED", "Date Passed", "Your target date has passed. Tap Edit Goal to pick a new date.")
+            daysRemaining == 0 -> Triple("DEADLINE_TODAY", "Goal Day Today", "Your target date is today — give it a strong finish!")
+            paceRatio >= 1.0 -> Triple(
+                "ON_TRACK",
+                "On Track",
+                if (paceDeltaHours > 0.1) "Great pace! At ${String.format(Locale.US, "%.1f", currentDailyHours)}h/day, you are +${String.format(Locale.US, "%.1f", paceDeltaHours)}h/day ahead of schedule."
+                else "Nice steady pace! Keep this up to finish on time."
+            )
+            paceRatio >= 0.8 -> Triple(
+                "MINOR_DEFICIT",
+                "Slightly Behind",
+                "Almost there — add about ${maxOf(5L, Math.round(kotlin.math.abs(paceDeltaHours) * 60))} mins/day to get back on schedule."
+            )
+            else -> Triple(
+                "CRITICAL_LAG",
+                "Needs Catch-up",
+                "Aim for ${String.format(Locale.US, "%.1f", requiredDailyHours)}h/day to cover the remaining ${String.format(Locale.US, "%.1f", remainingHours)}h on time."
+            )
         }
 
         val projectedDate = when {
@@ -457,7 +470,7 @@ object AnalyticsEngine {
                 }
                 DateFormatterCache.formatIsoDate(projCal.timeInMillis)
             }
-            else -> "Indeterminate (0h pace)"
+            else -> "Start studying"
         }
 
         val examProjection = ExamProjection(

@@ -38,6 +38,16 @@ import java.util.Locale
 class FocusViewModel(application: Application) : AndroidViewModel(application) {
 
     private val prefs = application.getSharedPreferences("focus_timer_prefs", Context.MODE_PRIVATE)
+    private val _isOnboarded = MutableStateFlow(prefs.getBoolean("ft_onboarded", false))
+    val isOnboarded: StateFlow<Boolean> = _isOnboarded.asStateFlow()
+
+    fun markOnboarded() {
+        if (!_isOnboarded.value) {
+            _isOnboarded.value = true
+            prefs.edit().putBoolean("ft_onboarded", true).apply()
+        }
+    }
+
     private val _currentAppTheme = MutableStateFlow(
         AppTheme.fromId(prefs.getString("app_theme", "dark"))
     )
@@ -142,6 +152,7 @@ class FocusViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             val result = repository.syncManager.signInWithGoogle(activity)
             result.onSuccess { user ->
+                markOnboarded()
                 showToast("Signed in as ${user.email ?: "User"}")
             }.onFailure { err ->
                 showToast("Sign in: ${err.message ?: "Cancelled"}")

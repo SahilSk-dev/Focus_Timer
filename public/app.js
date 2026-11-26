@@ -1,6 +1,6 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {
-  getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged
+  getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, signOut, onAuthStateChanged
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import {
   initializeFirestore, persistentLocalCache, persistentMultipleTabManager,
@@ -29,6 +29,7 @@ let currentUser = null;
 const LS_SESSIONS = 'st_sessions';
 const LS_PREFS = 'st_prefs';
 const LS_TIMERSTATE = 'st_timerstate';
+const LS_ONBOARDED = 'ft_onboarded';
 
 function localGet(key, fallback){
   try{ const v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; }catch(e){ return fallback; }
@@ -36,9 +37,20 @@ function localGet(key, fallback){
 function localSet(key, val){
   try{ localStorage.setItem(key, JSON.stringify(val)); }catch(e){}
 }
+function unescapeHTML(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#039;/g, "'")
+    .replace(/&#39;/g, "'");
+}
 function escapeHTML(str) {
   if (str === null || str === undefined) return '';
-  return String(str)
+  // Unescape first to prevent double-escaping previously stored entities (&amp; -> & -> &amp;)
+  return unescapeHTML(String(str))
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
@@ -281,13 +293,95 @@ async function savePrefs(){
 /* ---------- auth ---------- */
 const authbar = document.getElementById('authbar');
 
-document.getElementById('googleBtn').addEventListener('click', async ()=>{
-  try{ await signInWithPopup(auth, provider); }
-  catch(e){ showToast('Sign in failed - check if domain is added in Firebase console'); }
+/* ---------- onboarding gate ---------- */
+const welcomeGate = document.getElementById('welcomeGate');
+const welcomeGoogleBtn = document.getElementById('welcomeGoogleBtn');
+const welcomeLocalBtn = document.getElementById('welcomeLocalBtn');
+
+function isOnboarded(){
+  return localGet(LS_ONBOARDED, false) === true;
+}
+
+function markOnboarded(){
+  localSet(LS_ONBOARDED, true);
+}
+
+function openWelcomeGate(){
+  if (!welcomeGate) return;
+  welcomeGate.hidden = false;
+  document.body.classList.add('welcome-open');
+  if (welcomeGoogleBtn) {
+    try { welcomeGoogleBtn.focus({ preventScroll: true }); } catch(e) { welcomeGoogleBtn.focus(); }
+  }
+}
+
+function closeWelcomeGate(){
+  if (!welcomeGate) return;
+  welcomeGate.hidden = true;
+  document.body.classList.remove('welcome-open');
+}
+
+/* Popups are blocked in most mobile browsers and standalone PWAs, so those
+   environments use the redirect flow instead. */
+function shouldUseRedirectAuth(){
+  const ua = navigator.userAgent || '';
+  return /Android|iPhone|iPad|iPod|Mobile/i.test(ua)
+    || window.matchMedia('(max-width: 860px)').matches
+    || window.matchMedia('(display-mode: standalone)').matches
+    || navigator.standalone === true;
+}
+
+async function signInWithGoogle(){
+  try {
+    if (shouldUseRedirectAuth()) {
+      await signInWithRedirect(auth, provider);
+      return;
+    }
+    await signInWithPopup(auth, provider);
+  } catch (err) {
+    const code = err && err.code ? String(err.code) : '';
+    if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request') return;
+    if (code.includes('popup-blocked') || code.includes('operation-not-supported')) {
+      try { await signInWithRedirect(auth, provider); return; }
+      catch (redirectErr) { console.error(redirectErr); }
+    }
+    if (code === 'auth/unauthorized-domain') {
+      showToast('This domain is not authorized in Firebase Authentication settings.');
+    } else {
+      showToast('Google sign-in failed. Please try again.');
+    }
+    console.error(err);
+  }
+}
+
+if (welcomeGoogleBtn) welcomeGoogleBtn.addEventListener('click', signInWithGoogle);
+
+if (welcomeLocalBtn) {
+  welcomeLocalBtn.addEventListener('click', () => {
+    markOnboarded();
+    closeWelcomeGate();
+    renderAuthBar();
+    showToast('Local mode — sessions stay on this device');
+  });
+}
+
+if (!isOnboarded()) openWelcomeGate();
+document.body.classList.remove('pre-auth');
+
+getRedirectResult(auth).catch((err) => {
+  const code = err && err.code ? String(err.code) : '';
+  if (code && code !== 'auth/no-auth-event') console.warn('Google redirect sign-in failed:', code);
 });
+
+document.getElementById('googleBtn').addEventListener('click', signInWithGoogle);
 
 onAuthStateChanged(auth, async (user)=>{
   currentUser = user;
+  document.body.classList.remove('pre-auth');
+  if (user) {
+    markOnboarded();
+    closeWelcomeGate();
+  }
   renderAuthBar();
   
   if (currentUser) {
@@ -395,12 +489,12 @@ function renderAuthBar(){
       const signOutBtn = bar.querySelector('.signout');
       if (signOutBtn) signOutBtn.addEventListener('click', openSignOutModal);
     } else {
-      bar.innerHTML = `<button class="gbtn">Sign in with Google</button>`;
+      const isLocal = isOnboarded();
+      bar.innerHTML = `
+        <button class="gbtn">${isLocal ? 'Sign in to sync' : 'Sign in with Google'}</button>
+        ${isLocal ? '<span class="auth-local-note">Local mode · not synced</span>' : ''}`;
       const googleBtnEl = bar.querySelector('.gbtn');
-      if (googleBtnEl) googleBtnEl.addEventListener('click', async ()=>{
-        try{ await signInWithPopup(auth, provider); }
-        catch(e){ showToast('Sign in failed - check if domain is added in Firebase console'); }
-      });
+      if (googleBtnEl) googleBtnEl.addEventListener('click', signInWithGoogle);
     }
   });
 }
@@ -1180,10 +1274,28 @@ targetInput.addEventListener('change', async ()=>{
   prefs.dailyTarget = Math.max(10, parseInt(targetInput.value)||120);
   await savePrefs(); renderTarget();
 });
+
+/* ---------- study session filter helper ---------- */
+function getStudySessions(){
+  const nonStudySubjs = new Set(
+    (prefs.subjects || []).filter(s => s && s.isNonStudy).map(s => s.name)
+  );
+  return sessions.filter(s => {
+    if (!s) return false;
+    if (s.isNonStudy) return false;
+    if (s.id && String(s.id).startsWith('ns')) return false;
+    const baseSubj = (s.subject || '').split(' - ')[0];
+    if (nonStudySubjs.has(s.subject) || nonStudySubjs.has(baseSubj)) return false;
+    return true;
+  });
+}
+
+/* ---------- daily target ---------- */
 function renderTarget(){
   targetInput.value = prefs.dailyTarget;
   const today = todayStr();
-  const done = sessions.filter(s=>s.date===today).reduce((a,s)=>a+s.minutes,0);
+  const studyOnly = getStudySessions();
+  const done = studyOnly.filter(s=>s.date===today).reduce((a,s)=>a+s.minutes,0);
   const pct = Math.min(100, Math.round(done/prefs.dailyTarget*100));
   document.getElementById('targetFill').style.width = pct+'%';
   document.getElementById('targetDone').textContent = done+' mins';
@@ -1192,7 +1304,8 @@ function renderTarget(){
 
 /* ---------- level / xp ---------- */
 function renderLevel(){
-  const total = sessions.reduce((a,s)=>a+s.minutes,0);
+  const studyOnly = getStudySessions();
+  const total = studyOnly.reduce((a,s)=>a+s.minutes,0);
   const XP_PER_LEVEL = 300; 
   const level = Math.floor(total/XP_PER_LEVEL)+1;
   const xp = total % XP_PER_LEVEL;
@@ -1206,14 +1319,15 @@ function renderLevel(){
   const totalFocusHrsEl = document.getElementById('totalFocusHrs');
   if (totalFocusHrsEl) totalFocusHrsEl.textContent = (total / 60).toFixed(1);
   const totalFocusSessionsEl = document.getElementById('totalFocusSessions');
-  if (totalFocusSessionsEl) totalFocusSessionsEl.textContent = sessions.length;
+  if (totalFocusSessionsEl) totalFocusSessionsEl.textContent = studyOnly.length;
 }
 
 /* ---------- week comparison ---------- */
 function renderCompare(){
-  const thisWeek = sessions.filter(s=> s.date >= daysAgoStr(6)).reduce((a,s)=>a+s.minutes,0);
+  const studyOnly = getStudySessions();
+  const thisWeek = studyOnly.filter(s=> s.date >= daysAgoStr(6)).reduce((a,s)=>a+s.minutes,0);
   const lastWeekDays = new Set(); for(let i=13;i>=7;i--) lastWeekDays.add(daysAgoStr(i));
-  const lastWeek = sessions.filter(s=>lastWeekDays.has(s.date)).reduce((a,s)=>a+s.minutes,0);
+  const lastWeek = studyOnly.filter(s=>lastWeekDays.has(s.date)).reduce((a,s)=>a+s.minutes,0);
   const el = document.getElementById('compareLine');
   if(lastWeek===0 && thisWeek===0){ el.textContent=''; return; }
   if(lastWeek===0){ el.innerHTML = 'Studied for <b>'+thisWeek+'</b> mins this week'; return; }
@@ -1236,9 +1350,10 @@ function barRow(label,minutes,pct){
     + '<div class="bar-value">'+minutes+' mins</div></div>';
 }
 function renderStats(){
+  const studyOnly = getStudySessions();
   if(statsMode==='daily'){
     const today = todayStr();
-    const todaySessions = sessions.filter(s=>s.date===today);
+    const todaySessions = studyOnly.filter(s=>s.date===today);
     const bySubject={}; todaySessions.forEach(s=>{ bySubject[s.subject]=(bySubject[s.subject]||0)+s.minutes; });
     const entries = Object.entries(bySubject).sort((a,b)=>b[1]-a[1]);
     const total = todaySessions.reduce((a,s)=>a+s.minutes,0);
@@ -1248,7 +1363,7 @@ function renderStats(){
     todayTotalEl.innerHTML = 'Total time today: <b>'+total+' mins</b>';
   } else {
     const days=[]; for(let i=6;i>=0;i--) days.push(daysAgoStr(i));
-    const totals = days.map(d=>sessions.filter(s=>s.date===d).reduce((a,s)=>a+s.minutes,0));
+    const totals = days.map(d=>studyOnly.filter(s=>s.date===d).reduce((a,s)=>a+s.minutes,0));
     const grand = totals.reduce((a,b)=>a+b,0);
     if(grand===0){ chartEl.innerHTML='<div class="empty-note">No sessions completed in the last 7 days</div>'; todayTotalEl.innerHTML=''; return; }
     const max = Math.max(...totals,1);
@@ -1268,7 +1383,8 @@ let currentStreakVal = 0;
 let bestStreakVal = 0;
 
 function renderStreak(){
-  const uniqueDates = [...new Set(sessions.map(s=>s.date))].sort();
+  const studyOnly = getStudySessions();
+  const uniqueDates = [...new Set(studyOnly.map(s=>s.date))].sort();
   if(uniqueDates.length===0){
     currentStreakVal = 0;
     bestStreakVal = 0;
@@ -1304,10 +1420,11 @@ function renderStreak(){
 let currentBadgeFilter = 'all';
 
 function calculateMilestoneBadges() {
-  const totalStudyMinutes = sessions.reduce((a, s) => a + s.minutes, 0);
+  const studyOnly = getStudySessions();
+  const totalStudyMinutes = studyOnly.reduce((a, s) => a + s.minutes, 0);
   const totalHours = Math.floor(totalStudyMinutes / 60);
-  const maxSessionMin = sessions.reduce((max, s) => Math.max(max, s.minutes || 0), 0);
-  const totalSessions = sessions.length;
+  const maxSessionMin = studyOnly.reduce((max, s) => Math.max(max, s.minutes || 0), 0);
+  const totalSessions = studyOnly.length;
   const streakToUse = Math.max(currentStreakVal, bestStreakVal);
 
   return [
@@ -1706,46 +1823,46 @@ function computeExamProjection(allStudy, goal, todayDate = new Date()) {
   const paceDeltaHours = currentDailyHours - requiredDailyHours;
   const paceRatio = requiredDailyHours > 0 ? (currentDailyHours / requiredDailyHours) : 1.0;
 
-  // 5. Feasibility status
+  // 5. Friendly pace status
   let status = 'ON_TRACK';
-  let statusBadgeText = 'ON TRACK';
+  let statusBadgeText = 'On Track';
   let statusBadgeClass = 'on-track';
-  let statusDescription = 'Current 7-day velocity is on schedule to complete the syllabus before the target deadline.';
+  let statusDescription = 'Nice steady pace! Keep this up to finish on time.';
 
   if (remainingHours <= 0) {
     status = 'COMPLETE';
-    statusBadgeText = 'GOAL ACHIEVED';
+    statusBadgeText = 'Goal Reached!';
     statusBadgeClass = 'complete';
-    statusDescription = 'Congratulations! You have completed 100% of your targeted syllabus hours.';
+    statusDescription = 'Awesome work — you have completed your study goal!';
   } else if (daysRemaining < 0) {
     status = 'EXPIRED';
-    statusBadgeText = 'DEADLINE PASSED';
+    statusBadgeText = 'Date Passed';
     statusBadgeClass = 'critical-lag';
-    statusDescription = 'The target exam date has passed. Edit the target date in settings to recalibrate.';
+    statusDescription = 'Your target date has passed. Tap Edit Goal to pick a new date.';
   } else if (daysRemaining === 0) {
     status = 'DEADLINE_TODAY';
-    statusBadgeText = 'EXAM TODAY';
+    statusBadgeText = 'Goal Day Today';
     statusBadgeClass = 'minor-deficit';
-    statusDescription = 'Target deadline is today! Focus on high-yield formulas and active recall.';
+    statusDescription = 'Your target date is today — give it a strong finish!';
   } else if (paceRatio >= 1.0) {
     status = 'ON_TRACK';
-    statusBadgeText = 'ON TRACK';
+    statusBadgeText = 'On Track';
     statusBadgeClass = 'on-track';
-    statusDescription = `Velocity surplus of +${paceDeltaHours.toFixed(1)}h/day. Syllabus will be completed on schedule.`;
+    statusDescription = `Great pace! At ${currentDailyHours.toFixed(1)}h/day, you are ${paceDeltaHours > 0.1 ? '+' + paceDeltaHours.toFixed(1) + 'h/day ahead of' : 'right on'} schedule.`;
   } else if (paceRatio >= 0.8) {
     status = 'MINOR_DEFICIT';
-    statusBadgeText = 'MINOR DEFICIT';
+    statusBadgeText = 'Slightly Behind';
     statusBadgeClass = 'minor-deficit';
-    statusDescription = `Velocity lag of ${Math.abs(paceDeltaHours).toFixed(1)}h/day. Increase study blocks by ~${Math.round(Math.abs(paceDeltaHours) * 60)} mins/day to regain pace.`;
+    statusDescription = `Almost there — add about ${Math.max(5, Math.round(Math.abs(paceDeltaHours) * 60))} mins/day to get back on schedule.`;
   } else {
     status = 'CRITICAL_LAG';
-    statusBadgeText = 'CRITICAL LAG';
+    statusBadgeText = 'Needs Catch-up';
     statusBadgeClass = 'critical-lag';
-    statusDescription = `Significant pace deficit of ${Math.abs(paceDeltaHours).toFixed(1)}h/day. Urgent pace recalibration needed to cover remaining ${remainingHours.toFixed(1)}h.`;
+    statusDescription = `Aim for ${requiredDailyHours.toFixed(1)}h/day to cover the remaining ${remainingHours.toFixed(1)}h on time.`;
   }
 
   // 6. Projected Completion Date
-  let projectedDate = 'Indeterminate (0h pace)';
+  let projectedDate = 'Start studying';
   if (remainingHours <= 0) {
     projectedDate = 'Completed';
   } else if (currentDailyHours >= 0.05) {
@@ -3042,46 +3159,46 @@ async function exportAnalysisPdf() {
 
     doc.autoTable({
       startY: currentY,
-      head: [[kpiTitle, '', '']],
+      head: [[{ content: kpiTitle, colSpan: 3 }]],
       body: execRows,
       theme: 'grid',
       headStyles: { fillColor: [24, 24, 27], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 9.5 },
-      styles: { fontSize: 8.5, cellPadding: 3, textColor: [30, 41, 59] },
+      styles: { fontSize: 8.5, cellPadding: 3, textColor: [30, 41, 59], overflow: 'linebreak' },
       margin: { left: 14, right: 14 }
     });
 
     currentY = doc.lastAutoTable.finalY + 6;
 
-    // 2. Exam & Syllabus Projection Table
+    // 2. Study Goal & Daily Pace Table
     const proj = effectiveReport.examProjection;
     const projRows = [
       [
-        cleanPdfText(`Exam / Goal: ${proj.examName}`),
-        cleanPdfText(`Deadline: ${proj.targetDate} (${proj.daysRemaining} days left)`),
+        cleanPdfText(`Goal: ${proj.examName}`),
+        cleanPdfText(`Target Date: ${proj.targetDate || 'Not set'} (${proj.daysRemaining} days left)`),
         cleanPdfText(`Status: ${proj.statusBadgeText}`)
       ],
       [
-        cleanPdfText(`Completed: ${proj.completedHours.toFixed(1)}h / ${proj.targetHours}h`),
-        cleanPdfText(`Remaining: ${proj.remainingHours.toFixed(1)}h`),
-        cleanPdfText(`Required Pace: ${proj.requiredDailyHours.toFixed(1)} hrs/day`)
+        cleanPdfText(`Done: ${proj.completedHours.toFixed(1)}h / ${proj.targetHours}h`),
+        cleanPdfText(`Hours Left: ${proj.remainingHours.toFixed(1)}h`),
+        cleanPdfText(`Daily Pace Needed: ${proj.requiredDailyHours.toFixed(1)} hrs/day`)
       ],
       [
-        cleanPdfText(`Actual 7-Day Velocity: ${proj.currentDailyHours.toFixed(1)} hrs/day`),
-        cleanPdfText(`Pace Delta: ${proj.paceDeltaHours >= 0 ? '+' : ''}${proj.paceDeltaHours.toFixed(1)} hrs/day`),
-        cleanPdfText(`Projected Finish: ${proj.projectedDate}`)
+        cleanPdfText(`Your 7-Day Avg: ${proj.currentDailyHours.toFixed(1)} hrs/day`),
+        cleanPdfText(`Pace Diff: ${proj.paceDeltaHours >= 0 ? '+' : ''}${proj.paceDeltaHours.toFixed(1)} hrs/day`),
+        cleanPdfText(`Est. Finish: ${proj.projectedDate}`)
       ],
       [
-        { content: cleanPdfText(`Projection Summary: ${proj.statusDescription}`), colSpan: 3, styles: { fontStyle: 'italic', textColor: [71, 85, 105] } }
+        { content: cleanPdfText(`Summary: ${proj.statusDescription}`), colSpan: 3, styles: { fontStyle: 'italic', textColor: [71, 85, 105] } }
       ]
     ];
 
     doc.autoTable({
       startY: currentY,
-      head: [['EXAM & SYLLABUS PROJECTION', '', '']],
+      head: [[{ content: 'STUDY GOAL & DAILY PACE', colSpan: 3 }]],
       body: projRows,
       theme: 'grid',
       headStyles: { fillColor: [5, 150, 105], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 9 },
-      styles: { fontSize: 8, cellPadding: 2.5 },
+      styles: { fontSize: 8, cellPadding: 2.5, overflow: 'linebreak' },
       margin: { left: 14, right: 14 }
     });
 
@@ -3140,21 +3257,24 @@ async function exportAnalysisPdf() {
     });
 
     const sessionRows = sortedAuditSessions.map(s => {
-      const timeStr = s.ts ? formatTimeRange(s.ts, s.minutes) : s.date;
-      return [s.date, cleanPdfText(timeStr), cleanPdfText(s.subject), cleanPdfText(s.workType || 'Other'), `${s.minutes}m`];
+      const timeStr = s.ts ? formatTimeRangeOnlyTime(s.ts, s.minutes) : '-';
+      return [cleanPdfText(s.date), cleanPdfText(timeStr), cleanPdfText(s.subject), cleanPdfText(s.workType || 'Other'), `${s.minutes}m`];
     });
-
-    const auditHeader = hasHistory
-      ? `SESSION LOG (ALL TIME: ${sortedAuditSessions.length} SESSIONS)`
-      : `SESSION LOG (${cleanPdfText(periodLabel).toUpperCase()}: ${sortedAuditSessions.length} SESSIONS)`;
 
     doc.autoTable({
       startY: currentY,
-      head: [[auditHeader, 'TIME WINDOW', 'SUBJECT', 'WORK TYPE', 'MINUTES']],
+      head: [['DATE', 'TIME', 'SUBJECT', 'WORK TYPE', 'DURATION']],
       body: sessionRows.length > 0 ? sessionRows : [['No sessions recorded in this period', '-', '-', '-', '-']],
       theme: 'striped',
       headStyles: { fillColor: [63, 63, 70], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8.5 },
-      styles: { fontSize: 7.5, cellPadding: 2 },
+      styles: { fontSize: 8, cellPadding: 2.2, overflow: 'linebreak' },
+      columnStyles: {
+        0: { cellWidth: 24 },
+        1: { cellWidth: 36 },
+        2: { cellWidth: 'auto' },
+        3: { cellWidth: 28 },
+        4: { cellWidth: 20 }
+      },
       margin: { left: 14, right: 14 }
     });
 
@@ -3276,7 +3396,7 @@ setupAnalyticsEvents();
 function renderHeatmap(){
   const grid = document.getElementById('heatmap');
   const totalsByDate = {};
-  sessions.forEach(s=> totalsByDate[s.date]=(totalsByDate[s.date]||0)+s.minutes);
+  getStudySessions().forEach(s=> totalsByDate[s.date]=(totalsByDate[s.date]||0)+s.minutes);
   const days = 84; 
   const cells = [];
   for(let i=days-1;i>=0;i--){
@@ -3446,7 +3566,7 @@ document.getElementById('exportPdfBtn').addEventListener('click', async ()=>{
     btn.textContent = 'Preparing...';
 
     const { jsPDF } = window.jspdf;
-    const doc = new jsPDF();
+    const doc = new jsPDF('p', 'mm', 'a4');
     
     const range = document.getElementById('exportRange').value;
     let titleStr = 'Study Report';
@@ -3466,16 +3586,20 @@ document.getElementById('exportPdfBtn').addEventListener('click', async ()=>{
     const studyHr = (studyMin/60).toFixed(1);
     const nonStudyHr = (nonStudyMin/60).toFixed(1);
 
-    doc.setFontSize(18);
-    doc.text('Focus Study Timer', 14, 22);
-    doc.setFontSize(12);
-    doc.setTextColor(100);
-    doc.text(titleStr, 14, 30);
-    
-    doc.setFontSize(11);
-    doc.setTextColor(0);
-    doc.text(`Total Study: ${studyHr} hrs`, 14, 40);
-    doc.text(`Non-Study: ${nonStudyHr} hrs`, 14, 46);
+    doc.setFillColor(9, 9, 11);
+    doc.rect(0, 0, 210, 32, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(16);
+    doc.text('FOCUS STUDY TIMER', 14, 14);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10);
+    doc.setTextColor(212, 212, 216);
+    doc.text(`${cleanPdfText(titleStr)}  |  Generated: ${todayStr()}`, 14, 22);
+
+    doc.setFontSize(10);
+    doc.setTextColor(30, 41, 59);
+    doc.text(`Total Study: ${studyHr} hrs (${studyMin} mins)   |   Non-Study: ${nonStudyHr} hrs`, 14, 41);
 
     const tableData = data.sort((a,b)=>(a.ts||0) - (b.ts||0)).map(s => {
       const isNS = s.isNonStudy || (s.id && String(s.id).startsWith('ns')) ? 'Non-Study' : 'Study';
@@ -3491,18 +3615,27 @@ document.getElementById('exportPdfBtn').addEventListener('click', async ()=>{
     });
 
     doc.autoTable({
-      startY: 52,
-      head: [['Date', 'Time', 'Subject', 'Work Type', 'Minutes', 'Category']],
+      startY: 47,
+      head: [['Date', 'Time', 'Subject', 'Work Type', 'Duration', 'Category']],
       body: tableData,
       theme: 'grid',
-      headStyles: { fillColor: [201, 150, 47] },
-      alternateRowStyles: { fillColor: [250, 250, 250] },
-      styles: { fontSize: 10 },
+      headStyles: { fillColor: [24, 24, 27], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8.5 },
+      alternateRowStyles: { fillColor: [248, 250, 252] },
+      styles: { fontSize: 8.5, cellPadding: 2.5, overflow: 'linebreak' },
       columnStyles: {
-        0: { cellWidth: 24 }, 1: { cellWidth: 38 }, 2: { cellWidth: 'auto' }, 
-        3: { cellWidth: 26 }, 4: { cellWidth: 18 }, 5: { cellWidth: 24 }  
-      }
+        0: { cellWidth: 23 }, 1: { cellWidth: 36 }, 2: { cellWidth: 'auto' }, 
+        3: { cellWidth: 26 }, 4: { cellWidth: 19 }, 5: { cellWidth: 22 }  
+      },
+      margin: { left: 14, right: 14 }
     });
+
+    const pageCount = doc.internal.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
+      doc.setPage(i);
+      doc.setFontSize(8);
+      doc.setTextColor(148, 163, 184);
+      doc.text(`Page ${i} of ${pageCount}  |  Focus Study Timer`, 105, 290, { align: 'center' });
+    }
 
     doc.save('focus-timer-report.pdf');
   } catch(err) {

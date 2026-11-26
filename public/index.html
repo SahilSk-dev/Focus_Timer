@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover">
 <meta name="theme-color" content="#000000">
-<meta name="app-version" content="1.1.5">
+<meta name="app-version" content="1.1.6">
 <meta name="description" content="High-performance Focus Study Timer, Pomodoro, and Cognitive Analytics. Track study hours, circadian focus windows, and export clean PDF reports.">
 <meta name="keywords" content="focus timer, study timer, pomodoro timer, study tracker, circadian rhythm focus, productivity, study analytics">
 <meta name="mobile-web-app-capable" content="yes">
@@ -22,7 +22,71 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Outfit:wght@500;600;700;800&display=swap">
 <link rel="stylesheet" href="./style.css">
 </head>
-<body data-theme="dark">
+<body class="pre-auth" data-theme="dark">
+
+<!-- ============================================================
+     ONBOARDING / SIGN-IN GATE
+     Shown once until the user signs in with Google or picks local mode.
+     ============================================================ -->
+<div class="welcome-gate" id="welcomeGate" role="dialog" aria-modal="true" aria-labelledby="welcomeTitle" hidden>
+  <div class="welcome-shell">
+    <div class="welcome-brand">
+      <img src="./icon.svg?v=6" width="38" height="38" alt="" aria-hidden="true">
+      <span>Focus Timer</span>
+    </div>
+
+    <div class="welcome-body">
+      <div class="welcome-copy">
+        <span class="welcome-badge">Focus, measured</span>
+        <h2 class="welcome-title" id="welcomeTitle">Study with intention.<br>Improve with evidence.</h2>
+        <p class="welcome-sub">A calm, precise workspace for deep work. Track every session, understand your focus patterns, and keep your progress safe across devices.</p>
+
+        <ul class="welcome-points">
+          <li>
+            <span class="welcome-check" aria-hidden="true"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5L20 7"/></svg></span>
+            <span>Pomodoro, custom timers and fullscreen focus mode</span>
+          </li>
+          <li>
+            <span class="welcome-check" aria-hidden="true"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5L20 7"/></svg></span>
+            <span>Circadian analytics, streaks and subject breakdowns</span>
+          </li>
+          <li>
+            <span class="welcome-check" aria-hidden="true"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5L20 7"/></svg></span>
+            <span>Clean PDF reports, JSON backup and Google sync</span>
+          </li>
+        </ul>
+      </div>
+
+      <div class="welcome-card">
+        <div class="welcome-card-head">
+          <h3>Get started</h3>
+          <p>Choose how you want to use Focus Timer.</p>
+        </div>
+
+        <button class="welcome-google" id="welcomeGoogleBtn" type="button">
+          <svg viewBox="0 0 48 48" width="18" height="18" aria-hidden="true">
+            <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+            <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+            <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
+            <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+          </svg>
+          <span>Continue with Google</span>
+        </button>
+
+        <div class="welcome-divider" aria-hidden="true"><span>or</span></div>
+
+        <button class="welcome-local" id="welcomeLocalBtn" type="button">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6" y="2" width="12" height="20" rx="3"/><path d="M11 18h2"/></svg>
+          <span>Continue locally</span>
+        </button>
+
+        <p class="welcome-note">Local mode keeps sessions on this device only. You can connect Google anytime from the sidebar to sync.</p>
+      </div>
+    </div>
+
+    <p class="welcome-foot">No ads, no tracking. Your study data belongs to you.</p>
+  </div>
+</div>
 
 <div class="desktop-shell" id="desktopShell">
 
@@ -77,7 +141,7 @@
         </button>
         <img src="./icon.svg?v=4" alt="" width="26" height="26" class="mobile-brand-logo" aria-hidden="true" />
         <h1 class="stage-title" id="stageTitle">Focus Timer</h1>
-        <span class="app-version-badge" title="Focus Timer Web v1.1.5">v1.1.5</span>
+        <span class="app-version-badge" title="Focus Timer Web v1.1.6">v1.1.6</span>
       </div>
 
       <div class="stage-header-right">
@@ -248,27 +312,27 @@
           <!-- Empty Notice Banner when current filter has 0 sessions but all-time has data -->
           <div id="analyticsEmptyNotice" class="analytics-empty-notice" style="display:none;"></div>
 
-          <!-- Exam & Syllabus Projection Calculator Card (Full Width) -->
+          <!-- Study Goal & Daily Pace Card (Full Width) -->
           <div class="exam-projection-card" id="examProjectionCard">
             <div class="exam-projection-header">
               <div class="exam-projection-title-wrap">
                 <span class="exam-projection-icon"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg></span>
                 <div>
-                  <div class="exam-projection-name" id="examTargetName">Target Exam / Syllabus</div>
-                  <div class="exam-projection-sub" id="examTargetSub">Deterministic Pace & Horizon Projection</div>
+                  <div class="exam-projection-name" id="examTargetName">Study Goal & Daily Pace</div>
+                  <div class="exam-projection-sub" id="examTargetSub">Track your hours & daily study pace</div>
                 </div>
               </div>
               <div class="exam-projection-actions">
                 <span class="exam-countdown-pill" id="examCountdownPill">-- Days Left</span>
-                <button class="exam-edit-btn" id="examGoalEditBtn" title="Configure Exam / Syllabus Target"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px; margin-right:4px;"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>Edit Goal</button>
+                <button class="exam-edit-btn" id="examGoalEditBtn" title="Set Study Goal & Target Date"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px; margin-right:4px;"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>Edit Goal</button>
               </div>
             </div>
 
-            <!-- Syllabus Progress Bar -->
+            <!-- Study Goal Progress Bar -->
             <div class="exam-progress-wrap">
               <div class="exam-progress-labels">
-                <span id="examCompletedHoursLabel">0.0h Completed</span>
-                <span id="examTargetHoursLabel">Target: 150h</span>
+                <span id="examCompletedHoursLabel">0.0h Done</span>
+                <span id="examTargetHoursLabel">Goal: 150h</span>
               </div>
               <div class="track" style="height: 8px;"><div class="fill green" id="examProgressFill" style="width: 0%;"></div></div>
             </div>
@@ -277,26 +341,26 @@
             <div class="exam-metrics-grid">
               <div class="exam-metric-box">
                 <div class="exam-metric-val" id="examRemainingHoursVal">0h</div>
-                <div class="exam-metric-label">Remaining Hours</div>
+                <div class="exam-metric-label">Hours Left</div>
               </div>
               <div class="exam-metric-box">
                 <div class="exam-metric-val" id="examRequiredPaceVal">0.0h/d</div>
-                <div class="exam-metric-label">Required Daily Pace</div>
+                <div class="exam-metric-label">Daily Pace Needed</div>
               </div>
               <div class="exam-metric-box">
                 <div class="exam-metric-val" id="examActualVelocityVal">0.0h/d</div>
-                <div class="exam-metric-label">Actual Velocity (7d)</div>
+                <div class="exam-metric-label">Your 7-Day Avg</div>
               </div>
               <div class="exam-metric-box">
                 <div class="exam-metric-val" id="examProjectedDateVal">--</div>
-                <div class="exam-metric-label">Projected Finish</div>
+                <div class="exam-metric-label">Est. Finish</div>
               </div>
             </div>
 
-            <!-- Feasibility Status Banner -->
+            <!-- Friendly Status Banner -->
             <div class="exam-status-footer">
-              <div class="exam-status-badge" id="examFeasibilityBadge">Calculating Feasibility...</div>
-              <div class="exam-status-text" id="examFeasibilityText">Analyzing trailing 7-day study pace against syllabus target...</div>
+              <div class="exam-status-badge" id="examFeasibilityBadge">Checking Pace...</div>
+              <div class="exam-status-text" id="examFeasibilityText">See how many hours per day you need to reach your goal on time.</div>
             </div>
           </div>
 
@@ -388,7 +452,7 @@
               <div class="android-app-eyebrow">Android app</div>
               <div class="android-app-title" id="androidAppTitle">Focus Timer for Android</div>
               <p class="android-app-sub">Native APK build with offline tracking, background alarms and Google sync.</p>
-              <p class="android-app-meta">Version 1.1.5 &middot; Debug build &middot; Android 7.0+</p>
+              <p class="android-app-meta">Version 1.1.6 &middot; Debug build &middot; Android 7.0+</p>
             </div>
           </div>
           <div class="android-app-actions">

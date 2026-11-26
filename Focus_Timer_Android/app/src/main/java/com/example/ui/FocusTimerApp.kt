@@ -26,8 +26,11 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BarChart
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.CloudSync
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.NotificationsActive
+import androidx.compose.material.icons.filled.PhoneAndroid
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -93,18 +96,23 @@ fun FocusTimerApp(
     var currentNavIndex by remember { mutableStateOf(0) }
 
     val isStartupReady by viewModel.isStartupReady.collectAsState()
+    val isOnboarded by viewModel.isOnboarded.collectAsState()
+    val currentUser by viewModel.currentUser.collectAsState()
     var prewarmTabs by remember { mutableStateOf(false) }
     var showStartupSplash by remember { mutableStateOf(true) }
 
-    LaunchedEffect(Unit) {
-        delay(16)
-        prewarmTabs = true
+    LaunchedEffect(currentUser) {
+        if (currentUser != null) {
+            viewModel.markOnboarded()
+        }
     }
 
-    LaunchedEffect(isStartupReady, prewarmTabs) {
-        if (isStartupReady && prewarmTabs) {
-            delay(360)
+    LaunchedEffect(isStartupReady) {
+        if (isStartupReady) {
             showStartupSplash = false
+            // Defer prewarming hidden tabs until after the splash fades out so the main thread never hitches on cold start
+            delay(300)
+            prewarmTabs = true
         }
     }
 
@@ -287,6 +295,24 @@ fun FocusTimerApp(
             )
         }
 
+        // Professional Welcome / Auth Gate for first-time or signed-out non-onboarded users
+        if (!showStartupSplash && !isOnboarded && currentUser == null) {
+            WelcomeOnboardingOverlay(
+                onGoogleSignIn = {
+                    val hostActivity = context as? android.app.Activity
+                    if (hostActivity != null) {
+                        viewModel.signInWithGoogle(hostActivity)
+                    } else {
+                        viewModel.showToast("Unable to launch Google Sign-In from this context")
+                    }
+                },
+                onContinueLocal = {
+                    viewModel.markOnboarded()
+                    viewModel.showToast("Local mode — sessions stay on this device")
+                }
+            )
+        }
+
         StartupLoadingOverlay(visible = showStartupSplash)
     }
 
@@ -453,22 +479,177 @@ fun FocusTimerApp(
 }
 
 @Composable
+private fun WelcomeOnboardingOverlay(
+    onGoogleSignIn: () -> Unit,
+    onContinueLocal: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(BgDark)
+            .navigationBarsPadding()
+            .padding(horizontal = 24.dp, vertical = 28.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(20.dp)
+        ) {
+            Surface(
+                modifier = Modifier.size(64.dp),
+                shape = RoundedCornerShape(18.dp),
+                color = PanelDark,
+                border = BorderStroke(1.dp, LineBorder)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = Icons.Default.Timer,
+                        contentDescription = null,
+                        tint = GoldBright,
+                        modifier = Modifier.size(30.dp)
+                    )
+                }
+            }
+
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(
+                    text = "Focus Timer",
+                    color = GoldBright,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    letterSpacing = 0.6.sp
+                )
+                Text(
+                    text = "Study with intention.\nImprove with evidence.",
+                    color = TextPrimary,
+                    fontSize = 24.sp,
+                    fontWeight = FontWeight.Bold,
+                    lineHeight = 30.sp,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                )
+                Text(
+                    text = "Track every session, understand your focus patterns, and keep your progress safe across devices.",
+                    color = TextDim,
+                    fontSize = 13.sp,
+                    lineHeight = 19.sp,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                )
+            }
+
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(18.dp),
+                color = PanelDark,
+                border = BorderStroke(1.dp, LineBorder)
+            ) {
+                Column(
+                    modifier = Modifier.padding(20.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    listOf(
+                        "Pomodoro, custom countdown & stopwatch",
+                        "Daily goals, streaks & pace insights",
+                        "Cloud sync with Web & JSON backups"
+                    ).forEach { point ->
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = PanelElevated,
+                                modifier = Modifier.size(22.dp)
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(
+                                        imageVector = Icons.Default.Check,
+                                        contentDescription = null,
+                                        tint = GoldBright,
+                                        modifier = Modifier.size(13.dp)
+                                    )
+                                }
+                            }
+                            Text(
+                                text = point,
+                                color = TextPrimary,
+                                fontSize = 13.sp
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    Button(
+                        onClick = onGoogleSignIn,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = GoldBright,
+                            contentColor = BgDark
+                        ),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(50.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.CloudSync,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.size(8.dp))
+                        Text(
+                            text = "Continue with Google",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 14.sp
+                        )
+                    }
+
+                    androidx.compose.material3.OutlinedButton(
+                        onClick = onContinueLocal,
+                        border = BorderStroke(1.dp, LineBorder),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(48.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.PhoneAndroid,
+                            contentDescription = null,
+                            tint = TextPrimary,
+                            modifier = Modifier.size(17.dp)
+                        )
+                        Spacer(modifier = Modifier.size(8.dp))
+                        Text(
+                            text = "Continue locally",
+                            color = TextPrimary,
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 14.sp
+                        )
+                    }
+
+                    Text(
+                        text = "Local mode stores data on this device. You can connect Google anytime in History & Data.",
+                        color = TextDim,
+                        fontSize = 11.sp,
+                        lineHeight = 16.sp,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
 private fun StartupLoadingOverlay(visible: Boolean) {
     AnimatedVisibility(
         visible = visible,
-        exit = fadeOut(animationSpec = tween(durationMillis = 260, easing = FastOutSlowInEasing))
+        exit = fadeOut(animationSpec = tween(durationMillis = 200, easing = FastOutSlowInEasing))
     ) {
-        val infiniteTransition = rememberInfiniteTransition(label = "startup_pulse")
-        val badgeScale by infiniteTransition.animateFloat(
-            initialValue = 0.96f,
-            targetValue = 1.04f,
-            animationSpec = infiniteRepeatable(
-                animation = tween(durationMillis = 750, easing = FastOutSlowInEasing),
-                repeatMode = RepeatMode.Reverse
-            ),
-            label = "startup_badge_scale"
-        )
-
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -480,12 +661,7 @@ private fun StartupLoadingOverlay(visible: Boolean) {
                 verticalArrangement = Arrangement.spacedBy(18.dp)
             ) {
                 Surface(
-                    modifier = Modifier
-                        .size(72.dp)
-                        .graphicsLayer {
-                            scaleX = badgeScale
-                            scaleY = badgeScale
-                        },
+                    modifier = Modifier.size(72.dp),
                     shape = RoundedCornerShape(18.dp),
                     color = PanelDark,
                     border = BorderStroke(1.dp, LineBorder)

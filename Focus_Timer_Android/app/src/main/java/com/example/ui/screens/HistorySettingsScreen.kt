@@ -171,6 +171,28 @@ fun HistorySettingsScreen(
     val isPreviewingSound by viewModel.isPreviewingSound.collectAsState()
     val alarmCustomUri by viewModel.alarmCustomUri.collectAsState()
 
+    val jsonSaveLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("application/json")
+    ) { uri: Uri? ->
+        if (uri != null) {
+            coroutineScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                try {
+                    val jsonStr = viewModel.repository.exportToJson(allSessions)
+                    context.contentResolver.openOutputStream(uri)?.use { out ->
+                        out.write(jsonStr.toByteArray(Charsets.UTF_8))
+                    }
+                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                        viewModel.showToast("Backup JSON saved successfully!")
+                    }
+                } catch (e: Exception) {
+                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                        viewModel.showToast("Failed to save JSON: ${e.localizedMessage}")
+                    }
+                }
+            }
+        }
+    }
+
     val ringtonePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
     ) { result ->
@@ -611,11 +633,46 @@ fun HistorySettingsScreen(
 
                             Spacer(modifier = Modifier.height(10.dp))
 
-                            // Two action buttons: Download JSON (Backup) & Restore JSON (Upload)
+                            // Action buttons: Download JSON (Direct Save), Share JSON, & Restore JSON (Upload)
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
+                                OutlinedButton(
+                                    onClick = {
+                                        jsonSaveLauncher.launch("focus-timer-backup-${FocusRepository.getTodayString()}.json")
+                                    },
+                                    border = BorderStroke(1.dp, LineBorder),
+                                    shape = RoundedCornerShape(8.dp),
+                                    contentPadding = PaddingValues(horizontal = 6.dp, vertical = 6.dp),
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .heightIn(min = 52.dp)
+                                ) {
+                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                        Text("Download JSON", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                                        Spacer(modifier = Modifier.height(2.dp))
+                                        Text("(Save to Storage)", fontSize = 10.sp, color = TextDim)
+                                    }
+                                }
+
+                                OutlinedButton(
+                                    onClick = { showImportDialog = true },
+                                    border = BorderStroke(1.dp, LineBorder),
+                                    shape = RoundedCornerShape(8.dp),
+                                    contentPadding = PaddingValues(horizontal = 6.dp, vertical = 6.dp),
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .heightIn(min = 52.dp)
+                                ) {
+                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                        Text("Import JSON", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                                        Spacer(modifier = Modifier.height(2.dp))
+                                        Text("(Merge & Restore)", fontSize = 10.sp, color = TextDim)
+                                    }
+                                }
+
                                 OutlinedButton(
                                     onClick = {
                                         coroutineScope.launch(kotlinx.coroutines.Dispatchers.IO) {
@@ -638,43 +695,28 @@ fun HistorySettingsScreen(
                                                     addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                                                 }
                                                 kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
-                                                    context.startActivity(Intent.createChooser(sendIntent, "Export JSON (Backup)"))
+                                                    context.startActivity(Intent.createChooser(sendIntent, "Share JSON Backup"))
                                                 }
                                             } catch (e: Exception) {
                                                 kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
-                                                    viewModel.showToast("Failed to create backup: ${e.localizedMessage}")
+                                                    viewModel.showToast("Failed to share backup: ${e.localizedMessage}")
                                                 }
                                             }
                                         }
                                     },
                                     border = BorderStroke(1.dp, LineBorder),
                                     shape = RoundedCornerShape(8.dp),
-                                    contentPadding = PaddingValues(horizontal = 6.dp, vertical = 6.dp),
+                                    contentPadding = PaddingValues(0.dp),
                                     modifier = Modifier
-                                        .weight(1f)
+                                        .width(48.dp)
                                         .heightIn(min = 52.dp)
                                 ) {
-                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                        Text("Export JSON", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
-                                        Spacer(modifier = Modifier.height(2.dp))
-                                        Text("(Share / Save)", fontSize = 10.sp, color = TextDim)
-                                    }
-                                }
-
-                                OutlinedButton(
-                                    onClick = { showImportDialog = true },
-                                    border = BorderStroke(1.dp, LineBorder),
-                                    shape = RoundedCornerShape(8.dp),
-                                    contentPadding = PaddingValues(horizontal = 6.dp, vertical = 6.dp),
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .heightIn(min = 52.dp)
-                                ) {
-                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                        Text("Import JSON", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
-                                        Spacer(modifier = Modifier.height(2.dp))
-                                        Text("(Merge & Restore)", fontSize = 10.sp, color = TextDim)
-                                    }
+                                    Icon(
+                                        imageVector = Icons.Default.Share,
+                                        contentDescription = "Share JSON",
+                                        tint = TextDim,
+                                        modifier = Modifier.size(18.dp)
+                                    )
                                 }
                             }
                         }

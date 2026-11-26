@@ -53,10 +53,32 @@ body[data-theme="light"] {
 
 /* Base Styles */
 * { box-sizing: border-box; }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   GLOBAL SCROLLBAR REMOVAL (Zero-Scrollbar Clean UX)
+   Completely removes default thick OS scrollbars across all browsers & containers
+   while preserving smooth scrolling via wheel, trackpad, drag, and touch.
+   ══════════════════════════════════════════════════════════════════════════ */
+html, body, *, *::before, *::after {
+  scrollbar-width: none !important; /* Firefox & modern Chromium */
+  -ms-overflow-style: none !important; /* IE and legacy Edge */
+}
+
+::-webkit-scrollbar,
+*::-webkit-scrollbar,
+html::-webkit-scrollbar,
+body::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+  background: transparent !important;
+}
+
 html, body {
   margin: 0;
   padding: 0;
   background: var(--bg);
+  overflow-x: hidden;
 }
 body {
   background: var(--bg) !important;
@@ -101,6 +123,224 @@ h1, .stats-title {
 
 .wrap { width: 100%; max-width: 100%; }
 
+/* ============================================================
+   ONBOARDING / SIGN-IN GATE
+   ============================================================ */
+.welcome-gate {
+  position: fixed;
+  inset: 0;
+  z-index: 4000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 20px;
+  overflow-y: auto;
+  background:
+    radial-gradient(900px 520px at 10% -10%, rgba(255, 255, 255, 0.10), transparent 62%),
+    radial-gradient(760px 460px at 104% 112%, rgba(255, 255, 255, 0.06), transparent 58%),
+    var(--bg);
+}
+.welcome-gate[hidden] { display: none !important; }
+body.welcome-open { overflow: hidden; }
+/* Avoid flashing the app behind the gate while the module boots. */
+body.pre-auth .desktop-shell,
+body.pre-auth .mobile-tabbar,
+body.pre-auth #particles { visibility: hidden !important; }
+
+.welcome-shell {
+  width: 100%;
+  max-width: 1000px;
+  display: flex;
+  flex-direction: column;
+  gap: 26px;
+}
+.welcome-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--font-display);
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--text);
+}
+.welcome-brand img { border-radius: 10px; }
+
+.welcome-body {
+  display: grid;
+  grid-template-columns: 1.12fr 0.88fr;
+  gap: 56px;
+  align-items: center;
+}
+.welcome-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.welcome-title {
+  margin: 16px 0 14px;
+  font-family: var(--font-display);
+  font-size: clamp(2rem, 3.4vw, 3rem);
+  font-weight: 800;
+  line-height: 1.06;
+  letter-spacing: -0.035em;
+  background: var(--clock-gradient);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.welcome-sub {
+  max-width: 46ch;
+  margin: 0 0 22px;
+  font-size: 0.92rem;
+  line-height: 1.65;
+  color: var(--text-dim);
+}
+.welcome-points {
+  display: grid;
+  gap: 11px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.welcome-points li {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 0.84rem;
+  line-height: 1.5;
+  color: var(--text-dim);
+}
+.welcome-check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 20px;
+  width: 20px;
+  height: 20px;
+  margin-top: 1px;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: var(--panel-elevated);
+  color: var(--text);
+}
+
+.welcome-card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  padding: 26px;
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.55);
+}
+body[data-theme="light"] .welcome-card { box-shadow: 0 24px 60px rgba(15, 23, 42, 0.14); }
+.welcome-card-head h3 {
+  margin: 0 0 4px;
+  font-family: var(--font-display);
+  font-size: 1.18rem;
+  font-weight: 700;
+  color: var(--text);
+  text-align: left;
+}
+.welcome-card-head p {
+  margin: 0 0 20px;
+  font-size: 0.8rem;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+.welcome-google,
+.welcome-local {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 50px;
+  padding: 0 16px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  font-family: var(--font-main);
+  font-size: 0.92rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.18s ease, border-color 0.18s ease, transform 0.18s ease;
+}
+.welcome-google {
+  background: #ffffff;
+  border-color: rgba(0, 0, 0, 0.12);
+  color: #1f1f1f;
+}
+.welcome-google:hover { background: #f4f4f5; border-color: rgba(0, 0, 0, 0.2); }
+.welcome-google:active,
+.welcome-local:active { transform: scale(0.99); }
+.welcome-google:focus-visible,
+.welcome-local:focus-visible {
+  outline: 2px solid var(--text);
+  outline-offset: 3px;
+}
+.welcome-local {
+  background: transparent;
+  color: var(--text);
+}
+.welcome-local:hover { background: var(--panel-elevated); border-color: var(--line-bright); }
+.welcome-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 16px 0;
+  color: var(--text-muted);
+  font-size: 0.7rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.welcome-divider::before,
+.welcome-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--line);
+}
+.welcome-note {
+  margin: 16px 0 0;
+  font-size: 0.72rem;
+  line-height: 1.55;
+  color: var(--text-muted);
+}
+.welcome-foot {
+  margin: 0;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+@media (max-width: 860px) {
+  .welcome-gate {
+    align-items: flex-start;
+    padding: calc(22px + env(safe-area-inset-top)) 16px calc(22px + env(safe-area-inset-bottom));
+  }
+  .welcome-shell { max-width: 520px; gap: 20px; }
+  .welcome-body { grid-template-columns: 1fr; gap: 24px; }
+  .welcome-title { font-size: clamp(1.9rem, 8.6vw, 2.5rem); margin: 14px 0 12px; }
+  .welcome-sub { font-size: 0.86rem; margin-bottom: 18px; }
+  .welcome-points { gap: 9px; }
+  .welcome-points li { font-size: 0.8rem; }
+  .welcome-card { padding: 20px; border-radius: 18px; }
+}
+@media (max-width: 360px) {
+  .welcome-points { display: none; }
+  .welcome-title { font-size: 1.75rem; }
+}
+
+@media print {
+  .welcome-gate { display: none !important; }
+}
+
 /* Auth Bar */
 .authbar {
   display: flex;
@@ -109,6 +349,13 @@ h1, .stats-title {
   gap: 10px;
   margin-bottom: 22px;
 }
+.auth-local-note {
+  font-size: 0.7rem;
+  line-height: 1.4;
+  color: var(--text-muted);
+  text-align: center;
+}
+.desktop-shell.sidebar-collapsed .auth-local-note { display: none !important; }
 .gbtn {
   display: flex;
   align-items: center;

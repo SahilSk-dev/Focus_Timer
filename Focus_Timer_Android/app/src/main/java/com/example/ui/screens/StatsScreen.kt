@@ -92,11 +92,32 @@ fun StatsScreen(
 ) {
     val context = LocalContext.current
     val allSessions by viewModel.allSessions.collectAsState()
-    val studySessions = remember(allSessions) { allSessions.filter { !it.isNonStudy } }
+    val allSubjects by viewModel.allSubjects.collectAsState()
+    val examGoal by viewModel.examGoal.collectAsState()
+    val nonStudySubjectNames = remember(allSubjects) {
+        allSubjects.filter { it.isNonStudy }.map { it.name }.toSet()
+    }
+    val studySessions = remember(allSessions, nonStudySubjectNames) {
+        allSessions.filter { s ->
+            val baseSubj = s.subject.substringBefore(" - ")
+            !s.isNonStudy && !s.id.startsWith("ns") &&
+                !nonStudySubjectNames.contains(s.subject) && !nonStudySubjectNames.contains(baseSubj)
+        }
+    }
     val dailyTarget by viewModel.dailyTargetMinutes.collectAsState()
 
     var showTargetEditDialog by remember { mutableStateOf(false) }
+    var showExamGoalEditDialog by remember { mutableStateOf(false) }
     var statsTab by remember { mutableStateOf("daily") } // "daily" or "weekly"
+
+    val analyticsReport = remember(studySessions, examGoal, dailyTarget) {
+        com.example.util.AnalyticsEngine.computeReport(
+            allSessions = studySessions,
+            timeframe = com.example.util.AnalyticsTimeframe.LAST_7_DAYS,
+            examGoal = examGoal,
+            dailyTargetMinutes = dailyTarget
+        )
+    }
 
     // Today's date
     val todayStr = remember {
@@ -586,6 +607,192 @@ fun StatsScreen(
         Spacer(modifier = Modifier.height(22.dp))
 
         // ============================================================
+        // 5b. USER-FRIENDLY STUDY GOAL & DAILY PACE CARD
+        // ============================================================
+        analyticsReport.examProjection?.let { proj ->
+            val statusColor = when (proj.status) {
+                "ON_TRACK", "COMPLETE" -> SuccessGreen
+                "MINOR_DEFICIT", "DEADLINE_TODAY" -> GoldBright
+                else -> Color(0xFFEF4444)
+            }
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                color = PanelDark,
+                shape = RoundedCornerShape(14.dp),
+                border = BorderStroke(1.dp, LineBorder)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = proj.examName.ifBlank { "Study Goal & Daily Pace" },
+                                color = TextPrimary,
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Text(
+                                text = if (proj.targetDate.isNotBlank()) "Target date: ${proj.targetDate}" else "Set a target date to track pace",
+                                color = TextDim,
+                                fontSize = 11.sp
+                            )
+                        }
+                        Surface(
+                            onClick = { showExamGoalEditDialog = true },
+                            shape = RoundedCornerShape(8.dp),
+                            color = PanelElevated,
+                            border = BorderStroke(1.dp, LineBorder)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Edit,
+                                    contentDescription = "Edit Goal",
+                                    tint = GoldAccent,
+                                    modifier = Modifier.size(13.dp)
+                                )
+                                Text("Edit Goal", color = TextPrimary, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            text = "${String.format(Locale.US, "%.1f", proj.completedHours)}h Done (${proj.progressPercentage}%)",
+                            color = TextPrimary,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Text(
+                            text = "Goal: ${proj.targetHours.toInt()}h",
+                            color = TextDim,
+                            fontSize = 12.sp
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(7.dp)
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(LineBorder)
+                    ) {
+                        if (proj.progressPercentage > 0) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth(proj.progressPercentage / 100f)
+                                    .height(7.dp)
+                                    .clip(RoundedCornerShape(4.dp))
+                                    .background(SuccessGreen)
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Surface(
+                            modifier = Modifier.weight(1f),
+                            color = PanelElevated,
+                            shape = RoundedCornerShape(10.dp),
+                            border = BorderStroke(1.dp, LineBorder)
+                        ) {
+                            Column(modifier = Modifier.padding(10.dp)) {
+                                Text(
+                                    text = "${String.format(Locale.US, "%.1f", proj.remainingHours)}h",
+                                    color = TextPrimary,
+                                    fontSize = 15.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text("Hours Left", color = TextDim, fontSize = 10.sp)
+                            }
+                        }
+                        Surface(
+                            modifier = Modifier.weight(1f),
+                            color = PanelElevated,
+                            shape = RoundedCornerShape(10.dp),
+                            border = BorderStroke(1.dp, LineBorder)
+                        ) {
+                            Column(modifier = Modifier.padding(10.dp)) {
+                                Text(
+                                    text = "${String.format(Locale.US, "%.1f", proj.requiredDailyHours)}h/d",
+                                    color = GoldBright,
+                                    fontSize = 15.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text("Daily Pace Needed", color = TextDim, fontSize = 10.sp)
+                            }
+                        }
+                        Surface(
+                            modifier = Modifier.weight(1f),
+                            color = PanelElevated,
+                            shape = RoundedCornerShape(10.dp),
+                            border = BorderStroke(1.dp, LineBorder)
+                        ) {
+                            Column(modifier = Modifier.padding(10.dp)) {
+                                Text(
+                                    text = "${String.format(Locale.US, "%.1f", proj.currentDailyHours)}h/d",
+                                    color = TextPrimary,
+                                    fontSize = 15.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text("Your 7-Day Avg", color = TextDim, fontSize = 10.sp)
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(statusColor.copy(alpha = 0.16f))
+                                .padding(horizontal = 8.dp, vertical = 4.dp)
+                        ) {
+                            Text(
+                                text = proj.statusBadgeText,
+                                color = statusColor,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                        Text(
+                            text = proj.statusDescription,
+                            color = TextDim,
+                            fontSize = 11.sp,
+                            lineHeight = 15.sp,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                }
+            }
+            Spacer(modifier = Modifier.height(16.dp))
+        }
+
+        // ============================================================
         // 6. WEB DASHBOARD & FULL REPORT PORTAL CARD
         // ============================================================
         Surface(
@@ -689,8 +896,87 @@ fun StatsScreen(
     }
 
     // ============================================================
-    // DIALOGS: DAILY TARGET EDIT
+    // DIALOGS: STUDY GOAL & DAILY TARGET EDIT
     // ============================================================
+    if (showExamGoalEditDialog) {
+        var goalNameInput by remember(examGoal) { mutableStateOf(examGoal.examName) }
+        var goalHoursInput by remember(examGoal) { mutableStateOf(examGoal.targetHours.toInt().toString()) }
+        var goalDateInput by remember(examGoal) { mutableStateOf(examGoal.targetDate) }
+
+        AlertDialog(
+            onDismissRequest = { showExamGoalEditDialog = false },
+            title = { Text("Study Goal & Pace", color = GoldBright, fontSize = 16.sp, fontWeight = FontWeight.Bold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    OutlinedTextField(
+                        value = goalNameInput,
+                        onValueChange = { goalNameInput = it },
+                        label = { Text("Goal Name (e.g. Final Exam)", color = TextDim) },
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = GoldAccent,
+                            unfocusedBorderColor = LineBorder,
+                            focusedTextColor = TextPrimary,
+                            unfocusedTextColor = TextPrimary
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    OutlinedTextField(
+                        value = goalHoursInput,
+                        onValueChange = { goalHoursInput = it.filter { ch -> ch.isDigit() } },
+                        label = { Text("Target Hours (e.g. 150)", color = TextDim) },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = GoldAccent,
+                            unfocusedBorderColor = LineBorder,
+                            focusedTextColor = TextPrimary,
+                            unfocusedTextColor = TextPrimary
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    OutlinedTextField(
+                        value = goalDateInput,
+                        onValueChange = { goalDateInput = it },
+                        label = { Text("Target Date (YYYY-MM-DD)", color = TextDim) },
+                        placeholder = { Text("2026-12-31", color = TextDim) },
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = GoldAccent,
+                            unfocusedBorderColor = LineBorder,
+                            focusedTextColor = TextPrimary,
+                            unfocusedTextColor = TextPrimary
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val hrs = goalHoursInput.toDoubleOrNull() ?: 150.0
+                        viewModel.updateExamGoal(
+                            name = goalNameInput.trim(),
+                            targetDate = goalDateInput.trim(),
+                            targetHours = hrs,
+                            subjectScope = examGoal.subjectScope
+                        )
+                        showExamGoalEditDialog = false
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = GoldAccent, contentColor = BgDark)
+                ) {
+                    Text("Save Goal", fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showExamGoalEditDialog = false }) {
+                    Text("Cancel", color = TextDim)
+                }
+            },
+            containerColor = PanelDark
+        )
+    }
+
     if (showTargetEditDialog) {
         var inputTarget by remember(dailyTarget) { mutableStateOf(dailyTarget.toString()) }
         AlertDialog(
