@@ -25,6 +25,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.LocalFireDepartment
+import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.OpenInBrowser
 import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material.icons.filled.Schedule
@@ -36,6 +37,8 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
@@ -88,6 +91,7 @@ import kotlin.math.abs
 @Composable
 fun StatsScreen(
     viewModel: FocusViewModel,
+    onOpenDrawer: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -128,8 +132,15 @@ fun StatsScreen(
     // Week comparison
     val weekComparison = remember(studySessions) { calculateWeekComparison(studySessions) }
 
-    // Last 7 days ranking
+    // Last 7 days ranking & Peak Focus insights
     val rankingList = remember(studySessions) { calculate7DaysRanking(studySessions) }
+    val insightsReport = remember(studySessions, dailyTarget) {
+        com.example.util.AnalyticsEngine.computeReport(
+            allSessions = studySessions,
+            timeframe = com.example.util.AnalyticsTimeframe.LAST_7_DAYS,
+            dailyTargetMinutes = dailyTarget
+        )
+    }
 
     Column(
         modifier = modifier
@@ -139,7 +150,7 @@ fun StatsScreen(
             .padding(horizontal = 16.dp, vertical = 14.dp)
     ) {
         // ============================================================
-        // 1. HEADER (Title & Web PDF Action)
+        // 1. HEADER (Menu + Title + Single PDF Report Action)
         // ============================================================
         Row(
             modifier = Modifier
@@ -148,20 +159,34 @@ fun StatsScreen(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Column {
-                Text(
-                    text = "Performance Dashboard",
-                    style = TextStyle(
-                        brush = GoldGradientBrush,
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.Bold
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                IconButton(
+                    onClick = onOpenDrawer,
+                    modifier = Modifier.size(36.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Menu,
+                        contentDescription = "Open Menu",
+                        tint = TextPrimary,
+                        modifier = Modifier.size(21.dp)
                     )
-                )
-                Text(
-                    text = "Analytics, consistency & study pacing",
-                    color = TextDim,
-                    fontSize = 12.sp
-                )
+                }
+                Spacer(modifier = Modifier.width(6.dp))
+                Column {
+                    Text(
+                        text = "Analytics",
+                        style = TextStyle(
+                            brush = GoldGradientBrush,
+                            fontSize = 21.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    )
+                    Text(
+                        text = "Focus pacing & consistency",
+                        color = TextDim,
+                        fontSize = 12.sp
+                    )
+                }
             }
 
             Surface(
@@ -179,12 +204,12 @@ fun StatsScreen(
                 ) {
                     Icon(
                         imageVector = Icons.Default.PictureAsPdf,
-                        contentDescription = "Web PDF",
+                        contentDescription = "PDF Report",
                         tint = GoldLight,
                         modifier = Modifier.size(15.dp)
                     )
                     Text(
-                        text = "Web PDF",
+                        text = "PDF Report",
                         color = GoldLight,
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold
@@ -591,7 +616,7 @@ fun StatsScreen(
         Spacer(modifier = Modifier.height(22.dp))
 
         // ============================================================
-        // 6. WEB DASHBOARD & FULL REPORT PORTAL CARD
+        // 6. FOCUS INSIGHTS & PEAK HOURS (Last 7 Days)
         // ============================================================
         Surface(
             modifier = Modifier.fillMaxWidth(),
@@ -606,86 +631,79 @@ fun StatsScreen(
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     Icon(
-                        imageVector = Icons.Default.OpenInBrowser,
+                        imageVector = Icons.Default.Schedule,
                         contentDescription = null,
-                        tint = TextPrimary,
+                        tint = GoldBright,
                         modifier = Modifier.size(22.dp)
                     )
                     Column {
                         Text(
-                            text = "Web Dashboard & Full PDF",
+                            text = "Peak Focus & Quality (7 Days)",
                             color = TextPrimary,
                             fontSize = 15.sp,
                             fontWeight = FontWeight.Bold
                         )
                         Text(
-                            text = "Focus quality, peak hours & PDF reports",
-                            color = TextDim,
-                            fontSize = 11.sp
+                            text = "Peak window: ${insightsReport.peakFocusWindow}",
+                            color = GoldLight,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold
                         )
                     }
                 }
 
-                Spacer(modifier = Modifier.height(10.dp))
-
-                Text(
-                    text = "Open the synced Web Dashboard for Focus Quality Score, Peak Study Time, Study Method Breakdown, and clean multi-page PDF reports.",
-                    color = TextPrimary.copy(alpha = 0.85f),
-                    fontSize = 12.sp,
-                    lineHeight = 17.sp
-                )
-
                 Spacer(modifier = Modifier.height(12.dp))
 
-                // Feature Highlights Pills
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    listOf("Focus Quality", "Peak Hours", "Methods", "PDF Report").forEach { tag ->
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(6.dp))
-                                .background(PanelDark)
-                                .border(1.dp, LineBorder, RoundedCornerShape(6.dp))
-                                .padding(horizontal = 8.dp, vertical = 4.dp)
+                    listOf(
+                        "Focus Score" to "${insightsReport.focusQualityScore}/100",
+                        "Deep Work" to "${insightsReport.deepWorkRatio}%",
+                        "Avg Session" to "${insightsReport.avgSessionMinutes}m"
+                    ).forEach { (lbl, valStr) ->
+                        Surface(
+                            modifier = Modifier.weight(1f),
+                            color = PanelDark,
+                            shape = RoundedCornerShape(8.dp),
+                            border = BorderStroke(1.dp, LineBorder)
                         ) {
-                            Text(text = tag, color = TextDim, fontSize = 10.sp, fontWeight = FontWeight.Medium)
+                            Column(
+                                modifier = Modifier.padding(vertical = 8.dp, horizontal = 6.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Text(text = lbl, color = TextDim, fontSize = 10.sp)
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(text = valStr, color = GoldBright, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                            }
                         }
                     }
                 }
 
-                Spacer(modifier = Modifier.height(14.dp))
+                Spacer(modifier = Modifier.height(12.dp))
 
-                Button(
-                    onClick = {
-                        WebPortalHelper.openWebAnalytics(context)
-                    },
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = GoldAccent,
-                        contentColor = BgDark
-                    ),
+                OutlinedButton(
+                    onClick = { WebPortalHelper.openWebAnalytics(context) },
+                    border = BorderStroke(1.dp, LineBorder),
                     shape = RoundedCornerShape(8.dp),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(44.dp)
+                        .height(42.dp)
                 ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.OpenInBrowser,
-                            contentDescription = null,
-                            tint = BgDark,
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Text(
-                            text = "Open Web Dashboard",
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 13.sp
-                        )
-                    }
+                    Icon(
+                        imageVector = Icons.Default.OpenInBrowser,
+                        contentDescription = null,
+                        tint = GoldLight,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = "Open Web Dashboard",
+                        color = GoldLight,
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 12.sp
+                    )
                 }
             }
         }

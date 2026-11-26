@@ -43,6 +43,7 @@ import androidx.compose.material.icons.filled.Fullscreen
 import androidx.compose.material.icons.filled.FullscreenExit
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.LightMode
+import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.NotificationsOff
 import androidx.compose.material.icons.filled.SubdirectoryArrowRight
@@ -117,6 +118,7 @@ fun TimerScreen(
     onOpenAddWorkType: () -> Unit,
     onEditSubject: (String, Long) -> Unit,
     onEditWorkType: (WorkTypeEntity) -> Unit = {},
+    onOpenDrawer: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val isTimerActive by viewModel.isTimerActive.collectAsState()
@@ -166,7 +168,7 @@ fun TimerScreen(
     ) {
         val currentTheme by viewModel.currentAppTheme.collectAsState()
 
-        // App Header with single Black / Light Mode Toggle
+        // App Header with Sidebar Menu + Brand + Black / Light Mode Toggle
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -175,10 +177,24 @@ fun TimerScreen(
                 .padding(bottom = 18.dp)
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(
+                IconButton(
+                    onClick = onOpenDrawer,
                     modifier = Modifier
                         .size(38.dp)
-                        .clip(RoundedCornerShape(12.dp))
+                        .testTag("open_drawer_btn")
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Menu,
+                        contentDescription = "Open Menu",
+                        tint = TextPrimary,
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.width(6.dp))
+                Box(
+                    modifier = Modifier
+                        .size(36.dp)
+                        .clip(RoundedCornerShape(11.dp))
                         .background(if (currentTheme.isLight) Color(0xFF09090B) else Color(0xFFFFFFFF)),
                     contentAlignment = Alignment.Center
                 ) {
@@ -186,7 +202,7 @@ fun TimerScreen(
                         imageVector = Icons.Default.Timer,
                         contentDescription = "Focus Timer Logo",
                         tint = if (currentTheme.isLight) Color(0xFFFFFFFF) else Color(0xFF09090B),
-                        modifier = Modifier.size(20.dp)
+                        modifier = Modifier.size(19.dp)
                     )
                 }
                 Spacer(modifier = Modifier.width(10.dp))
@@ -195,7 +211,7 @@ fun TimerScreen(
                         text = "Focus Timer",
                         style = TextStyle(
                             brush = ThemeGradientBrush,
-                            fontSize = 22.sp,
+                            fontSize = 21.sp,
                             fontWeight = FontWeight.Bold
                         )
                     )

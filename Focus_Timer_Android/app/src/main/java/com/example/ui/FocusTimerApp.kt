@@ -1,6 +1,7 @@
 package com.example.ui
 
 import android.widget.Toast
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -28,7 +29,12 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Cloud
+import androidx.compose.material.icons.filled.DarkMode
+import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.LightMode
+import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material3.AlertDialog
@@ -37,15 +43,29 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DrawerValue
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.ModalDrawerSheet
+import androidx.compose.material3.ModalNavigationDrawer
+import androidx.compose.material3.NavigationDrawerItem
+import androidx.compose.material3.NavigationDrawerItemDefaults
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberDrawerState
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -71,9 +91,12 @@ import com.example.ui.components.ConfettiEffect
 import com.example.ui.components.EditSubjectDialog
 import com.example.ui.components.EditWorkTypeDialog
 import com.example.ui.components.SmoothTabHost
-import com.example.ui.screens.HistorySettingsScreen
+import com.example.ui.screens.HistoryScreen
+import com.example.ui.screens.SettingsSection
+import com.example.ui.screens.SettingsToolsScreen
 import com.example.ui.screens.StatsScreen
 import com.example.ui.screens.TimerScreen
+import com.example.ui.theme.ActiveTheme
 import com.example.ui.theme.BgDark
 import com.example.ui.theme.DangerRed
 import com.example.ui.theme.GoldAccent
@@ -86,13 +109,26 @@ import com.example.ui.theme.TextDim
 import com.example.ui.theme.TextPrimary
 import com.example.viewmodel.FocusViewModel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 @Composable
 fun FocusTimerApp(
     viewModel: FocusViewModel
 ) {
     val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+    val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     var currentNavIndex by remember { mutableStateOf(0) }
+    var activeSettingsSection by remember { mutableStateOf<SettingsSection?>(null) }
+    val currentAppTheme by viewModel.currentAppTheme.collectAsState()
+
+    BackHandler(enabled = drawerState.isOpen || activeSettingsSection != null) {
+        if (drawerState.isOpen) {
+            coroutineScope.launch { drawerState.close() }
+        } else {
+            activeSettingsSection = null
+        }
+    }
 
     val isStartupReady by viewModel.isStartupReady.collectAsState()
     val isOnboarded by viewModel.isOnboarded.collectAsState()
@@ -174,6 +210,203 @@ fun FocusTimerApp(
 
 
     Box(modifier = Modifier.fillMaxSize()) {
+        ModalNavigationDrawer(
+            drawerState = drawerState,
+            gesturesEnabled = !isFullscreen,
+            drawerContent = {
+                ModalDrawerSheet(
+                    drawerContainerColor = PanelDark,
+                    drawerContentColor = TextPrimary,
+                    modifier = Modifier.widthIn(max = 300.dp)
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .verticalScroll(rememberScrollState())
+                            .padding(horizontal = 16.dp, vertical = 20.dp)
+                    ) {
+                        // Sidebar Header
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            modifier = Modifier.padding(bottom = 12.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(38.dp)
+                                    .background(GoldBright, RoundedCornerShape(11.dp)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Timer,
+                                    contentDescription = null,
+                                    tint = BgDark,
+                                    modifier = Modifier.size(21.dp)
+                                )
+                            }
+                            Column {
+                                Text(
+                                    text = "Focus Timer",
+                                    color = GoldBright,
+                                    fontSize = 18.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    text = "v${BuildConfig.VERSION_NAME}",
+                                    color = TextDim,
+                                    fontSize = 11.sp
+                                )
+                            }
+                        }
+
+                        // Account Status Pill
+                        Surface(
+                            color = PanelElevated,
+                            shape = RoundedCornerShape(10.dp),
+                            border = BorderStroke(1.dp, LineBorder),
+                            onClick = {
+                                activeSettingsSection = SettingsSection.SYNC
+                                coroutineScope.launch { drawerState.close() }
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = 16.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Cloud,
+                                    contentDescription = null,
+                                    tint = if (currentUser != null) GoldBright else TextDim,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Text(
+                                    text = currentUser?.email ?: "Local mode · Tap to sign in",
+                                    color = TextPrimary,
+                                    fontSize = 12.sp,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        }
+
+                        val itemColors = NavigationDrawerItemDefaults.colors(
+                            selectedContainerColor = GoldAccent.copy(alpha = 0.2f),
+                            selectedIconColor = GoldBright,
+                            selectedTextColor = GoldBright,
+                            unselectedContainerColor = androidx.compose.ui.graphics.Color.Transparent,
+                            unselectedIconColor = TextDim,
+                            unselectedTextColor = TextPrimary
+                        )
+
+                        Text(
+                            text = "WORKSPACE",
+                            color = TextDim,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.padding(start = 12.dp, bottom = 6.dp)
+                        )
+
+                        listOf(
+                            Triple(0, "Timer", Icons.Default.Timer),
+                            Triple(1, "Analytics", Icons.Default.BarChart),
+                            Triple(2, "History", Icons.Default.History)
+                        ).forEach { (idx, label, icon) ->
+                            NavigationDrawerItem(
+                                label = { Text(label, fontWeight = FontWeight.Medium) },
+                                icon = { Icon(icon, contentDescription = null, modifier = Modifier.size(20.dp)) },
+                                selected = activeSettingsSection == null && currentNavIndex == idx,
+                                onClick = {
+                                    activeSettingsSection = null
+                                    currentNavIndex = idx
+                                    coroutineScope.launch { drawerState.close() }
+                                },
+                                colors = itemColors,
+                                modifier = Modifier.padding(vertical = 2.dp)
+                            )
+                        }
+
+                        HorizontalDivider(color = LineBorder, modifier = Modifier.padding(vertical = 12.dp))
+
+                        Text(
+                            text = "SETTINGS & TOOLS",
+                            color = TextDim,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.padding(start = 12.dp, bottom = 6.dp)
+                        )
+
+                        listOf(
+                            Triple(SettingsSection.SYNC, "Account & Cloud Sync", Icons.Default.Cloud),
+                            Triple(SettingsSection.DATA, "Backup & Bulk Data", Icons.Default.Download),
+                            Triple(SettingsSection.ALARM, "Timer & Alarm Sound", Icons.Default.Notifications),
+                            Triple(SettingsSection.SUBJECTS, "Subjects & Work Types", Icons.Default.Edit)
+                        ).forEach { (section, label, icon) ->
+                            NavigationDrawerItem(
+                                label = { Text(label, fontWeight = FontWeight.Medium) },
+                                icon = { Icon(icon, contentDescription = null, modifier = Modifier.size(20.dp)) },
+                                selected = activeSettingsSection == section,
+                                onClick = {
+                                    activeSettingsSection = section
+                                    coroutineScope.launch { drawerState.close() }
+                                },
+                                colors = itemColors,
+                                modifier = Modifier.padding(vertical = 2.dp)
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.weight(1f))
+                        HorizontalDivider(color = LineBorder, modifier = Modifier.padding(vertical = 12.dp))
+
+                        // Appearance quick switch
+                        Surface(
+                            color = PanelElevated,
+                            shape = RoundedCornerShape(10.dp),
+                            border = BorderStroke(1.dp, LineBorder),
+                            onClick = { viewModel.toggleTheme() },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = if (currentAppTheme.isLight) Icons.Default.LightMode else Icons.Default.DarkMode,
+                                        contentDescription = null,
+                                        tint = GoldBright,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Text(
+                                        text = if (currentAppTheme.isLight) "Light Mode" else "Black Mode",
+                                        color = TextPrimary,
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                }
+                                Switch(
+                                    checked = !currentAppTheme.isLight,
+                                    onCheckedChange = { viewModel.toggleTheme() },
+                                    colors = SwitchDefaults.colors(
+                                        checkedThumbColor = BgDark,
+                                        checkedTrackColor = GoldAccent
+                                    )
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        ) {
         Scaffold(
             bottomBar = {
                 if (!isFullscreen) {
@@ -205,7 +438,7 @@ fun FocusTimerApp(
                                 )
                                 navItems.forEach { (item, tag) ->
                                     val (index, label, icon) = item
-                                    val isSelected = currentNavIndex == index
+                                    val isSelected = activeSettingsSection == null && currentNavIndex == index
                                     val containerColor by animateColorAsState(
                                         targetValue = if (isSelected) GoldBright else PanelElevated,
                                         animationSpec = tween(durationMillis = 180, easing = FastOutSlowInEasing),
@@ -217,7 +450,10 @@ fun FocusTimerApp(
                                         label = "nav_fg_$index"
                                     )
                                     Surface(
-                                        onClick = { currentNavIndex = index },
+                                        onClick = {
+                                            activeSettingsSection = null
+                                            currentNavIndex = index
+                                        },
                                         modifier = Modifier
                                             .weight(1f)
                                             .height(54.dp)
@@ -264,26 +500,45 @@ fun FocusTimerApp(
                     .fillMaxSize()
                     .padding(if (isFullscreen) androidx.compose.foundation.layout.PaddingValues(0.dp) else innerPadding)
             ) {
-                SmoothTabHost(
-                    selectedIndex = currentNavIndex,
-                    tabCount = 3,
-                    modifier = Modifier.fillMaxSize(),
-                    prewarmAll = prewarmTabs
-                ) { tabIndex ->
-                    when (tabIndex) {
-                        0 -> TimerScreen(
-                            viewModel = viewModel,
-                            onOpenAddSubject = { showAddSubjectDialog = true },
-                            onOpenAddSubSubject = { parent -> subSubjectTargetSubject = parent },
-                            onOpenAddWorkType = { showAddWorkTypeDialog = true },
-                            onEditSubject = { name, id -> editSubjectTarget = name to id },
-                            onEditWorkType = { wt -> editWorkTypeTarget = wt }
-                        )
-                        1 -> StatsScreen(viewModel = viewModel)
-                        2 -> HistorySettingsScreen(viewModel = viewModel)
+                if (activeSettingsSection != null) {
+                    SettingsToolsScreen(
+                        viewModel = viewModel,
+                        selectedSection = activeSettingsSection!!,
+                        onSelectSection = { activeSettingsSection = it },
+                        onBack = { activeSettingsSection = null },
+                        onOpenDrawer = { coroutineScope.launch { drawerState.open() } }
+                    )
+                } else {
+                    SmoothTabHost(
+                        selectedIndex = currentNavIndex,
+                        tabCount = 3,
+                        modifier = Modifier.fillMaxSize(),
+                        prewarmAll = prewarmTabs
+                    ) { tabIndex ->
+                        when (tabIndex) {
+                            0 -> TimerScreen(
+                                viewModel = viewModel,
+                                onOpenAddSubject = { showAddSubjectDialog = true },
+                                onOpenAddSubSubject = { parent -> subSubjectTargetSubject = parent },
+                                onOpenAddWorkType = { showAddWorkTypeDialog = true },
+                                onEditSubject = { name, id -> editSubjectTarget = name to id },
+                                onEditWorkType = { wt -> editWorkTypeTarget = wt },
+                                onOpenDrawer = { coroutineScope.launch { drawerState.open() } }
+                            )
+                            1 -> StatsScreen(
+                                viewModel = viewModel,
+                                onOpenDrawer = { coroutineScope.launch { drawerState.open() } }
+                            )
+                            2 -> HistoryScreen(
+                                viewModel = viewModel,
+                                onOpenDrawer = { coroutineScope.launch { drawerState.open() } },
+                                onOpenSettings = { section -> activeSettingsSection = section }
+                            )
+                        }
                     }
                 }
             }
+        }
         }
 
         // Confetti celebration overlay

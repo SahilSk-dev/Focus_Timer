@@ -33,6 +33,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Cloud
@@ -40,11 +41,13 @@ import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.Sync
@@ -136,10 +139,286 @@ import java.util.Date
 import java.util.Locale
 import java.util.TimeZone
 
+enum class SettingsSection(val label: String) {
+    SYNC("Cloud Sync"),
+    DATA("Backup & Data"),
+    ALARM("Alarm"),
+    SUBJECTS("Subjects")
+}
+
+@Composable
+fun HistoryScreen(
+    viewModel: FocusViewModel,
+    onOpenDrawer: () -> Unit = {},
+    onOpenSettings: (SettingsSection) -> Unit = {},
+    modifier: Modifier = Modifier
+) {
+    val rawSessions by viewModel.allSessions.collectAsState()
+    val allSessions = remember(rawSessions) {
+        com.example.data.local.SessionDeduplicator.deduplicateList(rawSessions)
+    }
+    val subjects by viewModel.allSubjects.collectAsState()
+    val workTypes by viewModel.allWorkTypes.collectAsState()
+
+    var sessionToDelete by remember { mutableStateOf<StudySessionEntity?>(null) }
+    var sessionToEdit by remember { mutableStateOf<StudySessionEntity?>(null) }
+    var showAddSessionDialog by remember { mutableStateOf(false) }
+    var recentlyDeletedSession by remember { mutableStateOf<StudySessionEntity?>(null) }
+
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .background(BgDark)
+            .padding(horizontal = 16.dp, vertical = 12.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 12.dp, top = 4.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                IconButton(
+                    onClick = onOpenDrawer,
+                    modifier = Modifier.size(36.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Menu,
+                        contentDescription = "Open Menu",
+                        tint = TextPrimary,
+                        modifier = Modifier.size(21.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.width(6.dp))
+                Column {
+                    Text(
+                        text = "History",
+                        style = TextStyle(
+                            brush = GoldGradientBrush,
+                            fontSize = 21.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    )
+                    Text(
+                        text = "${allSessions.size} recorded sessions",
+                        color = TextDim,
+                        fontSize = 11.5.sp
+                    )
+                }
+            }
+
+            Surface(
+                onClick = { onOpenSettings(SettingsSection.DATA) },
+                shape = RoundedCornerShape(10.dp),
+                color = PanelElevated,
+                border = BorderStroke(1.dp, LineBorder)
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(5.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Settings,
+                        contentDescription = "Backup & Data Settings",
+                        tint = GoldLight,
+                        modifier = Modifier.size(15.dp)
+                    )
+                    Text(
+                        text = "Data",
+                        color = GoldLight,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+            }
+        }
+
+        if (recentlyDeletedSession != null) {
+            val deleted = recentlyDeletedSession!!
+            Surface(
+                color = PanelElevated,
+                shape = RoundedCornerShape(10.dp),
+                border = BorderStroke(1.dp, GoldAccent),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 10.dp)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Deleted: ${deleted.subject} (${deleted.minutes}m)",
+                        color = TextPrimary,
+                        fontSize = 13.sp
+                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        TextButton(onClick = {
+                            viewModel.restoreSession(deleted)
+                            recentlyDeletedSession = null
+                        }) {
+                            Text("UNDO", color = GoldBright, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                        }
+                        IconButton(
+                            onClick = { recentlyDeletedSession = null },
+                            modifier = Modifier.size(28.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = "Dismiss",
+                                tint = TextDim,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        OutlinedButton(
+            onClick = { showAddSessionDialog = true },
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 10.dp),
+            shape = RoundedCornerShape(10.dp),
+            border = BorderStroke(1.dp, GoldAccent),
+            colors = ButtonDefaults.outlinedButtonColors(
+                containerColor = PanelDark,
+                contentColor = GoldBright
+            )
+        ) {
+            Icon(
+                imageVector = Icons.Default.Add,
+                contentDescription = null,
+                modifier = Modifier.size(18.dp)
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                text = "Add Missed Session",
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 13.sp
+            )
+        }
+
+        if (allSessions.isEmpty()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(top = 32.dp),
+                contentAlignment = Alignment.TopCenter
+            ) {
+                Text(
+                    text = "No study sessions recorded yet.\nStart a timer or tap Add Missed Session!",
+                    color = TextDim,
+                    textAlign = TextAlign.Center,
+                    fontSize = 14.sp
+                )
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                items(
+                    items = allSessions,
+                    key = { it.id },
+                    contentType = { "session_item" }
+                ) { session ->
+                    SessionHistoryItem(
+                        session = session,
+                        onEdit = { sessionToEdit = session },
+                        onDelete = { sessionToDelete = session }
+                    )
+                }
+            }
+        }
+    }
+
+    if (sessionToDelete != null) {
+        val s = sessionToDelete!!
+        AlertDialog(
+            onDismissRequest = { sessionToDelete = null },
+            title = { Text("Delete Session", color = GoldBright) },
+            text = { Text("Delete session for '${s.subject}' (${s.minutes} mins) on ${s.date}?", color = TextPrimary) },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        recentlyDeletedSession = s
+                        viewModel.deleteSession(s.id)
+                        sessionToDelete = null
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = DangerRed)
+                ) {
+                    Text("Delete")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { sessionToDelete = null }) {
+                    Text("Cancel", color = TextDim)
+                }
+            },
+            containerColor = PanelDark
+        )
+    }
+
+    if (showAddSessionDialog || sessionToEdit != null) {
+        val editing = sessionToEdit
+        SessionFormDialog(
+            existingSession = editing,
+            allSessions = allSessions,
+            subjects = subjects,
+            workTypes = workTypes,
+            onDismiss = {
+                showAddSessionDialog = false
+                sessionToEdit = null
+            },
+            onShowToast = { viewModel.showToast(it) },
+            onSave = { date, subject, subSubject, workType, minutes, endTs, isNonStudy ->
+                if (editing != null) {
+                    val updated = editing.copy(
+                        subject = subject,
+                        subSubject = subSubject,
+                        workType = workType,
+                        minutes = minutes,
+                        timestamp = endTs,
+                        isNonStudy = isNonStudy
+                    )
+                    viewModel.updateSession(
+                        updated,
+                        previousIsNonStudy = editing.isNonStudy,
+                        previousTimestamp = editing.timestamp
+                    )
+                    sessionToEdit = null
+                } else {
+                    viewModel.addManualSession(
+                        date = date,
+                        subject = subject,
+                        subSubject = subSubject,
+                        workType = workType,
+                        minutes = minutes,
+                        endTimestamp = endTs,
+                        isNonStudy = isNonStudy
+                    )
+                    showAddSessionDialog = false
+                }
+            }
+        )
+    }
+}
+
 @OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
 @Composable
-fun HistorySettingsScreen(
+fun SettingsToolsScreen(
     viewModel: FocusViewModel,
+    selectedSection: SettingsSection,
+    onSelectSection: (SettingsSection) -> Unit,
+    onBack: () -> Unit,
+    onOpenDrawer: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -155,15 +434,10 @@ fun HistorySettingsScreen(
     val syncStatus by viewModel.syncStatus.collectAsState()
     val isSyncing by viewModel.isSyncing.collectAsState()
 
-    var selectedTab by remember { mutableStateOf(0) } // 0: History, 1: Backup & Export, 2: Subjects & Work
-    var sessionToDelete by remember { mutableStateOf<StudySessionEntity?>(null) }
-    var sessionToEdit by remember { mutableStateOf<StudySessionEntity?>(null) }
-    var showAddSessionDialog by remember { mutableStateOf(false) }
     var subjectToEdit by remember { mutableStateOf<SubjectEntity?>(null) }
     var workTypeToEdit by remember { mutableStateOf<WorkTypeEntity?>(null) }
     var showAddSubjectDialog by remember { mutableStateOf(false) }
     var showAddWorkTypeDialog by remember { mutableStateOf(false) }
-    var recentlyDeletedSession by remember { mutableStateOf<StudySessionEntity?>(null) }
     var showBulkDeleteDialog by remember { mutableStateOf(false) }
     var showSignOutConfirmDialog by remember { mutableStateOf(false) }
     var pickingDateFor by remember { mutableStateOf<String?>(null) }
@@ -264,20 +538,53 @@ fun HistorySettingsScreen(
             .background(BgDark)
             .padding(horizontal = 16.dp, vertical = 12.dp)
     ) {
-        Text(
-            text = "History & Data",
-            style = TextStyle(
-                brush = GoldGradientBrush,
-                fontSize = 22.sp,
-                fontWeight = FontWeight.Bold
-            ),
-            modifier = Modifier.padding(bottom = 12.dp, top = 4.dp)
-        )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 12.dp, top = 4.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                IconButton(
+                    onClick = onBack,
+                    modifier = Modifier.size(36.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.ArrowBack,
+                        contentDescription = "Back",
+                        tint = TextPrimary,
+                        modifier = Modifier.size(21.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    text = "Settings & Tools",
+                    style = TextStyle(
+                        brush = GoldGradientBrush,
+                        fontSize = 21.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                )
+            }
 
-        // Equal-width pill button tabs
+            IconButton(
+                onClick = onOpenDrawer,
+                modifier = Modifier.size(36.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Menu,
+                    contentDescription = "Open Menu",
+                    tint = TextPrimary,
+                    modifier = Modifier.size(21.dp)
+                )
+            }
+        }
+
+        // 4-section selector: Cloud Sync | Backup & Data | Alarm | Subjects
         Surface(
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(16.dp),
+            shape = RoundedCornerShape(14.dp),
             color = PanelDark,
             border = BorderStroke(1.dp, LineBorder)
         ) {
@@ -285,27 +592,27 @@ fun HistorySettingsScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(5.dp),
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                horizontalArrangement = Arrangement.spacedBy(5.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                listOf("Sessions", "Backup & Sync", "Subjects & Types").forEachIndexed { idx, title ->
-                    val isSelected = selectedTab == idx
+                SettingsSection.entries.forEach { section ->
+                    val isSelected = selectedSection == section
                     val btnContainerColor by animateColorAsState(
                         targetValue = if (isSelected) GoldBright else PanelElevated,
                         animationSpec = tween(durationMillis = 180, easing = FastOutSlowInEasing),
-                        label = "history_tab_bg_$idx"
+                        label = "settings_tab_bg_${section.name}"
                     )
                     val btnContentColor by animateColorAsState(
                         targetValue = if (isSelected) BgDark else TextDim,
                         animationSpec = tween(durationMillis = 180, easing = FastOutSlowInEasing),
-                        label = "history_tab_fg_$idx"
+                        label = "settings_tab_fg_${section.name}"
                     )
                     Surface(
-                        onClick = { selectedTab = idx },
+                        onClick = { onSelectSection(section) },
                         modifier = Modifier
                             .weight(1f)
-                            .height(42.dp),
-                        shape = RoundedCornerShape(11.dp),
+                            .height(38.dp),
+                        shape = RoundedCornerShape(10.dp),
                         color = btnContainerColor,
                         border = if (isSelected) null else BorderStroke(1.dp, LineBorder)
                     ) {
@@ -316,11 +623,10 @@ fun HistorySettingsScreen(
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
-                                text = title,
+                                text = section.label,
                                 color = btnContentColor,
                                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                fontSize = 11.sp,
-                                letterSpacing = (-0.2).sp,
+                                fontSize = 10.5.sp,
                                 maxLines = 1,
                                 softWrap = false,
                                 overflow = TextOverflow.Ellipsis,
@@ -334,55 +640,10 @@ fun HistorySettingsScreen(
 
         Spacer(modifier = Modifier.height(14.dp))
 
-        // Undo banner if a session was just deleted
-        if (recentlyDeletedSession != null) {
-            val deleted = recentlyDeletedSession!!
-            Surface(
-                color = PanelElevated,
-                shape = RoundedCornerShape(10.dp),
-                border = BorderStroke(1.dp, GoldAccent),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 10.dp)
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 12.dp, vertical = 8.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "Deleted: ${deleted.subject} (${deleted.minutes}m)",
-                        color = TextPrimary,
-                        fontSize = 13.sp
-                    )
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        TextButton(onClick = {
-                            viewModel.restoreSession(deleted)
-                            recentlyDeletedSession = null
-                        }) {
-                            Text("UNDO", color = GoldBright, fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                        }
-                        IconButton(
-                            onClick = { recentlyDeletedSession = null },
-                            modifier = Modifier.size(28.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Close,
-                                contentDescription = "Dismiss",
-                                tint = TextDim,
-                                modifier = Modifier.size(16.dp)
-                            )
-                        }
-                    }
-                }
-            }
-        }
-
+        val sectionIdx = SettingsSection.entries.indexOf(selectedSection)
         SmoothTabHost(
-            selectedIndex = selectedTab,
-            tabCount = 3,
+            selectedIndex = sectionIdx,
+            tabCount = SettingsSection.entries.size,
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth(),
@@ -390,70 +651,7 @@ fun HistorySettingsScreen(
         ) { tabIndex ->
             when (tabIndex) {
                 0 -> {
-                // SESSION HISTORY LIST
-                Column(modifier = Modifier.fillMaxSize()) {
-                    OutlinedButton(
-                        onClick = { showAddSessionDialog = true },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(bottom = 10.dp),
-                        shape = RoundedCornerShape(10.dp),
-                        border = BorderStroke(1.dp, GoldAccent),
-                        colors = ButtonDefaults.outlinedButtonColors(
-                            containerColor = PanelDark,
-                            contentColor = GoldBright
-                        )
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Add,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "Add Missed Session",
-                            fontWeight = FontWeight.SemiBold,
-                            fontSize = 13.sp
-                        )
-                    }
-
-                    if (allSessions.isEmpty()) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(top = 32.dp),
-                            contentAlignment = Alignment.TopCenter
-                        ) {
-                            Text(
-                                text = "No study sessions recorded yet.\nStart a timer or tap Add Missed Session!",
-                                color = TextDim,
-                                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                                fontSize = 14.sp
-                            )
-                        }
-                    } else {
-                        LazyColumn(
-                            modifier = Modifier.fillMaxSize(),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            items(
-                                items = allSessions,
-                                key = { it.id },
-                                contentType = { "session_item" }
-                            ) { session ->
-                                SessionHistoryItem(
-                                    session = session,
-                                    onEdit = { sessionToEdit = session },
-                                    onDelete = { sessionToDelete = session }
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-
-            1 -> {
-                // BACKUP, EXPORT & BULK DELETE
+                // CLOUD SYNC & ACCOUNT
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
@@ -574,6 +772,30 @@ fun HistorySettingsScreen(
                         }
                     }
 
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 4.dp, bottom = 20.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "Focus Timer v${BuildConfig.VERSION_NAME}",
+                            color = TextDim.copy(alpha = 0.7f),
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                }
+            }
+
+            1 -> {
+                // BACKUP, EXPORT & BULK DELETE
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
                     // Export Card
                     // DATA BACKUP & EXPORT (Matching Web layout)
                     Surface(
@@ -774,7 +996,123 @@ fun HistorySettingsScreen(
                         }
                     }
 
-                    // ALARM SOUND & VOLUME SETTINGS
+                    // Bulk Delete Card (moved cleanly into Backup & Data)
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        color = PanelDark,
+                        shape = RoundedCornerShape(12.dp),
+                        border = BorderStroke(1.dp, LineBorder)
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Text(
+                                text = "Bulk Delete (Date Range)",
+                                color = DangerRed,
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Text(
+                                text = "Choose a preset or tap From / To dates to remove sessions.",
+                                color = TextDim,
+                                fontSize = 12.sp
+                            )
+                            Spacer(modifier = Modifier.height(12.dp))
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                listOf(
+                                    "Today" to 0,
+                                    "Last 7 Days" to -6,
+                                    "Last 30 Days" to -29
+                                ).forEach { (label, offset) ->
+                                    val targetFrom = shiftIsoDate(todayStr, offset)
+                                    val isActive = fromDateStr == targetFrom && toDateStr == todayStr
+                                    Surface(
+                                        onClick = {
+                                            fromDateStr = targetFrom
+                                            toDateStr = todayStr
+                                        },
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .height(34.dp),
+                                        shape = RoundedCornerShape(8.dp),
+                                        color = if (isActive) GoldAccent.copy(alpha = 0.2f) else PanelElevated,
+                                        border = BorderStroke(1.dp, if (isActive) GoldBright else LineBorder)
+                                    ) {
+                                        Box(contentAlignment = Alignment.Center) {
+                                            Text(
+                                                text = label,
+                                                color = if (isActive) GoldBright else TextDim,
+                                                fontSize = 11.sp,
+                                                fontWeight = if (isActive) FontWeight.Bold else FontWeight.Medium,
+                                                maxLines = 1,
+                                                softWrap = false,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(10.dp))
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                DateSelectorCard(
+                                    label = "FROM",
+                                    dateStr = fromDateStr,
+                                    onClick = { pickingDateFor = "from" },
+                                    modifier = Modifier.weight(1f)
+                                )
+                                DateSelectorCard(
+                                    label = "TO",
+                                    dateStr = toDateStr,
+                                    onClick = { pickingDateFor = "to" },
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
+
+                            Spacer(modifier = Modifier.height(12.dp))
+
+                            Button(
+                                onClick = {
+                                    if (fromDateStr.isBlank() || toDateStr.isBlank()) {
+                                        viewModel.showToast("Please select From and To dates!")
+                                        return@Button
+                                    }
+                                    if (fromDateStr > toDateStr) {
+                                        viewModel.showToast("From Date cannot be greater than To Date!")
+                                        return@Button
+                                    }
+                                    showBulkDeleteDialog = true
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = DangerRed, contentColor = TextPrimary),
+                                shape = RoundedCornerShape(8.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("Delete Sessions")
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(20.dp))
+                }
+            }
+
+            2 -> {
+                // ALARM SOUND & VOLUME SETTINGS
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
                     Surface(
                         modifier = Modifier.fillMaxWidth(),
                         color = PanelDark,
@@ -1052,128 +1390,11 @@ fun HistorySettingsScreen(
                         }
                     }
 
-                    // Bulk Delete Card
-                    Surface(
-                        modifier = Modifier.fillMaxWidth(),
-                        color = PanelDark,
-                        shape = RoundedCornerShape(12.dp),
-                        border = BorderStroke(1.dp, LineBorder)
-                    ) {
-                        Column(modifier = Modifier.padding(16.dp)) {
-                            Text(
-                                text = "Bulk Delete (Date Range)",
-                                color = DangerRed,
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Spacer(modifier = Modifier.height(6.dp))
-                            Text(
-                                text = "Choose a preset or tap From / To dates to remove sessions.",
-                                color = TextDim,
-                                fontSize = 12.sp
-                            )
-                            Spacer(modifier = Modifier.height(12.dp))
-
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                listOf(
-                                    "Today" to 0,
-                                    "Last 7 Days" to -6,
-                                    "Last 30 Days" to -29
-                                ).forEach { (label, offset) ->
-                                    val targetFrom = shiftIsoDate(todayStr, offset)
-                                    val isActive = fromDateStr == targetFrom && toDateStr == todayStr
-                                    Surface(
-                                        onClick = {
-                                            fromDateStr = targetFrom
-                                            toDateStr = todayStr
-                                        },
-                                        modifier = Modifier
-                                            .weight(1f)
-                                            .height(34.dp),
-                                        shape = RoundedCornerShape(8.dp),
-                                        color = if (isActive) GoldAccent.copy(alpha = 0.2f) else PanelElevated,
-                                        border = BorderStroke(1.dp, if (isActive) GoldBright else LineBorder)
-                                    ) {
-                                        Box(contentAlignment = Alignment.Center) {
-                                            Text(
-                                                text = label,
-                                                color = if (isActive) GoldBright else TextDim,
-                                                fontSize = 11.sp,
-                                                fontWeight = if (isActive) FontWeight.Bold else FontWeight.Medium,
-                                                maxLines = 1,
-                                                softWrap = false,
-                                                overflow = TextOverflow.Ellipsis
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-
-                            Spacer(modifier = Modifier.height(10.dp))
-
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(10.dp)
-                            ) {
-                                DateSelectorCard(
-                                    label = "FROM",
-                                    dateStr = fromDateStr,
-                                    onClick = { pickingDateFor = "from" },
-                                    modifier = Modifier.weight(1f)
-                                )
-                                DateSelectorCard(
-                                    label = "TO",
-                                    dateStr = toDateStr,
-                                    onClick = { pickingDateFor = "to" },
-                                    modifier = Modifier.weight(1f)
-                                )
-                            }
-
-                            Spacer(modifier = Modifier.height(12.dp))
-
-                            Button(
-                                onClick = {
-                                    if (fromDateStr.isBlank() || toDateStr.isBlank()) {
-                                        viewModel.showToast("Please select From and To dates!")
-                                        return@Button
-                                    }
-                                    if (fromDateStr > toDateStr) {
-                                        viewModel.showToast("From Date cannot be greater than To Date!")
-                                        return@Button
-                                    }
-                                    showBulkDeleteDialog = true
-                                },
-                                colors = ButtonDefaults.buttonColors(containerColor = DangerRed, contentColor = TextPrimary),
-                                shape = RoundedCornerShape(8.dp),
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(16.dp))
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text("Delete Sessions")
-                            }
-                        }
-                    }
-
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 4.dp, bottom = 20.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = "v${BuildConfig.VERSION_NAME}",
-                            color = TextDim.copy(alpha = 0.7f),
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Medium
-                        )
-                    }
+                    Spacer(modifier = Modifier.height(20.dp))
                 }
             }
 
-            2 -> {
+            3 -> {
                 // SUBJECTS & WORK TYPES MANAGEMENT
                 Column(
                     modifier = Modifier
@@ -1366,79 +1587,6 @@ fun HistorySettingsScreen(
             }
             }
         }
-    }
-
-    // Delete single session confirmation dialog
-    if (sessionToDelete != null) {
-        val s = sessionToDelete!!
-        AlertDialog(
-            onDismissRequest = { sessionToDelete = null },
-            title = { Text("Delete Session", color = GoldBright) },
-            text = { Text("Delete session for '${s.subject}' (${s.minutes} mins) on ${s.date}?", color = TextPrimary) },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        recentlyDeletedSession = s
-                        viewModel.deleteSession(s.id)
-                        sessionToDelete = null
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = DangerRed)
-                ) {
-                    Text("Delete")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { sessionToDelete = null }) {
-                    Text("Cancel", color = TextDim)
-                }
-            },
-            containerColor = PanelDark
-        )
-    }
-
-    // Unified Add / Edit Session Dialog (Start Time -> End Time, no Date edit on existing sessions)
-    if (showAddSessionDialog || sessionToEdit != null) {
-        val editing = sessionToEdit
-        SessionFormDialog(
-            existingSession = editing,
-            allSessions = allSessions,
-            subjects = subjects,
-            workTypes = workTypes,
-            onDismiss = {
-                showAddSessionDialog = false
-                sessionToEdit = null
-            },
-            onShowToast = { viewModel.showToast(it) },
-            onSave = { date, subject, subSubject, workType, minutes, endTs, isNonStudy ->
-                if (editing != null) {
-                    val updated = editing.copy(
-                        subject = subject,
-                        subSubject = subSubject,
-                        workType = workType,
-                        minutes = minutes,
-                        timestamp = endTs,
-                        isNonStudy = isNonStudy
-                    )
-                    viewModel.updateSession(
-                        updated,
-                        previousIsNonStudy = editing.isNonStudy,
-                        previousTimestamp = editing.timestamp
-                    )
-                    sessionToEdit = null
-                } else {
-                    viewModel.addManualSession(
-                        date = date,
-                        subject = subject,
-                        subSubject = subSubject,
-                        workType = workType,
-                        minutes = minutes,
-                        endTimestamp = endTs,
-                        isNonStudy = isNonStudy
-                    )
-                    showAddSessionDialog = false
-                }
-            }
-        )
     }
 
     // Add / Edit Subject & Work Type Dialogs (shared unified dialogs)
