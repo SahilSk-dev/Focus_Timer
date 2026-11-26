@@ -1391,36 +1391,12 @@ render();
 /* ---------- fullscreen auto-hide & toggle ---------- */
 const fsContainer = document.getElementById('fsContainer');
 const fullscreenBtn = document.getElementById('fullscreenBtn');
-fullscreenBtn.addEventListener('click', () => {
-  if (!document.fullscreenElement) {
-    fsContainer.requestFullscreen().then(() => {
-      if(screen.orientation && screen.orientation.lock) {
-        screen.orientation.lock('landscape').catch(e => console.log('Orientation lock failed:', e));
-      }
-    }).catch(err => console.log(err));
-  } else {
-    document.exitFullscreen().then(() => {
-      if(screen.orientation && screen.orientation.unlock) {
-        screen.orientation.unlock();
-      }
-    });
-  }
-});
+const fsExitBtn = document.getElementById('fsExitBtn');
 
-let fsTimeout;
-document.addEventListener('mousemove', () => {
-  if (document.fullscreenElement) {
-    fsContainer.style.cursor = 'default';
-    clearTimeout(fsTimeout);
-    fsTimeout = setTimeout(() => {
-      fsContainer.style.cursor = 'none';
-    }, 3000);
-  }
-});
-
-document.addEventListener('fullscreenchange', () => {
+function updateFullscreenUiState(isFs) {
   const toastEl = document.getElementById('toast');
-  if (document.fullscreenElement) {
+  document.body.classList.toggle('is-fs-active', !!isFs);
+  if (isFs) {
     fsContainer.classList.add('is-fullscreen');
     if (toastEl && document.fullscreenElement === fsContainer) {
       fsContainer.appendChild(toastEl);
@@ -1434,6 +1410,66 @@ document.addEventListener('fullscreenchange', () => {
     fullscreenBtn.innerHTML = '<svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/></svg>';
     fsContainer.style.cursor = 'default';
     clearTimeout(fsTimeout);
+  }
+}
+
+function exitFullscreenMode() {
+  updateFullscreenUiState(false);
+  if (document.fullscreenElement) {
+    document.exitFullscreen().then(() => {
+      if (screen.orientation && screen.orientation.unlock) {
+        screen.orientation.unlock();
+      }
+    }).catch(() => {});
+  } else if (screen.orientation && screen.orientation.unlock) {
+    try { screen.orientation.unlock(); } catch (_) {}
+  }
+}
+
+fullscreenBtn.addEventListener('click', () => {
+  // Always ensure Timer tab is visible before entering fullscreen so UI never freezes on hidden tabs
+  const timerView = document.getElementById('view-timer');
+  if (timerView && !timerView.classList.contains('active')) {
+    switchView('view-timer');
+  }
+  const isCurrentlyFs = !!document.fullscreenElement || fsContainer.classList.contains('is-fullscreen');
+  if (!isCurrentlyFs) {
+    // Always activate full-viewport overlay immediately so fullscreen works reliably even if browser/webview blocks native Fullscreen API
+    updateFullscreenUiState(true);
+    if (fsContainer.requestFullscreen) {
+      fsContainer.requestFullscreen().then(() => {
+        if (screen.orientation && screen.orientation.lock) {
+          screen.orientation.lock('landscape').catch(() => {});
+        }
+      }).catch(() => {});
+    }
+  } else {
+    exitFullscreenMode();
+  }
+});
+
+if (fsExitBtn) {
+  fsExitBtn.addEventListener('click', exitFullscreenMode);
+}
+
+let fsTimeout;
+document.addEventListener('mousemove', () => {
+  if (document.fullscreenElement || fsContainer.classList.contains('is-fullscreen')) {
+    fsContainer.style.cursor = 'default';
+    clearTimeout(fsTimeout);
+    fsTimeout = setTimeout(() => {
+      fsContainer.style.cursor = 'none';
+    }, 3000);
+  }
+});
+
+document.addEventListener('fullscreenchange', () => {
+  updateFullscreenUiState(!!document.fullscreenElement);
+});
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && fsContainer.classList.contains('is-fullscreen')) {
+    exitFullscreenMode();
   }
 });
 
@@ -4361,6 +4397,13 @@ document.addEventListener('click', (e) => {
 });
 
 function switchView(targetId) {
+  if (targetId !== 'view-timer' && (document.fullscreenElement || (typeof fsContainer !== 'undefined' && fsContainer.classList.contains('is-fullscreen')))) {
+    if (typeof exitFullscreenMode === 'function') exitFullscreenMode();
+  }
+  const fsBtn = document.getElementById('fullscreenBtn');
+  if (fsBtn) {
+    fsBtn.style.display = targetId === 'view-timer' ? '' : 'none';
+  }
   document.querySelectorAll('.sidebar-nav .nav-item, .nav-item').forEach(nav => {
     const isActive = nav.getAttribute('data-target') === targetId;
     nav.classList.toggle('active', isActive);
