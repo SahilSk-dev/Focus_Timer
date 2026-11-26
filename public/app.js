@@ -111,37 +111,83 @@ let unsubSessions = null;
 let unsubNonStudySessions = null;
 
 /* ---------- data layer & deduplication ---------- */
+function normalizeSessionTs(rawTs, fallbackDate = '', fallbackIdx = 0) {
+  let ts = Number(rawTs);
+  if (!Number.isFinite(ts) || ts <= 0) ts = 0;
+  // Normalize 10-digit epoch seconds to milliseconds
+  if (ts >= 1e9 && ts < 1e10) ts = Math.round(ts * 1000);
+  if (ts > 0) return Math.round(ts);
+
+  if (fallbackDate && /^\d{4}-\d{2}-\d{2}$/.test(fallbackDate)) {
+    const parts = fallbackDate.split('-').map(Number);
+    const noon = new Date(parts[0], parts[1] - 1, parts[2], 12, 0, 0, 0).getTime();
+    if (Number.isFinite(noon) && noon > 0) return noon + (fallbackIdx * 1000);
+  }
+  return 0;
+}
+
+function isSameSessionRecord(a, b) {
+  const tsA = Number(a.ts || a.timestamp || 0);
+  const tsB = Number(b.ts || b.timestamp || 0);
+  if (tsA > 0 && tsB > 0 && tsA === tsB) return true;
+
+  const dateA = String(a.date || '').trim();
+  const dateB = String(b.date || '').trim();
+  const subjA = String(a.subject || '').trim().toLowerCase();
+  const subjB = String(b.subject || '').trim().toLowerCase();
+  const minsA = Math.max(0, Math.round(Number(a.minutes)) || 0);
+  const minsB = Math.max(0, Math.round(Number(b.minutes)) || 0);
+
+  if (dateA !== dateB || subjA !== subjB || minsA !== minsB) return false;
+  if (tsA > 0 && tsB > 0) {
+    return Math.abs(tsA - tsB) <= 120000;
+  }
+  const wtA = String(a.workType || '').trim().toLowerCase();
+  const wtB = String(b.workType || '').trim().toLowerCase();
+  return wtA === wtB;
+}
+
 function deduplicateSessions(rawList) {
   if (!Array.isArray(rawList)) return [];
-  const map = new Map();
+  const groups = new Map();
+  const result = [];
+
   rawList.forEach(s => {
     if (!s) return;
-    const date = s.date || '';
-    const subj = (s.subject || '').trim().toLowerCase();
     const mins = Math.max(0, Math.round(Number(s.minutes)) || 0);
+    if (mins <= 0) return;
+    const coreKey = `${String(s.date || '').trim()}|${String(s.subject || '').trim().toLowerCase()}|${mins}`;
     const numTs = Number(s.ts || s.timestamp || 0);
 
-    let key;
+    // Check by exact timestamp or matching coreKey within 2-minute window
+    let matchIdx = -1;
     if (numTs > 0) {
-      // 2-minute bucket (120,000ms) to cleanly collapse any sync duplicates or skews of the same session
-      const bucket = Math.round(numTs / 120000);
-      key = `${date}|${subj}|${mins}|${bucket}`;
-    } else {
-      const work = (s.workType || '').trim().toLowerCase();
-      key = `${date}|${subj}|${mins}|${work}|${s.id || ''}`;
+      matchIdx = result.findIndex(r => Number(r.ts || r.timestamp || 0) === numTs);
     }
-
-    if (!map.has(key)) {
-      map.set(key, s);
-    } else {
-      const prev = map.get(key);
-      // Prefer record with valid numeric timestamp ID or explicit ts field
-      if ((!prev.ts && s.ts) || (s.id && !isNaN(Number(s.id)))) {
-        map.set(key, s);
+    if (matchIdx === -1 && groups.has(coreKey)) {
+      const candidates = groups.get(coreKey);
+      for (const idx of candidates) {
+        if (isSameSessionRecord(result[idx], s)) {
+          matchIdx = idx;
+          break;
+        }
       }
     }
+
+    if (matchIdx === -1) {
+      const newIdx = result.length;
+      result.push(s);
+      if (!groups.has(coreKey)) groups.set(coreKey, []);
+      groups.get(coreKey).push(newIdx);
+    } else {
+      const prev = result[matchIdx];
+      const preferCandidate = ((!prev.ts && s.ts) || (s.id && /^\d+$/.test(String(s.id)) && !/^\d+$/.test(String(prev.id || ''))));
+      const merged = preferCandidate ? { ...s } : { ...prev };
+      if (prev.isNonStudy || s.isNonStudy) merged.isNonStudy = true;
+      result[matchIdx] = merged;
+    }
   });
-  return Array.from(map.values());
+  return result;
 }
 
 async function loadAll(){
@@ -257,21 +303,43 @@ async function addSession(subjName, minutes, workType){
   }
 }
 
+async function deleteCloudDocsForSession(colName, id, ts) {
+  if (!currentUser) return;
+  const colRef = collection(db, 'users', currentUser.uid, colName);
+  if (id) {
+    await deleteDoc(doc(colRef, String(id)));
+  }
+  const numTs = Number(ts || 0);
+  if (numTs > 0) {
+    if (String(id) !== String(numTs)) {
+      try { await deleteDoc(doc(colRef, String(numTs))); } catch(_) {}
+    }
+    const qSnap = await getDocs(query(colRef, where('ts', '==', numTs)));
+    for (const d of qSnap.docs) {
+      await deleteDoc(d.ref);
+    }
+  }
+}
+
 async function deleteSession(id){
-  const isNS = nonStudySessions.some(s => s.id === id);
+  const targetNS = nonStudySessions.find(s => s.id === id);
+  const targetS = targetNS || sessions.find(s => s.id === id);
+  const isNS = !!targetNS;
+  const ts = targetS ? Number(targetS.ts || targetS.timestamp || 0) : 0;
+
   if(isNS) {
-    nonStudySessions = nonStudySessions.filter(s => s.id !== id);
+    nonStudySessions = nonStudySessions.filter(s => s.id !== id && !(ts > 0 && Number(s.ts || s.timestamp || 0) === ts));
     if (currentUser) {
-      try { await deleteDoc(doc(db, 'users', currentUser.uid, 'nonStudySessions', id)); }
+      try { await deleteCloudDocsForSession('nonStudySessions', id, ts); }
       catch(e) {
         showToast('No internet! Deleted offline.');
         localSet('st_nonstudy_sessions', nonStudySessions);
       }
     } else { localSet('st_nonstudy_sessions', nonStudySessions); }
   } else {
-    sessions = sessions.filter(s => s.id !== id);
+    sessions = sessions.filter(s => s.id !== id && !(ts > 0 && Number(s.ts || s.timestamp || 0) === ts));
     if(currentUser){
-      try { await deleteDoc(doc(db,'users',currentUser.uid,'sessions',id)); }
+      try { await deleteCloudDocsForSession('sessions', id, ts); }
       catch(e) {
         showToast('No internet! Deleted offline.');
         localSet(LS_SESSIONS, sessions);
@@ -398,8 +466,9 @@ onAuthStateChanged(auth, async (user)=>{
       for (let i = 0; i < toMigrate.length; i += 500) {
         const batch = writeBatch(db);
         toMigrate.slice(i, i + 500).forEach(s => {
-          const rec = { date: s.date, subject: s.subject, minutes: s.minutes, ts: s.ts, workType: s.workType || 'Other' };
-          batch.set(doc(collection(db, 'users', currentUser.uid, 'sessions')), rec);
+          const ts = Number(s.ts || s.timestamp) || Date.now();
+          const rec = { date: s.date, subject: s.subject, minutes: s.minutes, ts, workType: s.workType || 'Other' };
+          batch.set(doc(db, 'users', currentUser.uid, 'sessions', String(ts)), rec, { merge: true });
         });
         await batch.commit();
       }
@@ -415,8 +484,9 @@ onAuthStateChanged(auth, async (user)=>{
       for (let i = 0; i < toMigrateNS.length; i += 500) {
         const batch = writeBatch(db);
         toMigrateNS.slice(i, i + 500).forEach(s => {
-          const rec = { date: s.date, subject: s.subject, minutes: s.minutes, ts: s.ts, workType: s.workType || 'Other' };
-          batch.set(doc(collection(db, 'users', currentUser.uid, 'nonStudySessions')), rec);
+          const ts = Number(s.ts || s.timestamp) || Date.now();
+          const rec = { date: s.date, subject: s.subject, minutes: s.minutes, ts, isNonStudy: true, workType: s.workType || 'Other' };
+          batch.set(doc(db, 'users', currentUser.uid, 'nonStudySessions', String(ts)), rec, { merge: true });
         });
         await batch.commit();
       }
@@ -473,12 +543,14 @@ function renderAuthBar(){
 
   bars.forEach(bar => {
     if(currentUser){
-      const safePhoto = escapeHTML(currentUser.photoURL || '');
+      const rawPhoto = String(currentUser.photoURL || '');
+      const validPhoto = /^https?:\/\//i.test(rawPhoto) ? rawPhoto : '';
+      const safePhoto = escapeHTML(validPhoto);
       const safeName = escapeHTML(currentUser.displayName || currentUser.email || 'User');
       const safeAlt = escapeHTML((currentUser.displayName || 'User') + ' profile picture');
       bar.innerHTML = `
         <div class="userchip">
-          <img src="${safePhoto}" alt="${safeAlt}">
+          ${safePhoto ? `<img src="${safePhoto}" alt="${safeAlt}">` : ''}
           <span>${safeName}</span>
         </div>
         <button class="signout">Sign Out</button>`;
@@ -806,7 +878,7 @@ document.getElementById('modalDelete').addEventListener('click', async () => {
 
 document.getElementById('modalSave').addEventListener('click', async () => {
   const { type, oldName } = editContext;
-  const newName = sanitizeHTML(modalInput.value.trim());
+  const newName = modalInput.value.trim().slice(0, 80);
   if (!newName || newName === oldName) { closeEditModal(); return; }
 
   if (type === 'subject') {
@@ -838,6 +910,10 @@ document.getElementById('modalSave').addEventListener('click', async () => {
   renderSelectionChips();
   closeEditModal();
 });
+
+if (editModal) {
+  editModal.addEventListener('click', (e) => { if (e.target === editModal) closeEditModal(); });
+}
 
 /* ---------- Sign Out confirmation modal ---------- */
 const signOutModal = document.getElementById('signOutModal');
@@ -907,9 +983,13 @@ if (androidGuideModal) {
 }
 
 document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape' && androidGuideModal && androidGuideModal.classList.contains('show')) {
-    closeAndroidGuide();
-  }
+  if (e.key !== 'Escape') return;
+  if (androidGuideModal && androidGuideModal.classList.contains('show')) closeAndroidGuide();
+  if (signOutModal && signOutModal.classList.contains('show')) closeSignOutModal();
+  if (editModal && editModal.classList.contains('show')) closeEditModal();
+  if (addModal && addModal.classList.contains('show')) closeAddModal();
+  const badgeModal = document.getElementById('badgeDetailModal');
+  if (badgeModal && badgeModal.classList.contains('show')) badgeModal.classList.remove('show');
 });
 
 const addModal = document.getElementById('addModal');
@@ -944,10 +1024,14 @@ function openAddModal(type) {
 
 function closeAddModal() { addModal.classList.remove('show'); }
 
+if (addModal) {
+  addModal.addEventListener('click', (e) => { if (e.target === addModal) closeAddModal(); });
+}
+
 document.getElementById('addModalCancel').addEventListener('click', closeAddModal);
 
 document.getElementById('addModalSave').addEventListener('click', async () => {
-  const val = sanitizeHTML(addModalInput.value.trim());
+  const val = addModalInput.value.trim().slice(0, 80);
   if (!val) return;
   
   if (addContextType === 'subject') {
@@ -1276,18 +1360,26 @@ targetInput.addEventListener('change', async ()=>{
 });
 
 /* ---------- study session filter helper ---------- */
-function getStudySessions(){
-  const nonStudySubjs = new Set(
-    (prefs.subjects || []).filter(s => s && s.isNonStudy).map(s => s.name)
+function getNonStudySubjectNamesSet(){
+  return new Set(
+    (prefs.subjects || [])
+      .filter(s => s && s.isNonStudy && s.name)
+      .map(s => String(s.name).trim().toLowerCase())
   );
-  return sessions.filter(s => {
-    if (!s) return false;
-    if (s.isNonStudy) return false;
-    if (s.id && String(s.id).startsWith('ns')) return false;
-    const baseSubj = (s.subject || '').split(' - ')[0];
-    if (nonStudySubjs.has(s.subject) || nonStudySubjs.has(baseSubj)) return false;
-    return true;
-  });
+}
+
+function isNonStudyRecord(s, nonStudySet = getNonStudySubjectNamesSet()){
+  if (!s) return true;
+  if (s.isNonStudy) return true;
+  if (s.id && String(s.id).toLowerCase().startsWith('ns')) return true;
+  const full = String(s.subject || '').trim().toLowerCase();
+  const base = full.split(' - ')[0].trim();
+  return nonStudySet.has(full) || nonStudySet.has(base);
+}
+
+function getStudySessions(){
+  const nonStudySubjs = getNonStudySubjectNamesSet();
+  return deduplicateSessions(sessions).filter(s => s && (Number(s.minutes) || 0) > 0 && !isNonStudyRecord(s, nonStudySubjs));
 }
 
 /* ---------- daily target ---------- */
@@ -1345,7 +1437,7 @@ tabDaily.addEventListener('click', ()=>{ statsMode='daily'; tabDaily.classList.a
 tabWeekly.addEventListener('click', ()=>{ statsMode='weekly'; tabWeekly.classList.add('active'); tabDaily.classList.remove('active'); renderStats(); });
 
 function barRow(label,minutes,pct){
-  return '<div class="bar-row"><div class="bar-label">'+label+'</div>'
+  return '<div class="bar-row"><div class="bar-label">'+escapeHTML(label)+'</div>'
     + '<div class="bar-track"><div class="bar-fill" style="width:'+pct+'%"></div></div>'
     + '<div class="bar-value">'+minutes+' mins</div></div>';
 }
@@ -2450,7 +2542,7 @@ function drawPdfRadarChart(doc, cx, cy, radius, subjectEquilibrium) {
 }
 
 function computeAnalyticsReport(period) {
-  const allStudy = deduplicateSessions(sessions.filter(s => !s.isNonStudy));
+  const allStudy = getStudySessions();
   let filtered = allStudy;
   let priorSessions = [];
 
@@ -3380,8 +3472,9 @@ function renderHistory(){
   const allSess = deduplicateSessions([...sessions, ...nonStudySessions]);
   const sorted = allSess.sort((a,b)=> (b.ts||0)-(a.ts||0)).slice(0,30);
   if(sorted.length===0){ list.innerHTML='<div class="empty-note">No sessions yet</div>'; return; }
+  const nonStudySet = getNonStudySubjectNamesSet();
   list.innerHTML = sorted.map(s=>{
-    const isNS = s.isNonStudy || (s.id && String(s.id).startsWith('ns'));
+    const isNS = isNonStudyRecord(s, nonStudySet);
     const badge = isNS ? `<span style="background:var(--line); padding:2px 6px; border-radius:4px; font-size:0.7rem; display:inline-block; width:max-content;">Non-Study</span>` : '';
     const safeSubject = escapeHTML(s.subject);
     const safeWorkType = escapeHTML(s.workType || 'Other');
@@ -3614,10 +3707,15 @@ document.getElementById('exportPdfBtn').addEventListener('click', async ()=>{
 
 /* ---------- JSON Backup & Restore ---------- */
 document.getElementById('backupJsonBtn').addEventListener('click', ()=>{
+  const nonStudySet = getNonStudySubjectNamesSet();
+  const cleanStudy = deduplicateSessions(sessions).filter(s => !isNonStudyRecord(s, nonStudySet));
+  const leakedNS = deduplicateSessions(sessions).filter(s => isNonStudyRecord(s, nonStudySet)).map(s => ({ ...s, isNonStudy: true }));
+  const cleanNS = deduplicateSessions([...nonStudySessions, ...leakedNS]).map(s => ({ ...s, isNonStudy: true }));
+
   const backupData = {
     timestamp: Date.now(),
-    sessions,
-    nonStudySessions,
+    sessions: cleanStudy,
+    nonStudySessions: cleanNS,
     settings: {
       dailyTargetMinutes: (typeof prefs !== 'undefined' && prefs.dailyTarget) ? prefs.dailyTarget : 120
     },
@@ -3653,7 +3751,7 @@ document.getElementById('restoreFileInput').addEventListener('change', (e)=>{
       // Restore settings & examGoal if present in backup
       if (data.settings && (data.settings.dailyTargetMinutes || data.settings.dailyTarget)) {
         const tVal = Number(data.settings.dailyTargetMinutes || data.settings.dailyTarget);
-        if (tVal > 0) {
+        if (tVal >= 10) {
           prefs.dailyTarget = tVal;
           const targetInput = document.getElementById('targetInput');
           if (targetInput) targetInput.value = tVal;
@@ -3663,69 +3761,80 @@ document.getElementById('restoreFileInput').addEventListener('change', (e)=>{
       if (data.examGoal && typeof data.examGoal === 'object' && typeof saveExamGoal === 'function') {
         saveExamGoal(data.examGoal);
       }
-      
+
+      // Heal existing in-memory arrays before merging
+      sessions = deduplicateSessions(sessions);
+      nonStudySessions = deduplicateSessions(nonStudySessions);
+      const nonStudySet = getNonStudySubjectNamesSet();
+
       let newSessCount = 0;
       let newNonStudyCount = 0;
       const toWriteNS = [];
       const toWriteS = [];
 
-      const rawNonStudy = Array.isArray(data.nonStudySessions) ? data.nonStudySessions : [];
-      for (const nsRaw of rawNonStudy) {
-        if (!nsRaw || !nsRaw.date || !nsRaw.subject) continue;
-        const ts = Number(nsRaw.ts || nsRaw.timestamp) || Date.now();
-        const nsId = String(nsRaw.id || ('ns_' + ts));
-        const ns = {
-          id: nsId,
+      function ingestRecord(raw, defaultIsNS, idx) {
+        if (!raw || !raw.date || !raw.subject) return;
+        const mins = Math.max(0, Math.min(1440, Math.round(Number(raw.minutes)) || 0));
+        if (mins <= 0) return;
+
+        const dateStr = String(raw.date).trim().slice(0, 32);
+        const subjStr = String(raw.subject).trim().slice(0, 120);
+        if (!dateStr || !subjStr) return;
+
+        const ts = normalizeSessionTs(raw.ts ?? raw.timestamp, dateStr, idx);
+        const workTypeStr = String(raw.workType || 'Other').trim().slice(0, 100) || 'Other';
+        const rawId = String(raw.id || '').trim();
+        const isNS = (typeof raw.isNonStudy === 'boolean' ? raw.isNonStudy : defaultIsNS)
+          || rawId.toLowerCase().startsWith('ns')
+          || isNonStudyRecord({ subject: subjStr, id: rawId, isNonStudy: defaultIsNS }, nonStudySet);
+
+        const docId = ts > 0 ? String(ts) : (isNS ? `ns_${dateStr}_${idx}` : `s_${dateStr}_${idx}`);
+        const rec = {
+          id: docId,
           ts,
-          date: String(nsRaw.date).slice(0, 32),
-          subject: String(nsRaw.subject).slice(0, 100),
-          workType: String(nsRaw.workType || 'Other').slice(0, 100),
-          minutes: Math.max(0, Math.min(1440, Math.round(Number(nsRaw.minutes)) || 0)),
-          isNonStudy: true
+          date: dateStr,
+          subject: subjStr,
+          workType: workTypeStr,
+          minutes: mins
         };
-        if (ns.minutes <= 0) continue;
-        const isDuplicate = nonStudySessions.some(s => (s.ts && ns.ts && s.ts === ns.ts) || (s.id && ns.id && s.id === ns.id && (s.id.startsWith('ns_') || s.id.startsWith('s_'))));
-        if (!isDuplicate) {
-          nonStudySessions.push(ns);
+        if (raw.subSubject && String(raw.subSubject).trim()) {
+          rec.subSubject = String(raw.subSubject).trim().slice(0, 120);
+        }
+        if (isNS) rec.isNonStudy = true;
+
+        const alreadyExists = sessions.some(curr => isSameSessionRecord(curr, rec))
+          || nonStudySessions.some(curr => isSameSessionRecord(curr, rec));
+        if (alreadyExists) return;
+
+        if (isNS) {
+          nonStudySessions.push(rec);
           newNonStudyCount++;
-          toWriteNS.push(ns);
+          toWriteNS.push(rec);
+        } else {
+          sessions.push(rec);
+          newSessCount++;
+          toWriteS.push(rec);
         }
       }
 
+      const rawNonStudy = Array.isArray(data.nonStudySessions) ? data.nonStudySessions : [];
+      rawNonStudy.forEach((nsRaw, i) => ingestRecord(nsRaw, true, i + 10000));
+
       const rawSessions = Array.isArray(data.sessions) ? data.sessions : [];
-      for (const sRaw of rawSessions) {
-        if (!sRaw || !sRaw.date || !sRaw.subject) continue;
-        const ts = Number(sRaw.ts || sRaw.timestamp) || Date.now();
-        const sId = String(sRaw.id || ('s_' + ts));
-        const s = {
-          id: sId,
-          ts,
-          date: String(sRaw.date).slice(0, 32),
-          subject: String(sRaw.subject).slice(0, 100),
-          workType: String(sRaw.workType || 'Other').slice(0, 100),
-          minutes: Math.max(0, Math.min(1440, Math.round(Number(sRaw.minutes)) || 0))
-        };
-        if (s.minutes <= 0) continue;
-        const isDuplicate = sessions.some(curr => (curr.ts && s.ts && curr.ts === s.ts) || (curr.id && s.id && curr.id === s.id && (curr.id.startsWith('s_') || curr.id.startsWith('ns_'))));
-        if (!isDuplicate) {
-          sessions.push(s);
-          newSessCount++;
-          toWriteS.push(s);
-        }
-      }
+      rawSessions.forEach((sRaw, i) => ingestRecord(sRaw, false, i));
 
       if (currentUser) {
         for (let i = 0; i < toWriteNS.length; i += 500) {
           const batch = writeBatch(db);
           toWriteNS.slice(i, i + 500).forEach(ns => {
-            batch.set(doc(db, 'users', currentUser.uid, 'nonStudySessions', ns.id), ns);
+            batch.set(doc(db, 'users', currentUser.uid, 'nonStudySessions', ns.id), ns, { merge: true });
           });
           await batch.commit();
         }
         for (let i = 0; i < toWriteS.length; i += 500) {
           const batch = writeBatch(db);
           toWriteS.slice(i, i + 500).forEach(s => {
-            batch.set(doc(db, 'users', currentUser.uid, 'sessions', s.id), s);
+            batch.set(doc(db, 'users', currentUser.uid, 'sessions', s.id), s, { merge: true });
           });
           await batch.commit();
         }
@@ -3733,8 +3842,12 @@ document.getElementById('restoreFileInput').addEventListener('change', (e)=>{
         localSet('st_nonstudy_sessions', nonStudySessions);
         localSet(LS_SESSIONS, sessions);
       }
-      await refreshEverything();
-      showToast(`Restore successful: ${newSessCount} study, ${newNonStudyCount} non-study added!`);
+      await refreshEverything(true);
+      if (newSessCount === 0 && newNonStudyCount === 0) {
+        showToast('Backup checked: all sessions already exist');
+      } else {
+        showToast(`Restore successful: ${newSessCount} study, ${newNonStudyCount} non-study added!`);
+      }
     } catch(err) {
       console.error(err); showToast('Error reading backup file');
     }
@@ -4034,18 +4147,15 @@ document.getElementById('bulkDeleteBtn').addEventListener('click', async () => {
   if(confirm(`Are you sure you want to delete ${toDelete.length} sessions from ${fromDate} to ${toDate}? This cannot be undone!`)) {
     if (currentUser) {
       try {
-        for (let i = 0; i < toDelete.length; i += 500) {
-          const batch = writeBatch(db);
-          const chunk = toDelete.slice(i, i + 500);
-          chunk.forEach(s => {
-            const isNS = s.isNonStudy || (s.id && String(s.id).startsWith('ns'));
-            const colName = isNS ? 'nonStudySessions' : 'sessions';
-            batch.delete(doc(db, 'users', currentUser.uid, colName, s.id));
-          });
-          await batch.commit();
+        for (const s of toDelete) {
+          const isNS = isNonStudyRecord(s);
+          const colName = isNS ? 'nonStudySessions' : 'sessions';
+          await deleteCloudDocsForSession(colName, s.id, s.ts || s.timestamp);
         }
-        sessions = sessions.filter(s => !toDelete.some(d => d.id === s.id));
-        nonStudySessions = nonStudySessions.filter(s => !toDelete.some(d => d.id === s.id));
+        const delIds = new Set(toDelete.map(d => d.id));
+        const delTs = new Set(toDelete.map(d => Number(d.ts || d.timestamp || 0)).filter(t => t > 0));
+        sessions = sessions.filter(s => !delIds.has(s.id) && !delTs.has(Number(s.ts || s.timestamp || 0)));
+        nonStudySessions = nonStudySessions.filter(s => !delIds.has(s.id) && !delTs.has(Number(s.ts || s.timestamp || 0)));
       } catch(err) {
         console.error(err);
         showToast('Failed to delete!');
@@ -4091,22 +4201,24 @@ function triggerConfetti() {
   }
 }
 
-// Intercept renderTarget to trigger confetti when reaching target
+// Intercept renderTarget to trigger confetti when reaching target (only after initial load)
 const oldRenderTarget = renderTarget;
 renderTarget = function() {
   const today = todayStr();
-  const prevDone = parseInt(document.getElementById('targetDone').getAttribute('data-prev') || '0');
+  const targetDoneEl = document.getElementById('targetDone');
+  const prevRaw = targetDoneEl ? targetDoneEl.getAttribute('data-prev') : null;
+  const prevDone = prevRaw !== null ? parseInt(prevRaw, 10) : null;
   oldRenderTarget();
-  const done = sessions.filter(s=>s.date===today).reduce((a,s)=>a+s.minutes,0);
-  document.getElementById('targetDone').setAttribute('data-prev', done);
-  
-  if (prevDone < prefs.dailyTarget && done >= prefs.dailyTarget) {
+  const done = getStudySessions().filter(s => s.date === today).reduce((a, s) => a + s.minutes, 0);
+  if (targetDoneEl) targetDoneEl.setAttribute('data-prev', done);
+
+  if (prevDone !== null && prevDone < prefs.dailyTarget && done >= prefs.dailyTarget) {
     triggerConfetti();
     showToast('🎉 Daily target achieved! Great job!');
   }
 };
 
-// 7-Day Subject Analytics Logic (Groups by main subject)
+// 7-Day Subject Analytics Logic (Groups by main subject, strictly study-only & deduplicated)
 function renderSubjectAnalytics() {
   const listContainer = document.getElementById('subjectRankingList');
   if(!listContainer) return;
@@ -4115,7 +4227,7 @@ function renderSubjectAnalytics() {
   d.setDate(d.getDate() - 7);
   const sevenDaysAgoStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 
-  const recentSessions = sessions.filter(s => s.date >= sevenDaysAgoStr);
+  const recentSessions = getStudySessions().filter(s => s.date >= sevenDaysAgoStr);
   
   const subjMap = {};
   recentSessions.forEach(s => {

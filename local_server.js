@@ -3,6 +3,7 @@ const path = require('path');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+app.disable('x-powered-by');
 
 // Security & Content-Security-Policy headers
 app.use((req, res, next) => {
@@ -17,9 +18,14 @@ app.use((req, res, next) => {
     "img-src 'self' data: blob: https:; " +
     "connect-src 'self' https://firestore.googleapis.com https://*.firebaseio.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://www.googleapis.com https://accounts.google.com https://translate.googleapis.com https://cdnjs.cloudflare.com https://www.gstatic.com https://fonts.googleapis.com https://fonts.gstatic.com wss://*.firebaseio.com; " +
     "font-src 'self' data: https://fonts.gstatic.com https://fonts.googleapis.com; " +
-    "frame-ancestors 'self'; " +
+    "frame-src 'self' https://sahil-workspace-ab8af.firebaseapp.com https://accounts.google.com; " +
+    "object-src 'none'; " +
+    "frame-ancestors 'none'; " +
     "base-uri 'self'; form-action 'self'"
   );
+  if (req.path === '/sw.js' || req.path === '/' || req.path === '/index.html') {
+    res.setHeader('Cache-Control', 'no-cache');
+  }
   next();
 });
 

@@ -17,6 +17,9 @@ interface StudyDao {
     @Query("SELECT * FROM study_sessions ORDER BY timestamp DESC")
     fun getAllSessions(): Flow<List<StudySessionEntity>>
 
+    @Query("SELECT * FROM study_sessions ORDER BY id ASC")
+    suspend fun getAllSessionsOrderByIdAsc(): List<StudySessionEntity>
+
     @Query("SELECT * FROM study_sessions WHERE date = :date ORDER BY timestamp DESC")
     fun getSessionsForDate(date: String): Flow<List<StudySessionEntity>>
 
@@ -43,6 +46,9 @@ interface StudyDao {
 
     @Query("DELETE FROM study_sessions WHERE id = :id")
     suspend fun deleteSessionById(id: Long)
+
+    @Query("DELETE FROM study_sessions WHERE id IN (:ids)")
+    suspend fun deleteSessionsByIds(ids: List<Long>): Int
 
     @Query("DELETE FROM study_sessions WHERE timestamp = :timestamp")
     suspend fun deleteSessionByTimestamp(timestamp: Long): Int
@@ -84,6 +90,9 @@ interface StudyDao {
     // Work Types
     @Query("SELECT * FROM work_types ORDER BY id ASC")
     fun getAllWorkTypes(): Flow<List<WorkTypeEntity>>
+
+    @Query("SELECT * FROM work_types WHERE name = :name LIMIT 1")
+    suspend fun getWorkTypeByName(name: String): WorkTypeEntity?
 
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertWorkType(workType: WorkTypeEntity): Long

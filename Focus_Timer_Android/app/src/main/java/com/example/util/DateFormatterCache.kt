@@ -17,18 +17,8 @@ object DateFormatterCache {
         SimpleDateFormat("h:mm a", Locale.US)
     }
 
-    @Volatile
-    private var cachedTodayDate: String = ""
-    @Volatile
-    private var cachedTodayEpochDay: Long = -1
-
     fun getTodayString(): String {
-        val currentDay = System.currentTimeMillis() / (24 * 60 * 60 * 1000L)
-        if (currentDay != cachedTodayEpochDay || cachedTodayDate.isEmpty()) {
-            cachedTodayDate = isoDateFormatter.get()?.format(Date()) ?: "2026-01-01"
-            cachedTodayEpochDay = currentDay
-        }
-        return cachedTodayDate
+        return isoDateFormatter.get()?.format(Date()) ?: "2026-01-01"
     }
 
     fun formatIsoDate(timestamp: Long): String {

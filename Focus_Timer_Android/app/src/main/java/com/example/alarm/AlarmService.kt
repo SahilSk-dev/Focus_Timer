@@ -41,10 +41,14 @@ class AlarmService : Service() {
         val isAlarmRinging = _isAlarmRinging.asStateFlow()
 
         fun stop(context: Context) {
-            val intent = Intent(context, AlarmService::class.java).apply {
-                action = ACTION_STOP_ALARM
+            try {
+                val intent = Intent(context, AlarmService::class.java).apply {
+                    action = ACTION_STOP_ALARM
+                }
+                context.startService(intent)
+            } catch (_: Exception) {
+                _isAlarmRinging.value = false
             }
-            context.startService(intent)
         }
 
         fun startTracking(context: Context, title: String, timeText: String) {

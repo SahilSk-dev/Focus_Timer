@@ -316,7 +316,22 @@ class FocusViewModel(application: Application) : AndroidViewModel(application) {
                 if (left <= 0) {
                     _remainingSeconds.value = 0L
                     _isRunning.value = false
-                    onTimerFinished()
+                    if (now - endTs > 5 * 60 * 1000L) {
+                        // Timer expired more than 5 minutes ago while app was closed: save quietly without blasting an alarm
+                        _isTimerActive.value = false
+                        repository.clearRunningTimerState()
+                        val mins = if (isPomo) {
+                            if (pomoPhaseSaved == "work") 25 else 0
+                        } else {
+                            (totalSec / 60).toInt()
+                        }
+                        if (mins >= 1) {
+                            saveSession(mins)
+                        }
+                        if (isPomo) _pomoPhase.value = if (pomoPhaseSaved == "work") "break" else "work"
+                    } else {
+                        onTimerFinished()
+                    }
                 } else {
                     _remainingSeconds.value = left
                     _isRunning.value = true
@@ -692,8 +707,10 @@ class FocusViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun checkDailyTargetAchievement(addedMinutes: Int) {
         val today = FocusRepository.getTodayString()
-        val currentTotal = allSessions.value
-            .filter { it.date == today && !it.isNonStudy }
+        val subjects = allSubjects.value
+        val currentTotal = com.example.data.local.SessionDeduplicator
+            .deduplicateList(allSessions.value)
+            .filter { it.date == today && !com.example.data.local.SessionDeduplicator.isNonStudySession(it, subjects) }
             .sumOf { it.minutes }
         val prevTotal = currentTotal - addedMinutes
         val target = _dailyTargetMinutes.value

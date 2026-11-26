@@ -2,15 +2,21 @@ package com.example.data.repository
 
 import android.content.Context
 import android.content.SharedPreferences
+import com.example.data.local.SessionDeduplicator
+import com.example.data.local.SessionSyncLock
 import com.example.data.local.StudyDao
 import com.example.data.model.StudySessionEntity
 import com.example.data.model.SubjectEntity
 import com.example.data.model.WorkTypeEntity
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
 import java.text.SimpleDateFormat
+import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 
@@ -122,30 +128,47 @@ class FocusRepository(
     fun getSavedTimerRemainingSec(): Long = prefs.getLong("timer_remaining_sec", 0L)
 
     suspend fun addSession(session: StudySessionEntity): Long {
-        val id = studyDao.insertSession(session)
+        val id = SessionSyncLock.mutex.withLock {
+            val existing = studyDao.getAllSessionsOrderByIdAsc()
+                .firstOrNull { SessionDeduplicator.isDuplicateOf(it, session) }
+            if (existing != null && session.id == 0L) {
+                existing.id
+            } else {
+                studyDao.insertSession(session)
+            }
+        }
         syncManager.uploadSession(session)
         return id
     }
 
     suspend fun updateSession(session: StudySessionEntity, previousIsNonStudy: Boolean? = null) {
-        studyDao.updateSession(session)
+        SessionSyncLock.mutex.withLock {
+            studyDao.updateSession(session)
+        }
         syncManager.uploadSession(session, previousIsNonStudy)
     }
 
     suspend fun deleteSession(id: Long) {
-        val session = studyDao.getSessionById(id)
+        val session = SessionSyncLock.mutex.withLock {
+            val found = studyDao.getSessionById(id)
+            studyDao.deleteSessionById(id)
+            found
+        }
         if (session != null) {
             syncManager.deleteSessionFromCloud(session.timestamp, session.isNonStudy)
         }
-        studyDao.deleteSessionById(id)
     }
 
     suspend fun deleteSessionsBetweenDates(fromDate: String, toDate: String): Int {
-        val sessions = studyDao.getSessionsBetweenDates(fromDate, toDate)
+        val (sessions, count) = SessionSyncLock.mutex.withLock {
+            val list = studyDao.getSessionsBetweenDates(fromDate, toDate)
+            val deleted = studyDao.deleteSessionsBetweenDates(fromDate, toDate)
+            list to deleted
+        }
         if (sessions.isNotEmpty()) {
             syncManager.bulkDeleteSessionsFromCloud(sessions.map { it.timestamp })
         }
-        return studyDao.deleteSessionsBetweenDates(fromDate, toDate)
+        return count
     }
 
     suspend fun addSubject(subject: SubjectEntity): Long {
@@ -213,27 +236,28 @@ class FocusRepository(
         val studyArray = JSONArray()
         val nonStudyArray = JSONArray()
 
-        for (s in sessions) {
+        val deduplicated = SessionDeduplicator.deduplicateList(sessions)
+
+        for (s in deduplicated) {
             val obj = JSONObject()
-            val idStr = if (s.id > 0) s.id.toString() else "s_${s.timestamp}"
+            val prefix = if (s.isNonStudy) "ns_" else "s_"
+            val idStr = "$prefix${s.timestamp}"
             val workTypeStr = if (s.workType.isBlank()) "N/A" else s.workType
 
+            obj.put("id", idStr)
+            obj.put("date", s.date)
+            obj.put("subject", s.subject)
+            if (!s.subSubject.isNullOrBlank()) {
+                obj.put("subSubject", s.subSubject)
+            }
+            obj.put("workType", workTypeStr)
+            obj.put("minutes", s.minutes)
+            obj.put("ts", s.timestamp)
+
             if (s.isNonStudy) {
-                obj.put("id", idStr)
-                obj.put("workType", workTypeStr)
-                obj.put("ts", s.timestamp)
-                obj.put("minutes", s.minutes)
-                obj.put("subject", s.subject)
-                obj.put("date", s.date)
                 obj.put("isNonStudy", true)
                 nonStudyArray.put(obj)
             } else {
-                obj.put("id", idStr)
-                obj.put("date", s.date)
-                obj.put("workType", workTypeStr)
-                obj.put("minutes", s.minutes)
-                obj.put("subject", s.subject)
-                obj.put("ts", s.timestamp)
                 studyArray.put(obj)
             }
         }
@@ -259,27 +283,64 @@ class FocusRepository(
         return root.toString(2)
     }
 
-    suspend fun importFromJson(jsonString: String): ImportResult {
+    private fun parseTimestampFromJson(obj: JSONObject, fallbackDate: String, itemIndex: Int): Long {
+        val rawStr = when {
+            obj.has("ts") && !obj.isNull("ts") -> obj.opt("ts")?.toString()?.trim()
+            obj.has("timestamp") && !obj.isNull("timestamp") -> obj.opt("timestamp")?.toString()?.trim()
+            else -> null
+        }
+        val parsedDouble = rawStr?.toDoubleOrNull()
+        var ts = if (parsedDouble != null && parsedDouble > 0.0 && !parsedDouble.isNaN() && !parsedDouble.isInfinite()) {
+            parsedDouble.toLong()
+        } else {
+            0L
+        }
+        // Normalize 10-digit epoch seconds to milliseconds
+        if (ts in 1_000_000_000L..9_999_999_999L) {
+            ts *= 1000L
+        }
+        if (ts > 0L) return ts
+
+        // Deterministic fallback for legacy exports missing ts so re-imports never generate new duplicates
+        val parsedDate = com.example.util.DateFormatterCache.parseIsoDate(fallbackDate)
+        val baseMillis = if (parsedDate != null) {
+            val cal = Calendar.getInstance().apply {
+                time = parsedDate
+                set(Calendar.HOUR_OF_DAY, 12)
+                set(Calendar.MINUTE, 0)
+                set(Calendar.SECOND, 0)
+                set(Calendar.MILLISECOND, 0)
+            }
+            cal.timeInMillis
+        } else {
+            0L
+        }
+        return if (baseMillis > 0L) baseMillis + (itemIndex * 1000L) else 0L
+    }
+
+    suspend fun importFromJson(jsonString: String): ImportResult = withContext(Dispatchers.IO) {
         val root = JSONObject(jsonString)
         val studyArray = root.optJSONArray("sessions")
         val nonStudyArray = root.optJSONArray("nonStudySessions")
 
-        if (studyArray == null && nonStudyArray == null) return ImportResult(0, 0)
+        if (studyArray == null && nonStudyArray == null) return@withContext ImportResult(0, 0)
 
         // Restore settings if present
-        if (root.has("settings")) {
+        if (root.has("settings") && !root.isNull("settings")) {
             val sObj = root.optJSONObject("settings")
             if (sObj != null) {
-                if (sObj.has("dailyTargetMinutes")) {
-                    dailyTargetMinutes = sObj.optInt("dailyTargetMinutes", dailyTargetMinutes)
-                } else if (sObj.has("dailyTarget")) {
-                    dailyTargetMinutes = sObj.optInt("dailyTarget", dailyTargetMinutes)
+                if (sObj.has("dailyTargetMinutes") && !sObj.isNull("dailyTargetMinutes")) {
+                    val t = sObj.optInt("dailyTargetMinutes", dailyTargetMinutes)
+                    if (t >= 10) dailyTargetMinutes = t
+                } else if (sObj.has("dailyTarget") && !sObj.isNull("dailyTarget")) {
+                    val t = sObj.optInt("dailyTarget", dailyTargetMinutes)
+                    if (t >= 10) dailyTargetMinutes = t
                 }
             }
         }
 
         // Restore examGoal if present
-        if (root.has("examGoal")) {
+        if (root.has("examGoal") && !root.isNull("examGoal")) {
             val gObj = root.optJSONObject("examGoal")
             if (gObj != null) {
                 val name = gObj.optString("examName", "Target Exam / Syllabus")
@@ -297,36 +358,49 @@ class FocusRepository(
             }
         }
 
-        val existingSessions = studyDao.getAllSessions().first()
-        val existingTsSet = existingSessions.map { it.timestamp }.toSet()
         val list = mutableListOf<StudySessionEntity>()
         var studyCount = 0
         var nonStudyCount = 0
 
-        fun parseSession(obj: JSONObject, defaultIsNonStudy: Boolean) {
-            val ts = if (obj.has("ts")) obj.optLong("ts")
-                     else if (obj.has("timestamp")) obj.optLong("timestamp")
-                     else System.currentTimeMillis()
+        SessionSyncLock.mutex.withLock {
+            // Heal any historical duplicates in Room before merging new sessions
+            SessionDeduplicator.deduplicateStoredSessions(studyDao)
 
-            // Check for deduplication
-            if (existingTsSet.contains(ts) || list.any { it.timestamp == ts }) {
-                return
-            }
+            val existingSessions = studyDao.getAllSessionsOrderByIdAsc()
+            val allSubjects = studyDao.getAllSubjects().first()
+            val nonStudyNamesLower = allSubjects
+                .filter { it.isNonStudy }
+                .map { SessionDeduplicator.normalizeSubjectKey(it.name) }
+                .toSet()
 
-            val subject = obj.optString("subject", "").trim()
-            if (subject.isBlank()) return
+            fun parseSession(obj: JSONObject, defaultIsNonStudy: Boolean, idx: Int) {
+                val subject = obj.optString("subject", "").trim().take(120)
+                if (subject.isBlank()) return
 
-            val minutes = obj.optInt("minutes", 0)
-            if (minutes <= 0) return
+                val minutes = obj.optInt("minutes", 0).coerceAtMost(1440)
+                if (minutes <= 0) return
 
-            val sub = obj.optString("subSubject", "").trim()
-            val workType = obj.optString("workType", "N/A").trim()
-            val date = obj.optString("date", getTodayString()).trim()
-            val isNonStudy = if (obj.has("isNonStudy")) obj.optBoolean("isNonStudy", defaultIsNonStudy) else defaultIsNonStudy
+                val rawDate = obj.optString("date", "").trim().take(32)
+                val date = if (rawDate.isBlank()) getTodayString() else rawDate
+                val ts = parseTimestampFromJson(obj, date, idx)
 
-            list.add(
-                StudySessionEntity(
-                    date = if (date.isBlank()) getTodayString() else date,
+                val sub = obj.optString("subSubject", "").trim().take(120)
+                val workType = obj.optString("workType", "N/A").trim().take(100)
+                val idStr = obj.optString("id", "").trim()
+                val explicitNS = if (obj.has("isNonStudy") && !obj.isNull("isNonStudy")) {
+                    obj.optBoolean("isNonStudy", defaultIsNonStudy)
+                } else {
+                    defaultIsNonStudy
+                }
+                val subjLower = SessionDeduplicator.normalizeSubjectKey(subject)
+                val baseSubjLower = SessionDeduplicator.normalizeSubjectKey(subject.substringBefore(" - "))
+                val isNonStudy = explicitNS ||
+                    idStr.startsWith("ns", ignoreCase = true) ||
+                    nonStudyNamesLower.contains(subjLower) ||
+                    nonStudyNamesLower.contains(baseSubjLower)
+
+                val candidate = StudySessionEntity(
+                    date = date,
                     subject = subject,
                     subSubject = if (sub.isNotBlank()) sub else null,
                     workType = if (workType.isBlank()) "N/A" else workType,
@@ -334,35 +408,40 @@ class FocusRepository(
                     timestamp = ts,
                     isNonStudy = isNonStudy
                 )
-            )
 
-            if (isNonStudy) {
-                nonStudyCount++
-            } else {
-                studyCount++
+                val isDuplicate = existingSessions.any { SessionDeduplicator.isDuplicateOf(it, candidate) } ||
+                    list.any { SessionDeduplicator.isDuplicateOf(it, candidate) }
+                if (isDuplicate) return
+
+                list.add(candidate)
+                if (isNonStudy) nonStudyCount++ else studyCount++
             }
-        }
 
-        if (studyArray != null) {
-            for (i in 0 until studyArray.length()) {
-                val obj = studyArray.getJSONObject(i)
-                parseSession(obj, defaultIsNonStudy = false)
+            if (studyArray != null) {
+                for (i in 0 until studyArray.length()) {
+                    val obj = studyArray.optJSONObject(i) ?: continue
+                    parseSession(obj, defaultIsNonStudy = false, idx = i)
+                }
             }
-        }
 
-        if (nonStudyArray != null) {
-            for (i in 0 until nonStudyArray.length()) {
-                val obj = nonStudyArray.getJSONObject(i)
-                parseSession(obj, defaultIsNonStudy = true)
+            if (nonStudyArray != null) {
+                for (i in 0 until nonStudyArray.length()) {
+                    val obj = nonStudyArray.optJSONObject(i) ?: continue
+                    parseSession(obj, defaultIsNonStudy = true, idx = i + 10000)
+                }
+            }
+
+            if (list.isNotEmpty()) {
+                studyDao.insertSessions(list)
+                SessionDeduplicator.deduplicateStoredSessions(studyDao)
             }
         }
 
         if (list.isNotEmpty()) {
-            studyDao.insertSessions(list)
-            // Sync restored sessions to Firestore if user is authenticated
+            // Sync restored sessions to Firestore after local Room commit
             syncManager.uploadRestoredSessionsToCloud(list)
         }
-        return ImportResult(studyCount, nonStudyCount)
+        ImportResult(studyCount, nonStudyCount)
     }
 
     companion object {

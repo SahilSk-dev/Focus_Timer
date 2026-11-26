@@ -10,10 +10,13 @@ import androidx.credentials.GetCredentialRequest
 import androidx.credentials.exceptions.GetCredentialCancellationException
 import androidx.credentials.exceptions.GetCredentialException
 import androidx.credentials.exceptions.NoCredentialException
+import com.example.data.local.SessionDeduplicator
+import com.example.data.local.SessionSyncLock
 import com.example.data.local.StudyDao
 import com.example.data.model.StudySessionEntity
 import com.example.data.model.SubjectEntity
 import com.example.data.model.WorkTypeEntity
+import kotlinx.coroutines.sync.withLock
 import com.google.android.libraries.identity.googleid.GetGoogleIdOption
 import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
@@ -379,9 +382,24 @@ class FirebaseSyncManager(
             val sessionsCol = fs.collection("users").document(user.uid).collection("sessions")
             val nonStudyCol = fs.collection("users").document(user.uid).collection("nonStudySessions")
 
-            for (ts in timestamps) {
-                sessionsCol.document(ts.toString()).delete()
-                nonStudyCol.document(ts.toString()).delete()
+            val distinctTs = timestamps.distinct()
+            val refsToDelete = mutableListOf<com.google.firebase.firestore.DocumentReference>()
+            for (ts in distinctTs) {
+                refsToDelete.add(sessionsCol.document(ts.toString()))
+                refsToDelete.add(nonStudyCol.document(ts.toString()))
+                try {
+                    sessionsCol.whereEqualTo("ts", ts).get().await().documents.forEach {
+                        refsToDelete.add(it.reference)
+                    }
+                    nonStudyCol.whereEqualTo("ts", ts).get().await().documents.forEach {
+                        refsToDelete.add(it.reference)
+                    }
+                } catch (_: Exception) {}
+            }
+            refsToDelete.distinctBy { it.path }.chunked(400).forEach { chunk ->
+                val batch = fs.batch()
+                chunk.forEach { batch.delete(it) }
+                batch.commit().await()
             }
         } catch (e: Exception) {
             Log.e(TAG, "Failed to bulk delete sessions: ${e.message}")
@@ -391,12 +409,13 @@ class FirebaseSyncManager(
     suspend fun uploadRestoredSessionsToCloud(sessions: List<StudySessionEntity>) {
         val user = auth?.currentUser ?: return
         val fs = firestore ?: return
-        if (sessions.isEmpty()) return
+        val cleanSessions = SessionDeduplicator.deduplicateList(sessions)
+        if (cleanSessions.isEmpty()) return
         try {
             val sessionsCol = fs.collection("users").document(user.uid).collection("sessions")
             val nonStudyCol = fs.collection("users").document(user.uid).collection("nonStudySessions")
 
-            sessions.chunked(400).forEach { chunk ->
+            cleanSessions.chunked(400).forEach { chunk ->
                 val batch = fs.batch()
                 for (s in chunk) {
                     val targetCol = if (s.isNonStudy) nonStudyCol else sessionsCol
@@ -482,12 +501,13 @@ class FirebaseSyncManager(
                 prefs.edit().putInt("daily_target_mins", cloudTarget).apply()
             }
 
-            // 2. Subjects
+            // 2. Subjects (preserve existing row id so cloud changes update in place instead of being purged by MIN(id))
             @Suppress("UNCHECKED_CAST")
             val rawSubjects = snapshot.get("subjects") as? List<Map<String, Any>>
             if (!rawSubjects.isNullOrEmpty()) {
                 val list = rawSubjects.mapNotNull { map ->
-                    val name = map["name"] as? String ?: return@mapNotNull null
+                    val name = (map["name"] as? String)?.trim() ?: return@mapNotNull null
+                    if (name.isBlank()) return@mapNotNull null
                     val isCore = map["isCore"] as? Boolean ?: false
                     val isNonStudy = map["isNonStudy"] as? Boolean ?: false
                     @Suppress("UNCHECKED_CAST")
@@ -495,7 +515,9 @@ class FirebaseSyncManager(
                         ?: (map["subSubjects"] as? List<*>)?.mapNotNull { it?.toString() }
                         ?: emptyList()
 
+                    val existingSubj = studyDao.getSubjectByName(name)
                     SubjectEntity(
+                        id = existingSubj?.id ?: 0L,
                         name = name,
                         isCore = isCore,
                         isNonStudy = isNonStudy,
@@ -512,9 +534,16 @@ class FirebaseSyncManager(
             @Suppress("UNCHECKED_CAST")
             val rawWorkTypes = snapshot.get("workTypes") as? List<*>
             if (!rawWorkTypes.isNullOrEmpty()) {
-                val wtEntities = rawWorkTypes.mapNotNull { it?.toString() }.map { WorkTypeEntity(name = it) }
-                studyDao.insertWorkTypes(wtEntities)
-                studyDao.deduplicateWorkTypes()
+                val wtEntities = rawWorkTypes.mapNotNull { it?.toString()?.trim() }
+                    .filter { it.isNotBlank() }
+                    .map { name ->
+                        val existingWt = studyDao.getWorkTypeByName(name)
+                        WorkTypeEntity(id = existingWt?.id ?: 0L, name = name)
+                    }
+                if (wtEntities.isNotEmpty()) {
+                    studyDao.insertWorkTypes(wtEntities)
+                    studyDao.deduplicateWorkTypes()
+                }
             }
 
             // 4. Exam Goal
@@ -542,7 +571,11 @@ class FirebaseSyncManager(
     private suspend fun uploadLocalSessionsToCloud(uid: String) {
         val fs = firestore ?: return
         try {
-            val localSessions = studyDao.getAllSessions().first()
+            val rawSessions = SessionSyncLock.mutex.withLock {
+                SessionDeduplicator.deduplicateStoredSessions(studyDao)
+                studyDao.getAllSessionsOrderByIdAsc()
+            }
+            val localSessions = SessionDeduplicator.deduplicateList(rawSessions)
             if (localSessions.isEmpty()) return
 
             val sessionsCol = fs.collection("users").document(uid).collection("sessions")
@@ -577,55 +610,71 @@ class FirebaseSyncManager(
     ) {
         if (changes.isEmpty()) return
         try {
-            val localSessions = studyDao.getAllSessions().first()
-            val localTsMap = localSessions.associateBy { it.timestamp }
+            SessionSyncLock.mutex.withLock {
+                val localSessions = studyDao.getAllSessionsOrderByIdAsc()
+                val sessionsToInsert = mutableListOf<StudySessionEntity>()
+                val timestampsToDelete = mutableListOf<Long>()
 
-            val sessionsToInsert = mutableListOf<StudySessionEntity>()
-            val timestampsToDelete = mutableListOf<Long>()
+                for (change in changes) {
+                    val doc = change.document
+                    val ts = doc.getLong("ts") ?: continue
 
-            for (change in changes) {
-                val doc = change.document
-                val ts = doc.getLong("ts") ?: continue
+                    when (change.type) {
+                        DocumentChange.Type.REMOVED -> {
+                            timestampsToDelete.add(ts)
+                        }
+                        DocumentChange.Type.ADDED, DocumentChange.Type.MODIFIED -> {
+                            val date = doc.getString("date") ?: ""
+                            val subject = doc.getString("subject") ?: "General"
+                            val subSubject = doc.getString("subSubject").takeIf { !it.isNullOrBlank() }
+                            val workType = doc.getString("workType") ?: "Other"
+                            val minutes = doc.getLong("minutes")?.toInt() ?: 0
+                            if (minutes <= 0) continue
 
-                when (change.type) {
-                    DocumentChange.Type.REMOVED -> {
-                        timestampsToDelete.add(ts)
-                    }
-                    DocumentChange.Type.ADDED, DocumentChange.Type.MODIFIED -> {
-                        val existing = localTsMap[ts]
-                        val date = doc.getString("date") ?: ""
-                        val subject = doc.getString("subject") ?: "General"
-                        val subSubject = doc.getString("subSubject").takeIf { !it.isNullOrBlank() }
-                        val workType = doc.getString("workType") ?: "Other"
-                        val minutes = doc.getLong("minutes")?.toInt() ?: 0
-
-                        if (existing == null || existing.minutes != minutes || existing.subject != subject || existing.workType != workType || existing.isNonStudy != isNonStudy) {
-                            sessionsToInsert.add(
-                                StudySessionEntity(
-                                    id = existing?.id ?: 0L,
-                                    date = date,
-                                    subject = subject,
-                                    subSubject = subSubject,
-                                    workType = workType,
-                                    minutes = minutes,
-                                    timestamp = ts,
-                                    isNonStudy = isNonStudy
-                                )
+                            val incoming = StudySessionEntity(
+                                id = 0L,
+                                date = date,
+                                subject = subject,
+                                subSubject = subSubject,
+                                workType = workType,
+                                minutes = minutes,
+                                timestamp = ts,
+                                isNonStudy = isNonStudy
                             )
+
+                            // Skip if another cloud doc in this same batch already represents this session
+                            if (sessionsToInsert.any { SessionDeduplicator.isDuplicateOf(it, incoming) }) {
+                                continue
+                            }
+
+                            val existing = localSessions.firstOrNull {
+                                SessionDeduplicator.isDuplicateOf(it, incoming)
+                            }
+
+                            if (existing == null ||
+                                existing.date != date ||
+                                existing.minutes != minutes ||
+                                existing.subject != subject ||
+                                existing.workType != workType ||
+                                existing.isNonStudy != isNonStudy
+                            ) {
+                                sessionsToInsert.add(incoming.copy(id = existing?.id ?: 0L))
+                            }
                         }
                     }
                 }
-            }
 
-            // Batch deletions
-            for (ts in timestampsToDelete) {
-                studyDao.deleteSessionByTimestamp(ts)
-            }
+                // Batch deletions
+                for (ts in timestampsToDelete.distinct()) {
+                    studyDao.deleteSessionByTimestamp(ts)
+                }
 
-            // Single batch insert to prevent multiple UI flow invalidations
-            if (sessionsToInsert.isNotEmpty()) {
-                studyDao.insertSessions(sessionsToInsert)
-                Log.d(TAG, "Batch synced ${sessionsToInsert.size} sessions from Cloud")
+                // Single batch insert + clean up any residual duplicates
+                if (sessionsToInsert.isNotEmpty()) {
+                    studyDao.insertSessions(sessionsToInsert)
+                    SessionDeduplicator.deduplicateStoredSessions(studyDao)
+                    Log.d(TAG, "Batch synced ${sessionsToInsert.size} sessions from Cloud")
+                }
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error processing session changes: ${e.message}")

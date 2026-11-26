@@ -93,14 +93,9 @@ fun StatsScreen(
     val context = LocalContext.current
     val allSessions by viewModel.allSessions.collectAsState()
     val allSubjects by viewModel.allSubjects.collectAsState()
-    val nonStudySubjectNames = remember(allSubjects) {
-        allSubjects.filter { it.isNonStudy }.map { it.name }.toSet()
-    }
-    val studySessions = remember(allSessions, nonStudySubjectNames) {
-        allSessions.filter { s ->
-            val baseSubj = s.subject.substringBefore(" - ")
-            !s.isNonStudy &&
-                !nonStudySubjectNames.contains(s.subject) && !nonStudySubjectNames.contains(baseSubj)
+    val studySessions = remember(allSessions, allSubjects) {
+        com.example.data.local.SessionDeduplicator.deduplicateList(allSessions).filter { s ->
+            s.minutes > 0 && !com.example.data.local.SessionDeduplicator.isNonStudySession(s, allSubjects)
         }
     }
     val dailyTarget by viewModel.dailyTargetMinutes.collectAsState()

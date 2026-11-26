@@ -140,7 +140,10 @@ fun HistorySettingsScreen(
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
 
-    val allSessions by viewModel.allSessions.collectAsState()
+    val rawSessions by viewModel.allSessions.collectAsState()
+    val allSessions = remember(rawSessions) {
+        com.example.data.local.SessionDeduplicator.deduplicateList(rawSessions)
+    }
     val subjects by viewModel.allSubjects.collectAsState()
     val workTypes by viewModel.allWorkTypes.collectAsState()
     val currentUser by viewModel.currentUser.collectAsState()
@@ -165,6 +168,7 @@ fun HistorySettingsScreen(
     var ringtoneDropdownExpanded by remember { mutableStateOf(false) }
     var jsonImportText by remember { mutableStateOf("") }
     var showImportDialog by remember { mutableStateOf(false) }
+    var isImportingJson by remember { mutableStateOf(false) }
 
     val alarmToneId by viewModel.alarmToneId.collectAsState()
     val alarmVolumeBoost by viewModel.alarmVolumeBoost.collectAsState()
@@ -213,16 +217,31 @@ fun HistorySettingsScreen(
         contract = ActivityResultContracts.GetContent()
     ) { uri: Uri? ->
         uri?.let {
+            if (isImportingJson) return@let
+            isImportingJson = true
             coroutineScope.launch {
                 try {
-                    context.contentResolver.openInputStream(it)?.use { stream ->
-                        val content = stream.bufferedReader().use { r -> r.readText() }
+                    val content = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                        context.contentResolver.openInputStream(it)?.use { stream ->
+                            stream.bufferedReader().use { r -> r.readText() }
+                        }
+                    }
+                    if (content != null) {
                         val result = viewModel.repository.importFromJson(content)
                         viewModel.reloadSettingsAndExamGoal()
-                        viewModel.showToast("Restore successful: ${result.studyCount} study, ${result.nonStudyCount} non-study added!")
+                        val msg = if (result.totalCount == 0) {
+                            "Backup checked: all sessions already exist"
+                        } else {
+                            "Restore successful: ${result.studyCount} study, ${result.nonStudyCount} non-study added!"
+                        }
+                        viewModel.showToast(msg)
+                    } else {
+                        viewModel.showToast("Import error: Unable to read selected file")
                     }
                 } catch (e: Exception) {
                     viewModel.showToast("Import error: Invalid JSON file")
+                } finally {
+                    isImportingJson = false
                 }
             }
         }
@@ -1516,19 +1535,31 @@ fun HistorySettingsScreen(
             confirmButton = {
                 Button(
                     onClick = {
-                        val mins = editMinutes.toIntOrNull() ?: s.minutes
-                        if (editSubject.isNotBlank() && mins > 0) {
-                            val updated = s.copy(
-                                subject = editSubject.trim(),
-                                subSubject = if (editSubSubject.isNotBlank()) editSubSubject.trim() else null,
-                                workType = editWorkType.trim(),
-                                minutes = mins,
-                                date = editDate.trim(),
-                                isNonStudy = editIsNonStudy
-                            )
-                            viewModel.updateSession(updated, previousIsNonStudy = s.isNonStudy)
-                            sessionToEdit = null
+                        val mins = editMinutes.toIntOrNull()
+                        val trimmedDate = editDate.trim()
+                        val dateValid = Regex("^\\d{4}-\\d{2}-\\d{2}$").matches(trimmedDate)
+                        if (editSubject.isBlank()) {
+                            viewModel.showToast("Subject name cannot be empty")
+                            return@Button
                         }
+                        if (mins == null || mins !in 1..1440) {
+                            viewModel.showToast("Duration must be between 1 and 1440 minutes")
+                            return@Button
+                        }
+                        if (!dateValid) {
+                            viewModel.showToast("Date must use YYYY-MM-DD format")
+                            return@Button
+                        }
+                        val updated = s.copy(
+                            subject = editSubject.trim(),
+                            subSubject = if (editSubSubject.isNotBlank()) editSubSubject.trim() else null,
+                            workType = editWorkType.trim().ifBlank { "Other" },
+                            minutes = mins,
+                            date = trimmedDate,
+                            isNonStudy = editIsNonStudy
+                        )
+                        viewModel.updateSession(updated, previousIsNonStudy = s.isNonStudy)
+                        sessionToEdit = null
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = GoldAccent, contentColor = BgDark)
                 ) {
@@ -1776,22 +1807,32 @@ fun HistorySettingsScreen(
             },
             confirmButton = {
                 Button(
+                    enabled = !isImportingJson && jsonImportText.isNotBlank(),
                     onClick = {
+                        if (isImportingJson) return@Button
+                        isImportingJson = true
                         coroutineScope.launch {
                             try {
                                 val result = viewModel.repository.importFromJson(jsonImportText)
                                 viewModel.reloadSettingsAndExamGoal()
-                                viewModel.showToast("Merge successful: ${result.studyCount} study, ${result.nonStudyCount} non-study added!")
+                                val msg = if (result.totalCount == 0) {
+                                    "Backup checked: all sessions already exist"
+                                } else {
+                                    "Merge successful: ${result.studyCount} study, ${result.nonStudyCount} non-study added!"
+                                }
+                                viewModel.showToast(msg)
                                 showImportDialog = false
                                 jsonImportText = ""
                             } catch (e: Exception) {
                                 viewModel.showToast("Import error: Invalid JSON")
+                            } finally {
+                                isImportingJson = false
                             }
                         }
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = GoldAccent, contentColor = BgDark)
                 ) {
-                    Text("Merge & Restore")
+                    Text(if (isImportingJson) "Importing..." else "Merge & Restore")
                 }
             },
             dismissButton = {

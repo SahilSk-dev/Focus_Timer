@@ -9,6 +9,8 @@ import com.example.data.model.StudySessionEntity
 import com.example.data.model.SubjectEntity
 import com.example.data.model.WorkTypeEntity
 
+import kotlinx.coroutines.sync.withLock
+
 @Database(
     entities = [StudySessionEntity::class, SubjectEntity::class, WorkTypeEntity::class],
     version = 3,
@@ -65,10 +67,13 @@ abstract class AppDatabase : RoomDatabase() {
                 )
             }
 
-            // Ensure duplicates are purged
+            // Ensure duplicates are purged (including any historical session duplicates)
             try {
                 dao.deduplicateSubjects()
                 dao.deduplicateWorkTypes()
+                SessionSyncLock.mutex.withLock {
+                    SessionDeduplicator.deduplicateStoredSessions(dao)
+                }
             } catch (_: Exception) {}
         }
     }
