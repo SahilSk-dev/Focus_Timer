@@ -2088,24 +2088,33 @@ body[data-theme="light"] .app-version-badge {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-top: 4px;
-  font-size: 0.72rem;
+  margin-top: 8px;
+  font-size: 0.8rem;
   color: var(--text-dim);
 }
 .target-input-wrap {
   display: inline-flex;
   align-items: center;
-  gap: 3px;
+  gap: 6px;
+  font-weight: 500;
 }
 .target-input-wrap input {
-  width: 44px;
-  padding: 2px 4px;
+  width: 68px;
+  height: 28px;
+  padding: 2px 6px;
   background: var(--panel-elevated);
-  border: 1px solid var(--line);
-  border-radius: 4px;
+  border: 1px solid var(--line-bright, rgba(255, 255, 255, 0.25));
+  border-radius: 6px;
   color: var(--text);
-  font-size: 0.75rem;
+  font-size: 0.88rem;
+  font-weight: 600;
   text-align: center;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.target-input-wrap input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-glow, rgba(255, 255, 255, 0.15));
 }
 
 /* Badges Section */
