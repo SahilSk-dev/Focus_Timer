@@ -129,14 +129,6 @@ fun FocusTimerApp(
     }
     val currentAppTheme by viewModel.currentAppTheme.collectAsState()
 
-    BackHandler(enabled = isFullscreen || drawerState.isOpen || activeSettingsSection != null) {
-        when {
-            isFullscreen -> viewModel.toggleFullscreen()
-            drawerState.isOpen -> coroutineScope.launch { drawerState.close() }
-            else -> activeSettingsSection = null
-        }
-    }
-
     val isStartupReady by viewModel.isStartupReady.collectAsState()
     val isOnboarded by viewModel.isOnboarded.collectAsState()
     val currentUser by viewModel.currentUser.collectAsState()
@@ -165,6 +157,14 @@ fun FocusTimerApp(
     val isFullscreen by viewModel.isFullscreen.collectAsState()
     val isAlarmRinging by viewModel.isAlarmRinging.collectAsState()
     val isRunning by viewModel.isRunning.collectAsState()
+
+    BackHandler(enabled = isFullscreen || drawerState.isOpen || activeSettingsSection != null) {
+        when {
+            isFullscreen -> viewModel.toggleFullscreen()
+            drawerState.isOpen -> coroutineScope.launch { drawerState.close() }
+            else -> activeSettingsSection = null
+        }
+    }
 
     // Dialog states
     var showAddSubjectDialog by remember { mutableStateOf(false) }
