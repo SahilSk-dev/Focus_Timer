@@ -467,34 +467,27 @@ function closeWelcomeGate(){
   document.body.classList.remove('welcome-open');
 }
 
-/* Popups are blocked in most mobile browsers and standalone PWAs, so those
-   environments use the redirect flow instead. */
-function shouldUseRedirectAuth(){
-  const ua = navigator.userAgent || '';
-  return /Android|iPhone|iPad|iPod|Mobile/i.test(ua)
-    || window.matchMedia('(max-width: 860px)').matches
-    || window.matchMedia('(display-mode: standalone)').matches
-    || navigator.standalone === true;
-}
-
+/* On mobile, modern browsers (Chrome/Safari/iOS/Android) block third-party cookies & storage
+   partitioning by default, which causes signInWithRedirect() to loop back without authenticating.
+   signInWithPopup() works directly inside direct user-gesture tap events without cookie partitioning failures. */
 async function signInWithGoogle(){
   try {
-    if (shouldUseRedirectAuth()) {
-      await signInWithRedirect(auth, provider);
-      return;
-    }
     await signInWithPopup(auth, provider);
   } catch (err) {
     const code = err && err.code ? String(err.code) : '';
     if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request') return;
     if (code.includes('popup-blocked') || code.includes('operation-not-supported')) {
-      try { await signInWithRedirect(auth, provider); return; }
-      catch (redirectErr) { console.error(redirectErr); }
+      try {
+        await signInWithRedirect(auth, provider);
+        return;
+      } catch (redirectErr) {
+        console.error(redirectErr);
+      }
     }
     if (code === 'auth/unauthorized-domain') {
       showToast('This domain is not authorized in Firebase Authentication settings.');
     } else {
-      showToast('Google sign-in failed. Please try again.');
+      showToast('Google sign-in failed: ' + (err.message || 'Please try again.'));
     }
     console.error(err);
   }
@@ -514,10 +507,23 @@ if (welcomeLocalBtn) {
 if (!isOnboarded()) openWelcomeGate();
 document.body.classList.remove('pre-auth');
 
-getRedirectResult(auth).catch((err) => {
-  const code = err && err.code ? String(err.code) : '';
-  if (code && code !== 'auth/no-auth-event') console.warn('Google redirect sign-in failed:', code);
-});
+getRedirectResult(auth)
+  .then((result) => {
+    if (result && result.user) {
+      currentUser = result.user;
+      markOnboarded();
+      closeWelcomeGate();
+      renderAuthBar();
+      showToast('Signed in as ' + (result.user.displayName || result.user.email || 'User'));
+    }
+  })
+  .catch((err) => {
+    const code = err && err.code ? String(err.code) : '';
+    if (code && code !== 'auth/no-auth-event') {
+      console.warn('Google redirect sign-in failed:', code, err);
+      showToast('Sign-in redirect error: ' + (err.message || code));
+    }
+  });
 
 document.getElementById('googleBtn').addEventListener('click', signInWithGoogle);
 
